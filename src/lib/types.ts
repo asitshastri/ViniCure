@@ -116,3 +116,20 @@ export type HomeContent = {
   stories: PatientStory[];
   faqs: FaqItem[];
 };
+
+export type ConsultMode = "video" | "audio" | "followup";
+
+export type FamilyMember = {
+  id: string;
+  name: string;
+  relation: string;
+  age: number;
+};
+
+export type PaymentMethod = "upi" | "card" | "netbanking";
+
+export type PaymentResult =
+  | { status: "paid"; reference: string }
+  | { status: "failed"; reason: "declined" | "bank_down" }
+  | { status: "pending" }
+  | { status: "slot_taken" };

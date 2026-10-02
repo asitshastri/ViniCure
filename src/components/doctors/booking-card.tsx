@@ -3,7 +3,7 @@ import { Clock, PhoneCall, VideoCamera, ArrowsClockwise } from "@phosphor-icons/
 import { ButtonLink } from "@/components/ui/button";
 import { formatRupees } from "@/lib/format";
 import type { DoctorProfile } from "@/lib/types";
-import { formatSlotDay, formatSlotTime } from "@/mocks/doctors";
+import { formatSlotDay, formatSlotTime } from "@/lib/data/doctors";
 
 const DAYS_SHOWN = 3;
 const TIMES_PER_DAY = 6;

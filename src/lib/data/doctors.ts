@@ -85,3 +85,5 @@ export function getDoctor(id: string): DoctorProfile | undefined {
 export function getDoctorIds(): string[] {
   return mockDoctors.map((d) => d.id);
 }
+
+export { formatSlotDay, formatSlotTime } from "@/mocks/doctors";
