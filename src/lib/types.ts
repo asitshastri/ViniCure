@@ -44,6 +44,7 @@ export type DoctorSummary = {
   id: string;
   name: string;
   specialty: string;
+  specialtySlug: string;
   qualifications: string;
   /** Medical council registration number. Shown wherever a doctor appears. */
   registrationNumber: string;
@@ -52,7 +53,37 @@ export type DoctorSummary = {
   rating: number;
   reviewCount: number;
   feePaise: number;
+  /** Short label for the next free slot, in IST. */
   nextSlot: string;
+  availableToday: boolean;
+};
+
+export type DoctorSlot = {
+  id: string;
+  /** IST calendar date, YYYY-MM-DD. */
+  date: string;
+  /** IST time, 24-hour HH:mm. */
+  time: string;
+};
+
+export type DoctorReview = {
+  id: string;
+  /** First name and initial only. */
+  author: string;
+  rating: number;
+  text: string;
+  when: string;
+};
+
+export type DoctorProfile = DoctorSummary & {
+  about: string;
+  education: string[];
+  treats: string[];
+  council: string;
+  audioFeePaise: number;
+  followUpFeePaise: number;
+  slots: DoctorSlot[];
+  reviews: DoctorReview[];
 };
 
 export type ConsultationType = {

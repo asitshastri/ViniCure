@@ -1,10 +1,4 @@
-import type {
-  ConsultationType,
-  DoctorSummary,
-  FaqItem,
-  PatientStory,
-  Specialty,
-} from "@/lib/types";
+import type { ConsultationType, FaqItem, PatientStory, Specialty } from "@/lib/types";
 
 // FAKE DATA for the UI-first phase (D-007). Names, registration numbers and stories are invented.
 
@@ -65,61 +59,6 @@ export const mockSpecialties: Specialty[] = [
     name: "Chest and breathing",
     blurb: "Asthma, long cough, breathlessness",
     icon: "lungs",
-  },
-];
-
-export const mockFeaturedDoctors: DoctorSummary[] = [
-  {
-    id: "d-1001",
-    name: "Dr. Maya Rao",
-    specialty: "General physician",
-    qualifications: "MBBS, MD (Medicine)",
-    registrationNumber: "KA/45678/2011",
-    experienceYears: 14,
-    languages: ["English", "Hindi", "Kannada"],
-    rating: 4.8,
-    reviewCount: 312,
-    feePaise: 49900,
-    nextSlot: "Today, 6:30 pm",
-  },
-  {
-    id: "d-1002",
-    name: "Dr. Arjun Nair",
-    specialty: "Cardiology",
-    qualifications: "MBBS, DM (Cardiology)",
-    registrationNumber: "KL/22910/2008",
-    experienceYears: 17,
-    languages: ["English", "Malayalam", "Hindi"],
-    rating: 4.9,
-    reviewCount: 188,
-    feePaise: 79900,
-    nextSlot: "Tomorrow, 9:00 am",
-  },
-  {
-    id: "d-1003",
-    name: "Dr. Farah Sheikh",
-    specialty: "Paediatrics",
-    qualifications: "MBBS, DCH",
-    registrationNumber: "MH/78124/2013",
-    experienceYears: 11,
-    languages: ["English", "Hindi", "Marathi"],
-    rating: 4.7,
-    reviewCount: 254,
-    feePaise: 59900,
-    nextSlot: "Today, 8:00 pm",
-  },
-  {
-    id: "d-1004",
-    name: "Dr. Kiran Patel",
-    specialty: "Dermatology",
-    qualifications: "MBBS, MD (Dermatology)",
-    registrationNumber: "GJ/31377/2012",
-    experienceYears: 12,
-    languages: ["English", "Hindi", "Gujarati"],
-    rating: 4.8,
-    reviewCount: 207,
-    feePaise: 59900,
-    nextSlot: "Tomorrow, 11:30 am",
   },
 ];
 
