@@ -125,6 +125,7 @@ Added 2026-10-02 at the human's request (D-007). Build every screen as a real Ne
 Rules for every F task:
 - Look at `../Frontend_Inspirations` and `docs/design-notes.md` first. Note which reference inspired the screen. Use our own brand: never copy a reference's logo, name, text or photos.
 - Look at the matching ViniCare page in `../vinicare-reference` for panels, fields and edge cases (log it in the Progress log).
+- Before designing or building any screen or component, invoke the `ui-ux-pro-max` and `frontend-design` skills (both are in `.claude/skills/`) and follow them. Note in the Progress log that both were used. Decisions in this file and the security rules win over a skill suggestion.
 - Run the `ui-ux-pro-max` checklist: contrast 4.5:1, visible focus, 44px touch targets, labels on inputs, reduced motion, no emoji icons, no horizontal scroll at 375px.
 - UI only. No secrets, no real patient data, no tokens in localStorage, no `dangerouslySetInnerHTML`. Mock data is fake and marked as fake. Forms validate with Zod on the client for experience only, and the server will enforce the same schemas later.
 - Responsive at 375, 768, 1024 and 1440 px, light theme first.

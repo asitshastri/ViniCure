@@ -184,6 +184,7 @@ Tests ship with the code. A new route needs an entry in the access-control matri
 
 ## Frontend
 
+- **Mandatory:** every time you make or design any frontend (page, screen, component, layout, style), use the `ui-ux-pro-max` and `frontend-design` skills first. No exceptions, including small changes and fixes.
 - CSP via `src/proxy.ts`. No `dangerouslySetInnerHTML`. Escape rendered content. Error boundaries.
 - Route guards in the UI are for experience only. The backend enforces access.
 - No secrets in client code. Load heavy SDKs (video) only where needed.
