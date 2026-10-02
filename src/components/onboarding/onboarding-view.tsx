@@ -280,10 +280,10 @@ export function OnboardingView({ initial }: { initial: DoctorApplication }) {
               ) : null}
             </div>
             <p id="submit-note" className="text-ink-muted text-sm">
-              {!docsOk
-                ? "Upload all required documents to submit."
-                : pending > 0
-                  ? "Replace the documents marked above first."
+              {pending > 0
+                ? "Replace the documents marked above first."
+                : !docsOk
+                  ? "Upload all required documents to submit."
                   : "You can edit again only if we ask for changes."}
             </p>
           </div>
