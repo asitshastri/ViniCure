@@ -6,10 +6,19 @@ type EmptyStateProps = {
   title: string;
   description: string;
   action?: ReactNode;
+  /** Pick the level that follows the heading above it, so headings never skip a level. */
+  as?: "h2" | "h3" | "h4";
   className?: string;
 };
 
-export function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
+export function EmptyState({
+  icon,
+  title,
+  description,
+  action,
+  as: Heading = "h2",
+  className,
+}: EmptyStateProps) {
   return (
     <div
       className={cn(
@@ -23,7 +32,7 @@ export function EmptyState({ icon, title, description, action, className }: Empt
       >
         {icon}
       </span>
-      <h3 className="font-display text-ink text-lg font-semibold">{title}</h3>
+      <Heading className="font-display text-ink text-lg font-semibold">{title}</Heading>
       <p className="text-ink-muted max-w-sm text-base">{description}</p>
       {action ? <div className="pt-2">{action}</div> : null}
     </div>

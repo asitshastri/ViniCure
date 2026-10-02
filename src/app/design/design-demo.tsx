@@ -402,6 +402,7 @@ export function DesignDemo() {
         </Table>
         <Pagination page={page} pageCount={12} onPageChange={setPage} />
         <EmptyState
+          as="h3"
           icon={<Stethoscope />}
           title="No appointments yet"
           description="When you book a consultation, it will show up here."

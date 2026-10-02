@@ -53,7 +53,7 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 | Phase | Name | Total | Done | In progress | Blocked |
 |---|---|---|---|---|---|
 | 0 | Bootstrap | 16 | 0 | 0 | 0 |
-| F | Frontend (UI first, mock data) | 23 | 3 | 0 | 0 |
+| F | Frontend (UI first, mock data) | 23 | 4 | 0 | 0 |
 | 1 | Platform foundations | 21 | 0 | 0 | 0 |
 | 2 | Identity and access | 16 | 0 | 0 | 0 |
 | 3 | Cloud staging | 14 | 0 | 0 | 0 |
@@ -66,7 +66,7 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 | 10 | Frontend polish | 6 | 0 | 0 | 0 |
 | 11 | Hardening and launch | 10 | 0 | 0 | 0 |
 | 12 | After launch | 8 | 0 | 0 | 0 |
-| | **Total** | **178** | **3** | **0** | **0** |
+| | **Total** | **178** | **4** | **0** | **0** |
 
 ## Current focus
 
@@ -79,6 +79,8 @@ Phase F (frontend, mock data), in order, starting with F-01. Decision D-007: the
 | Start DLT registration with an SMS provider (principal entity, sender ID, templates) | Long lead time. Blocks OTP and reminders in production. | Start now, needed by P8 | Not started |
 | Clean the reference copy: delete `node_modules`, `.next`, `.vercel`, move `.env*` out, rename old `CLAUDE.md`, set read-only (commands in the setup guide, task P0-15) | Lets Claude Code consult ViniCare without reading secrets | Before the first session | Not started |
 | Start Meta business verification and WhatsApp number | Long lead time. | Start now, needed by P8 | Not started |
+| Decide about the "agent rules" block `next dev` adds to `CLAUDE.md` (tell me keep or remove) | It rewrites a file you own each time the dev server runs. I left it uncommitted. | Any time | Not started |
+| Supply the final logo as a real transparent PNG or SVG (the "no background" file has a checkerboard baked in) | The current logo is a temporary derived copy | Before launch | Not started |
 | Confirm medical record retention: the old ViniCare backlog assumed 7 years, one source we found says at least 3 years | Sets retention rules, the erasure job and the retention matrix | Before P9-04 | Not started |
 
 ## Blockers
@@ -91,6 +93,9 @@ New tasks found while working. Claude Code appends here, the human triages them 
 
 | Date | Found during | Task | Size | Owner | Acceptance criteria | Triage |
 |---|---|---|---|---|---|---|
+| 2026-10-02 | F-04 | **[SEC]** Server-side route guard for `/patient/*`, `/doctor/*`, `/admin/*` and `/staff/*`. The Phase F layouts use a fake session and let anyone in. They must never be deployed like that. | S | C | Without a valid session of the right role, every panel route returns a redirect to sign-in or a 404, tested in the access-control matrix. Layouts read the real session. | Fold into P2-08 and P2-12. Block P3-14 (staging deploy) until done. |
+| 2026-10-02 | F-04 | Sign out is a link to `/login` in the UI shell. It must become a POST that revokes the session and clears the cookie. | S | C | Sign out revokes the session server-side (tested). | Fold into P2-10. |
+| 2026-10-02 | F-03 | `next dev` appends an "agent rules" block to `CLAUDE.md` each time it runs. | S | H | Human decides whether to keep it. If kept, commit it. If not, find the Next.js setting that stops it. | Needs you. |
 
 ---
 
@@ -130,7 +135,7 @@ Rules for every F task:
 - [x] **F-01** (S, C) Review `../Frontend_Inspirations` and the ViniCare panels. Write `docs/design-notes.md` (this is P0-16): palette, type, spacing, radius, component list, screen inventory, and which reference each idea comes from. Use the ui-ux-pro-max search for the starting point. *AC:* notes list every screen in this phase with its inspiration.
 - [x] **F-02** (M, C) Scaffold Next.js (covers P0-02 to P0-04): Node 24, pnpm through corepack, latest patched Next.js after reading the security posts, TypeScript strict, Tailwind 4, App Router, `src/` layout, route groups `(public)`, `(patient)`, `(doctor)`, `(admin)`, ESLint, Prettier, `.gitignore`, `.env.example`. *AC:* `pnpm dev`, `build`, `lint`, `typecheck` pass. Installed version in Decisions.
 - [x] **F-03** (M, C) Design tokens and primitives: colors, type (Figtree and Noto Sans), spacing, radius, shadows as CSS variables in `globals.css`. Components: Button, Input, Select, Checkbox, OTP input, Card, Badge, Avatar, Tabs, Dialog, Sheet, Toast, Tooltip, Skeleton, Table, Pagination, EmptyState. Icons from one set (Phosphor). Logo component using the files in `Frontend_Inspirations/logos` (temporary: the human will replace the logo). *AC:* a `/design` preview page (dev only) shows every component and state, including focus and disabled.
-- [ ] **F-04** (M, C) App shells: public header and footer, language switch placeholder, dashboard shell with sidebar and top bar for patient, doctor, admin and support, mobile bottom navigation (5 items at most), breadcrumbs, notification bell, skip link. *AC:* navigation works at all four widths and by keyboard.
+- [x] **F-04** (M, C) App shells: public header and footer, dashboard shell with sidebar and top bar for patient, doctor, admin and support (support console lives under `/staff/*` so it does not nest inside the admin shell), mobile bottom navigation (4 tabs plus a More sheet), breadcrumbs, page header, notification bell, account menu, skip link. The language switch is added in F-22, so no dead control is shown now. *AC:* navigation works at all four widths and by keyboard.
 
 **Public site**
 - [ ] **F-05** (L, C) Home page. Inspired by Med24 and Doccure layout ideas, our own copy and colors. Sections: hero with search for doctor or specialty, how it works in three steps, specialties grid, featured doctors, consultation types, trust strip (registration verified, encrypted records, India-based data), patient stories, app-style benefits, FAQ teaser, final call to action. *AC:* page matches the notes, Lighthouse accessibility above 90.
@@ -385,9 +390,10 @@ Newest first. One line per finished task.
 
 | Date | Task | What changed | Checks | Commit |
 |---|---|---|---|---|
-| 2026-10-02 | F-03 | Design tokens in `globals.css` (all 22 contrast pairs pass, one fixed), 20 primitives in `src/components/ui/` (button, field, choice, OTP, card, stat tile, badge, avatar, tabs, accordion, dialog and sheet, toast, tooltip, skeleton, table, pagination, empty state, stepper, logo), dev-only `/design` page. Found and fixed: tab bar stray scrollbar, OTP autofill truncation. Checked ViniCare: nothing relevant | lint pass, types pass, format pass, build pass, axe 0 violations on `/design`, keyboard checks for dialog, tabs and OTP, no sideways scroll at 375px, `/design` returns 404 in production | pending |
-| 2026-10-02 | F-02 | Scaffolded Next.js 16.3.8, TS strict, Tailwind 4, App Router in `src/`, fonts via `next/font`, ESLint (no-danger, no-any), Prettier, `.gitignore` (env files excluded), `.nvmrc`, `.env.example`, dev launch config. Covers P0-02, P0-03, P0-04. Checked ViniCare: nothing relevant | lint pass, types pass, format pass, build pass (`/` static) | pending |
-| 2026-10-02 | F-01 | Wrote `docs/design-notes.md`: palette, type, spacing, components, screen inventory with a reference for every screen. Checked ViniCare: route map and home sections used as the panel list | n/a (docs) | pending |
+| 2026-10-02 | F-04 | Public header (full nav from 1280px, menu sheet below), footer with emergency notice (112), dashboard shell (sidebar, top bar, native-popover bell and account menu, 4 tabs plus More sheet on phones, focus moves to main on page change), breadcrumbs, page header, mock session through `src/lib/data/session.ts`, role layouts and one stub dashboard per role. Found and fixed: header wrapped at 1024px, footer cramped, empty state heading level skipped. Checked ViniCare: panel routes used for the navigation lists | lint pass, types pass, format pass, build pass (7 routes), axe 0 violations on `/` and all four panels at 375px, popover Escape and focus return, skip link visible on focus, no sideways scroll | pending |
+| 2026-10-02 | F-03 | Design tokens in `globals.css` (all 22 contrast pairs pass, one fixed), 20 primitives in `src/components/ui/` (button, field, choice, OTP, card, stat tile, badge, avatar, tabs, accordion, dialog and sheet, toast, tooltip, skeleton, table, pagination, empty state, stepper, logo), dev-only `/design` page. Found and fixed: tab bar stray scrollbar, OTP autofill truncation. Checked ViniCare: nothing relevant | lint pass, types pass, format pass, build pass, axe 0 violations on `/design`, keyboard checks for dialog, tabs and OTP, no sideways scroll at 375px, `/design` returns 404 in production | 5f23f40 |
+| 2026-10-02 | F-02 | Scaffolded Next.js 16.3.8, TS strict, Tailwind 4, App Router in `src/`, fonts via `next/font`, ESLint (no-danger, no-any), Prettier, `.gitignore` (env files excluded), `.nvmrc`, `.env.example`, dev launch config. Covers P0-02, P0-03, P0-04. Checked ViniCare: nothing relevant | lint pass, types pass, format pass, build pass (`/` static) | d705c39 |
+| 2026-10-02 | F-01 | Wrote `docs/design-notes.md`: palette, type, spacing, components, screen inventory with a reference for every screen. Checked ViniCare: route map and home sections used as the panel list | n/a (docs) | d705c39 |
 | 2026-10-02 | Planning | Added Phase F (23 frontend tasks, mock data first), decisions D-007 to D-009, updated Dashboard and Current focus. Reviewed 12 inspiration screens and the ViniCare route map (Checked ViniCare: patient, doctor, admin pages listed) | n/a | n/a |
 | 2026-10-02 | Planning | Adapted paths to the real folder layout (`ViniCure_Project`), added `../Frontend_Inspirations`, P0-16, rewrote P0-01 and P0-15 | n/a | n/a |
 | 2026-10-02 | Planning | Added project-context and when-to-consult-ViniCare rules to CLAUDE.md, task P0-15, `.claude/settings.json`, `/port` command | n/a | n/a |
