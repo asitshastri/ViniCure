@@ -504,3 +504,49 @@ export type AttendanceRow = {
   noShows: number;
 };
 export type DailyCount = { date: string; consultations: number };
+
+// Support console (F-19)
+export type TicketMessage = {
+  from: "requester" | "agent";
+  name: string;
+  at: string;
+  text: string;
+};
+export type Ticket = {
+  id: string;
+  subject: string;
+  requester: string;
+  requesterRole: "patient" | "doctor";
+  patientId?: string;
+  topic: "booking" | "payment" | "technical" | "records" | "doctor" | "other";
+  priority: "high" | "normal" | "low";
+  status: "new" | "open" | "waiting" | "solved";
+  opened: string;
+  /** Local date and time, "YYYY-MM-DD HH:mm". */
+  dueBy: string;
+  assignee?: string;
+  needsRecord?: boolean;
+  messages: TicketMessage[];
+};
+export type PatientLookup = {
+  id: string;
+  name: string;
+  phoneMasked: string;
+  joined: string;
+  status: AdminUser["status"];
+  bookings: AdminAppointment[];
+};
+/** What support sees after break-glass. Sample data only. */
+export type BreakGlassRecord = {
+  patientId: string;
+  sections: Array<{ id: string; title: string; items: string[] }>;
+};
+export type BreakGlassSession = {
+  patientId: string;
+  patientName: string;
+  category: string;
+  reason: string;
+  ticket?: string;
+  startedAt: number;
+  until: number;
+};

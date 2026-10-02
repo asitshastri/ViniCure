@@ -34,15 +34,17 @@ const delay = (ms = 600) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export type Page<T> = { rows: T[]; total: number; page: number; pageCount: number };
 
-function run<T>(
+export function run<T>(
   rows: T[],
   q: TableQuery,
   get: Record<string, (r: T) => string | number>,
   search: (r: T) => string,
+  /** Filters compare the plain value. Pass these when a sort key is a rank rather than the value itself. */
+  filterGet: Record<string, (r: T) => string> = {},
   pageSize = PAGE_SIZE,
 ): Page<T> {
   let list = rows.filter((r) =>
-    Object.entries(q.filters).every(([k, v]) => String(get[k]?.(r)) === v),
+    Object.entries(q.filters).every(([k, v]) => String((filterGet[k] ?? get[k])?.(r)) === v),
   );
   const needle = q.q.toLowerCase();
   if (needle) list = list.filter((r) => search(r).toLowerCase().includes(needle));
