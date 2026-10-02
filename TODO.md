@@ -53,7 +53,7 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 | Phase | Name | Total | Done | In progress | Blocked |
 |---|---|---|---|---|---|
 | 0 | Bootstrap | 16 | 0 | 0 | 0 |
-| F | Frontend (UI first, mock data) | 23 | 9 | 0 | 0 |
+| F | Frontend (UI first, mock data) | 23 | 10 | 0 | 0 |
 | 1 | Platform foundations | 21 | 0 | 0 | 0 |
 | 2 | Identity and access | 16 | 0 | 0 | 0 |
 | 3 | Cloud staging | 14 | 0 | 0 | 0 |
@@ -66,11 +66,11 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 | 10 | Frontend polish | 6 | 0 | 0 | 0 |
 | 11 | Hardening and launch | 10 | 0 | 0 | 0 |
 | 12 | After launch | 8 | 0 | 0 | 0 |
-| | **Total** | **178** | **9** | **0** | **0** |
+| | **Total** | **178** | **10** | **0** | **0** |
 
 ## Current focus
 
-Phase F (frontend, mock data), in order. F-01 to F-09 done, next F-10 (content pages). Decision D-007: the human asked for UI first. Backend phases (P1 to P9) follow and wire to these screens.
+Phase F (frontend, mock data), in order. F-01 to F-10 done (public site complete). Next F-11 (patient dashboard and appointments). Decision D-007: the human asked for UI first. Backend phases (P1 to P9) follow and wire to these screens.
 
 ## Needs you
 
@@ -148,7 +148,7 @@ Rules for every F task:
 - [x] **F-07** (L, C) Doctor directory and doctor profile. Search, filters (specialty, language, fee, available today), sort from an allow-list, cards, pagination, profile with registration number, qualifications, languages, reviews, fees and next slots. *AC:* filters work on mock data and URL query holds the state.
 - [x] **F-08** (L, C) Booking flow: slot picker (timezone IST), patient or family member choice, reason, consent, summary with fee, checkout UI (Razorpay-style, mock), success and failure screens, hold timer. *AC:* all steps and failure paths reachable.
 - [x] **F-09** (M, C) Trust and compliance pages: how it works, specialties list, doctor verification, patient rights, privacy policy, terms, cookie policy, grievance contact. Text is placeholder marked for legal review. *AC:* pages exist, banner says "draft, pending legal review" until P9-10.
-- [ ] **F-10** (M, C) Content pages: blog list and article, FAQ with accordion, patient stories, support and contact form, about. *AC:* pages reachable, FAQ accessible by keyboard.
+- [x] **F-10** (M, C) Content pages: blog list and article, FAQ with accordion, patient stories, support and contact form, about. *AC:* pages reachable, FAQ accessible by keyboard.
 
 **Patient panel**
 - [ ] **F-11** (M, C) Patient dashboard and appointments: next consultation card, quick actions, upcoming and past, reschedule and cancel dialogs, follow-ups. *AC:* all states including empty.
@@ -397,6 +397,7 @@ Newest first. One line per finished task.
 
 | Date | Task | What changed | Checks | Commit |
 |---|---|---|---|---|
+| 2026-10-02 | F-10 | Content pages: `/blog` (category links, junk category ignored) and `/blog/[slug]` (6 sample articles, each with a medical reviewer and registration number, emergency note), `/faq` (5 groups, search by GET form, topic jump links, accordion on `<details>`, empty state), `/stories`, `/support` (contact form with Zod, focusable error summary, failed-send state that keeps the text, ticket reference, emergency and grievance side panel, “no medical details here” notice), `/about`. Content in `src/mocks/content.ts` behind `src/lib/data/articles.ts` and `support.ts`; footer gained About and Patient stories. Skills: `ui-ux-pro-max` (FAQ landing pattern: categories, accordion, contact CTA; keyboard navigation) and `frontend-design` used. Checked ViniCare: reference not available in the cloud, nothing consulted | lint pass, types pass, build pass, axe 0 violations and no sideways scroll on all 9 page states at 375/768/1024/1440, FAQ opens with Enter and closes with Space, FAQ search and empty state, support form summary focus then failed then sent, unknown article returns 404, every footer link now returns 200 | PENDING |
 | 2026-10-02 | F-09 | Eight public pages: `/how-it-works` (5 steps, when online care fits and when to go in person or call 112), `/specialties` (12 with sample doctor counts), `/doctor-verification`, `/patient-rights`, `/privacy-policy`, `/terms`, `/cookie-policy`, `/grievance`. Legal text is placeholder in `src/content/legal.ts` and `src/content/pages.ts`, served through `src/lib/data/content.ts`, with unknown facts in [square brackets]. A “Draft, pending legal review” banner shows on every legal page (remove at P9-10). Footer grievance link now points to `/grievance`. Skills: `ui-ux-pro-max` (searches for long-form layout returned nothing specific, so Quick Reference rules were used: 65 to 75 characters per line, sequential headings, anchor offset) and `frontend-design` used. Checked ViniCare: reference not available in the cloud, nothing consulted | lint pass, types pass, build pass, axe 0 violations and no sideways scroll on all 8 pages at 375/768/1024/1440, one h1 per page, table-of-contents anchor lands below the sticky header, footer links all resolve except `/blog`, `/faq`, `/support` (F-10) | 4557062 |
 | 2026-10-02 | F-08 | Booking flow `/book/[id]?slot=`: 3 steps (time and consultation type, who and why with consent, review and pay), IST slot picker with day and time radios, family member or someone else (minor note), reason with quick chips, 10-minute hold timer (announced at 2 min, 1 min, 30 s), Razorpay-style checkout sheet that never asks for card or bank details (only a UPI id; card and net banking say Razorpay's page is used), outcome screens: success, failed (declined, bank unavailable), pending (“do not pay again”), slot taken, hold expired. Mock rules in `src/mocks/booking.ts` behind `src/lib/data/booking.ts`; the amount comes from the doctor record, never from the form. A slot id from the URL is accepted only if it belongs to that doctor. Skills: `ui-ux-pro-max` (multi-step progress, error summary, payment guidance) and `frontend-design` used. Found and fixed: invalid definition-list markup (axe). Checked ViniCare: reference not available in the cloud, nothing consulted | lint pass, types pass, build pass, axe 0 violations on all 3 steps, error state, checkout, failed, pending and success at 375px and step 1 at all four widths, no sideways scroll, browser run of every step, validation errors with focused summary, change links, failed then retry then success, pending, taken, hold expiry with a fake clock | bb2ee8a |
 | 2026-10-02 | F-07 | Doctor directory `/doctors` (search, specialty, language, fee cap, available today, sort from an allow-list, removable filter chips, page links, empty state) and profile `/doctors/[id]` (registration number and council, qualifications, languages, reviews, fees, next slots in IST, booking card). Filters are a plain GET form so the URL holds all state and bad values are dropped by `src/lib/schemas/doctors.ts`. 14 mock doctors in `src/mocks/doctors.ts` behind `src/lib/data/doctors.ts`; Home featured doctors now come from the same source. Skills: `ui-ux-pro-max` (no-results and filter guidance) and `frontend-design` used. Inspired by Doccure cards and ViniCare `/doctors`. Found and fixed: symptom words like “skin” matched nothing. Checked ViniCare: reference not available in the cloud, nothing consulted | lint pass, types pass, build pass, axe 0 violations on directory, profile and empty state at 375/768/1024/1440, no sideways scroll, browser run of every filter, combined filters, page 2, chip removal, mobile filter toggle, junk query values return 200 and profile of unknown id returns 404 | 691b897 |

@@ -151,3 +151,22 @@ export type LegalDoc = {
 };
 
 export type SpecialtyWithCount = Specialty & { doctorCount: number };
+
+export type ArticleBlock =
+  { type: "p"; text: string } | { type: "h2"; text: string } | { type: "ul"; items: string[] };
+
+export type Article = {
+  slug: string;
+  title: string;
+  excerpt: string;
+  category: string;
+  readMinutes: number;
+  /** ISO date. */
+  published: string;
+  reviewer: { name: string; specialty: string; registrationNumber: string };
+  body: ArticleBlock[];
+};
+
+export type FaqGroup = { id: string; title: string; items: FaqItem[] };
+
+export type SupportTopic = "booking" | "payment" | "technical" | "records" | "doctor" | "other";

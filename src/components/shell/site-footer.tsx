@@ -22,7 +22,9 @@ const columns: Array<{ title: string; links: Array<{ label: string; href: string
   {
     title: "Company",
     links: [
+      { label: "About ViniCure", href: "/about" },
       { label: "Health blog", href: "/blog" },
+      { label: "Patient stories", href: "/stories" },
       { label: "FAQs", href: "/faq" },
       { label: "Contact and support", href: "/support" },
       { label: "Grievance officer", href: "/grievance" },
