@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Figtree, Noto_Sans } from "next/font/google";
+import { ConnectionStatus } from "@/components/states/connection-status";
 import { ToastProvider } from "@/components/ui/toast";
 import "./globals.css";
 
@@ -33,7 +34,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className={`${figtree.variable} ${notoSans.variable}`}>
       <body>
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          {children}
+          <ConnectionStatus />
+        </ToastProvider>
       </body>
     </html>
   );

@@ -80,7 +80,6 @@ export default async function AdminDoctorsPage({
           ))}
         </TBody>
       </Table>
-      {res.rows.length === 0 ? <p className="text-ink-muted mt-4">No doctors match.</p> : null}
       <PageLinks ctx={ctx} page={res.page} pageCount={res.pageCount} total={res.total} />
       <p className="text-ink-muted mt-4 text-sm">
         Waiting for approval? Open{" "}

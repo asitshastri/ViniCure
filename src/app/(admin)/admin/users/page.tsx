@@ -89,9 +89,6 @@ export default async function UsersPage({
           ))}
         </TBody>
       </Table>
-      {res.rows.length === 0 ? (
-        <p className="text-ink-muted mt-4">No users match. Clear a filter to see more.</p>
-      ) : null}
       <PageLinks ctx={ctx} page={res.page} pageCount={res.pageCount} total={res.total} />
     </>
   );

@@ -101,7 +101,6 @@ export default async function AdminAppointmentsPage({
           ))}
         </TBody>
       </Table>
-      {res.rows.length === 0 ? <p className="text-ink-muted mt-4">No appointments match.</p> : null}
       <PageLinks ctx={ctx} page={res.page} pageCount={res.pageCount} total={res.total} />
     </>
   );

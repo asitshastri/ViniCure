@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CaretDown, CaretUp, CaretUpDown, MagnifyingGlass } from "@phosphor-icons/react/ssr";
-import { Button } from "@/components/ui/button";
+import { Button, buttonStyles } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input, Select } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
 import { tableHref, type TableQuery, type TableSpec } from "@/lib/schemas/admin";
@@ -144,6 +145,25 @@ export function PageLinks({
   total: number;
 }) {
   const href = (n: number) => tableHref(ctx.base, ctx.query, ctx.spec, { page: n }, ctx.extra);
+  if (total === 0) {
+    const clearHref =
+      ctx.extra && Object.keys(ctx.extra).length
+        ? `${ctx.base}?${new URLSearchParams(ctx.extra)}`
+        : ctx.base;
+    return (
+      <EmptyState
+        className="mt-4"
+        icon={<MagnifyingGlass />}
+        title="Nothing matches"
+        description="Try a different search or remove a filter."
+        action={
+          <Link href={clearHref} className={buttonStyles({ variant: "secondary" })}>
+            Clear search and filters
+          </Link>
+        }
+      />
+    );
+  }
   return (
     <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
       <p className="text-ink-muted text-sm" aria-live="polite">

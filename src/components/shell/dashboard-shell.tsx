@@ -1,5 +1,6 @@
 "use client";
 
+import { StatePreview } from "@/components/states/state-preview";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -105,7 +106,7 @@ export function DashboardShell({ role, user, notifications, children }: Dashboar
           tabIndex={-1}
           className="flex-1 px-4 py-6 pb-28 outline-none sm:px-6 lg:px-8 lg:pb-10"
         >
-          {children}
+          <StatePreview homeHref={nav.groups[0]?.items[0]?.href ?? "/"}>{children}</StatePreview>
         </main>
       </div>
 
