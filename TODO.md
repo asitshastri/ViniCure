@@ -180,7 +180,7 @@ Rules for every F task:
 
 **Quality and finish**
 - [x] **F-20** (M, C) Loading skeletons, empty states, error boundaries, custom 404 and 500, offline and slow-network messages, toasts. *AC:* every page has all four states.
-- [ ] **F-21** (M, C) Accessibility and responsive pass over the whole site: axe, keyboard walk-through, reduced motion, focus not hidden by sticky bars, 375 to 1440 px. Fix findings. *AC:* no serious axe violations on key pages. Screenshots stored in `docs/ui-checks/`.
+- [~] **F-21** (M, C) Accessibility and responsive pass over the whole site: axe, keyboard walk-through, reduced motion, focus not hidden by sticky bars, 375 to 1440 px. Fix findings. *AC:* no serious axe violations on key pages. Screenshots stored in `docs/ui-checks/`.
 - [ ] **F-22** (M, C) i18n scaffolding (UI part of P10-02): all copy in message files, English complete, Hindi and Gujarati keys present, language switch works. *AC:* switching language changes visible text on home and sign-in.
 - [ ] **F-23** (S, C) Wiring plan: list every mock in `src/mocks/` with the P-task and endpoint that replaces it, so later phases can swap them. *AC:* table in `docs/ui-wiring.md`, reviewed by the human.
 
