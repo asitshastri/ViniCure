@@ -354,3 +354,40 @@ export type EarningLine = {
   netPaise: number;
   status: "paid" | "processing";
 };
+
+export type Medicine = {
+  id: string;
+  name: string;
+  form: string;
+  strengths: string[];
+  /** Drug family tags, used to warn about allergies. */
+  classes: string[];
+  /** Cannot be prescribed on an online consultation. The exact list comes from the telemedicine rules, to be confirmed. */
+  restricted?: boolean;
+};
+
+export type RxFrequency = { morning: boolean; afternoon: boolean; night: boolean; sos: boolean };
+
+export type RxLine = {
+  id: string;
+  medicineId: string;
+  name: string;
+  strength: string;
+  freq: RxFrequency;
+  timing: "before" | "after" | "any";
+  days: number;
+  note: string;
+};
+
+export type ConsultContext = {
+  consult: DoctorConsultView;
+  patient: {
+    name: string;
+    ageSex: string;
+    conditions: string[];
+    medicines: string[];
+    pastVisits: Array<{ date: string; summary: string }>;
+    files: Array<{ id: string; title: string; type: string; sharedOn: string }>;
+  };
+  doctor: { name: string; qualifications: string; registrationNumber: string; council: string };
+};
