@@ -1,28 +1,17 @@
+import { getT } from "@/i18n/server";
+import type { MessageKey } from "@/i18n/translate";
 import { Section } from "./section";
 
-const steps = [
-  {
-    title: "Choose a doctor",
-    text: "Search by symptom, specialty or language. Every profile shows the registration number, fee and next free time.",
-  },
-  {
-    title: "Book and pay",
-    text: "Pick a time, say who the visit is for and add a short note or photo. Pay by UPI, card or net banking.",
-  },
-  {
-    title: "Talk and get your prescription",
-    text: "Join from your phone at the time. After the call, the prescription and any advice appear in your records.",
-  },
+const steps: Array<{ title: MessageKey; text: MessageKey }> = [
+  { title: "home.how.s1Title", text: "home.how.s1Text" },
+  { title: "home.how.s2Title", text: "home.how.s2Text" },
+  { title: "home.how.s3Title", text: "home.how.s3Text" },
 ];
 
-export function HowItWorks() {
+export async function HowItWorks() {
+  const { t } = await getT();
   return (
-    <Section
-      id="how-it-works"
-      title="How it works"
-      intro="Three steps, usually under ten minutes to your first call."
-      tone="tint"
-    >
+    <Section id="how-it-works" title={t("home.how.title")} intro={t("home.how.intro")} tone="tint">
       <ol className="grid gap-8 lg:grid-cols-3 lg:gap-10">
         {steps.map((step, i) => (
           <li key={step.title} className="flex gap-4 lg:flex-col">
@@ -34,10 +23,10 @@ export function HowItWorks() {
             </span>
             <div>
               <h3 className="text-ink text-xl font-semibold">
-                <span className="sr-only">Step {i + 1}: </span>
-                {step.title}
+                <span className="sr-only">{t("home.how.step", { n: i + 1 })}</span>
+                {t(step.title)}
               </h3>
-              <p className="text-ink-muted mt-2 max-w-sm">{step.text}</p>
+              <p className="text-ink-muted mt-2 max-w-sm">{t(step.text)}</p>
             </div>
           </li>
         ))}

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
+import { useT } from "@/i18n/client";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/choice";
 import { Field, Input } from "@/components/ui/field";
@@ -25,6 +26,7 @@ type Step = "details" | "otp" | "done";
 
 export function PatientAuth({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
+  const { t } = useT();
   const uid = useId();
   const [step, setStep] = useState<Step>("details");
   const [name, setName] = useState("");
@@ -51,7 +53,7 @@ export function PatientAuth({ mode }: { mode: "login" | "register" }) {
   const masked =
     cleanPhone.length === 10
       ? `+91 ${cleanPhone.slice(0, 2)}••••••${cleanPhone.slice(-2)}`
-      : "your number";
+      : t("auth.patient.yourNumber");
 
   async function sendCode(e?: FormEvent) {
     e?.preventDefault();
@@ -116,7 +118,7 @@ export function PatientAuth({ mode }: { mode: "login" | "register" }) {
   if (step === "done") {
     return (
       <p role="status" className="text-ink text-lg">
-        Signed in. Taking you to your dashboard.
+        {t("auth.patient.signedIn")}
       </p>
     );
   }
@@ -125,16 +127,13 @@ export function PatientAuth({ mode }: { mode: "login" | "register" }) {
     const locked = lockedMinutes !== null;
     return (
       <div>
-        <p className="text-ink-muted text-lg">
-          If {masked} can sign in, we sent a 6-digit code to it by SMS. It works for 10 minutes.
-        </p>
+        <p className="text-ink-muted text-lg">{t("auth.patient.sentCode", { masked })}</p>
 
         {locked ? (
-          <Notice tone="danger" title="Too many tries" className="mt-6">
-            For your safety we paused sign-in for this number. Try again in {lockedMinutes} minutes.
-            Need help now?{" "}
+          <Notice tone="danger" title={t("auth.patient.tooManyTries")} className="mt-6">
+            {t("auth.patient.paused", { minutes: lockedMinutes })}{" "}
             <Link href="/support" className="font-semibold underline">
-              Contact support
+              {t("auth.patient.contactSupport")}
             </Link>
             .
           </Notice>
@@ -148,7 +147,7 @@ export function PatientAuth({ mode }: { mode: "login" | "register" }) {
           >
             <div className="grid gap-2">
               <p id={`${uid}-otp-label`} className="text-ink text-sm font-medium">
-                Enter the code
+                {t("auth.patient.enterCode")}
               </p>
               <OtpInput
                 key={otpKey}
@@ -167,7 +166,7 @@ export function PatientAuth({ mode }: { mode: "login" | "register" }) {
               ) : null}
             </div>
             <Button type="submit" size="lg" loading={busy} disabled={code.length < 6}>
-              Verify and continue
+              {t("auth.patient.verify")}
             </Button>
           </form>
         )}
@@ -178,7 +177,9 @@ export function PatientAuth({ mode }: { mode: "login" | "register" }) {
             disabled={(secondsLeft > 0 && !expired) || busy || locked}
             onClick={() => void sendCode()}
           >
-            {secondsLeft > 0 && !expired ? `Send a new code in ${secondsLeft}s` : "Send a new code"}
+            {secondsLeft > 0 && !expired
+              ? t("auth.patient.newCodeIn", { seconds: secondsLeft })
+              : t("auth.patient.newCode")}
           </Button>
           <Button
             variant="ghost"
@@ -188,7 +189,7 @@ export function PatientAuth({ mode }: { mode: "login" | "register" }) {
               setLockedMinutes(null);
             }}
           >
-            Change number
+            {t("auth.patient.changeNumber")}
           </Button>
         </div>
 
@@ -209,7 +210,7 @@ export function PatientAuth({ mode }: { mode: "login" | "register" }) {
       <ErrorSummary errors={errors} fieldIds={fieldIds} attempt={attempt} />
 
       {mode === "register" ? (
-        <Field inputId={ids.name} label="Full name" error={errors.name} required>
+        <Field inputId={ids.name} label={t("auth.patient.fullName")} error={errors.name} required>
           {({ describedBy, invalid }) => (
             <Input
               id={ids.name}
@@ -225,8 +226,8 @@ export function PatientAuth({ mode }: { mode: "login" | "register" }) {
 
       <Field
         inputId={ids.phone}
-        label="Mobile number"
-        hint="10 digits, without +91. We send a 6-digit code by SMS."
+        label={t("auth.patient.mobile")}
+        hint={t("auth.patient.mobileHint")}
         error={errors.phone}
         required
       >
@@ -261,18 +262,18 @@ export function PatientAuth({ mode }: { mode: "login" | "register" }) {
             aria-invalid={Boolean(errors.consent) || undefined}
             label={
               <>
-                I agree to the{" "}
+                {t("auth.patient.agreeStart")}{" "}
                 <Link href="/terms" className="text-primary underline">
-                  terms
+                  {t("auth.patient.terms")}
                 </Link>{" "}
-                and have read the{" "}
+                {t("auth.patient.agreeMid")}{" "}
                 <Link href="/privacy-policy" className="text-primary underline">
-                  privacy policy
-                </Link>
-                .
+                  {t("auth.patient.privacyPolicy")}
+                </Link>{" "}
+                {t("auth.patient.agreeEnd")}
               </>
             }
-            description="We use your details only to provide care. You can withdraw consent in settings."
+            description={t("auth.patient.consentNote")}
           />
           {errors.consent ? (
             <p role="alert" className="text-danger mt-1.5 text-sm">
@@ -282,26 +283,26 @@ export function PatientAuth({ mode }: { mode: "login" | "register" }) {
         </div>
       ) : (
         <p className="text-ink-muted text-sm">
-          By continuing you agree to the{" "}
+          {t("auth.patient.byContinuing")}{" "}
           <Link href="/terms" className="text-primary underline">
-            terms
+            {t("auth.patient.terms")}
           </Link>{" "}
-          and{" "}
+          {t("auth.patient.and")}{" "}
           <Link href="/privacy-policy" className="text-primary underline">
-            privacy policy
-          </Link>
-          .
+            {t("auth.patient.privacyPolicy")}
+          </Link>{" "}
+          {t("auth.patient.byEnd")}
         </p>
       )}
 
       {rateLimit ? (
-        <Notice tone="warning" title="Too many codes requested">
-          Wait {rateLimit.retryInMinutes} minutes before asking for another code.
+        <Notice tone="warning" title={t("auth.patient.tooManyCodes")}>
+          {t("auth.patient.waitMinutes", { minutes: rateLimit.retryInMinutes })}
         </Notice>
       ) : null}
 
       <Button type="submit" size="lg" loading={busy}>
-        {mode === "register" ? "Create account and send code" : "Send code"}
+        {mode === "register" ? t("auth.patient.createAndSend") : t("auth.patient.sendCode")}
       </Button>
 
       <PrototypeHint>

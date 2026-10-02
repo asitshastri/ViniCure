@@ -1,19 +1,22 @@
 import Link from "next/link";
 import { ArrowRight } from "@phosphor-icons/react/ssr";
+import { specialtyText } from "@/i18n/helpers";
+import { getT } from "@/i18n/server";
 import { buttonStyles } from "@/components/ui/button";
 import type { Specialty } from "@/lib/types";
 import { Section } from "./section";
 import { SpecialtyGlyph } from "./specialty-icon";
 
-export function SpecialtiesGrid({ specialties }: { specialties: Specialty[] }) {
+export async function SpecialtiesGrid({ specialties }: { specialties: Specialty[] }) {
+  const { t } = await getT();
   return (
     <Section
       id="specialties"
-      title="Find a doctor by what you need help with"
-      intro="Not sure which one? A general physician can start and refer you on."
+      title={t("home.specialties.title")}
+      intro={t("home.specialties.intro")}
       action={
         <Link href="/specialties" className={buttonStyles({ variant: "secondary" })}>
-          All specialties
+          {t("home.specialties.all")}
           <ArrowRight aria-hidden className="size-4" />
         </Link>
       }
@@ -29,8 +32,12 @@ export function SpecialtiesGrid({ specialties }: { specialties: Specialty[] }) {
                 <SpecialtyGlyph icon={s.icon} className="size-6" />
               </span>
               <span>
-                <span className="font-display text-ink block text-lg font-semibold">{s.name}</span>
-                <span className="text-ink-muted block text-sm">{s.blurb}</span>
+                <span className="font-display text-ink block text-lg font-semibold">
+                  {specialtyText(t, s.slug, "name", s.name)}
+                </span>
+                <span className="text-ink-muted block text-sm">
+                  {specialtyText(t, s.slug, "blurb", s.blurb)}
+                </span>
               </span>
             </Link>
           </li>

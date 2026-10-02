@@ -3,19 +3,21 @@ import { ArrowRight, Clock, SealCheck, Star, Translate } from "@phosphor-icons/r
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink, buttonStyles } from "@/components/ui/button";
+import { getT } from "@/i18n/server";
 import { formatRupees } from "@/lib/format";
 import type { DoctorSummary } from "@/lib/types";
 import { Section } from "./section";
 
-export function FeaturedDoctors({ doctors }: { doctors: DoctorSummary[] }) {
+export async function FeaturedDoctors({ doctors }: { doctors: DoctorSummary[] }) {
+  const { t } = await getT();
   return (
     <Section
       id="doctors"
-      title="Doctors available soon"
-      intro="Sample profiles. Real doctors appear here after verification."
+      title={t("home.doctors.title")}
+      intro={t("home.doctors.intro")}
       action={
         <Link href="/doctors" className={buttonStyles({ variant: "secondary" })}>
-          See all doctors
+          {t("home.doctors.all")}
           <ArrowRight aria-hidden className="size-4" />
         </Link>
       }
@@ -38,25 +40,25 @@ export function FeaturedDoctors({ doctors }: { doctors: DoctorSummary[] }) {
             </p>
             <p className="mt-1">
               <Badge tone="success" icon={<SealCheck weight="fill" className="size-3.5" />}>
-                Reg. {d.registrationNumber}
+                {t("home.doctors.reg", { number: d.registrationNumber })}
               </Badge>
             </p>
             <dl className="text-ink-muted mt-4 grid gap-2 text-sm">
               <div className="flex items-center gap-2">
-                <dt className="sr-only">Rating</dt>
+                <dt className="sr-only">{t("home.doctors.rating")}</dt>
                 <Star aria-hidden weight="fill" className="text-warning size-4 shrink-0" />
                 <dd>
-                  <span className="text-ink font-semibold">{d.rating.toFixed(1)}</span> (
-                  {d.reviewCount} reviews)
+                  <span className="text-ink font-semibold">{d.rating.toFixed(1)}</span>{" "}
+                  {t("home.doctors.reviews", { count: d.reviewCount })}
                 </dd>
               </div>
               <div className="flex items-center gap-2">
-                <dt className="sr-only">Languages</dt>
+                <dt className="sr-only">{t("home.doctors.languages")}</dt>
                 <Translate aria-hidden className="size-4 shrink-0" />
                 <dd>{d.languages.join(", ")}</dd>
               </div>
               <div className="flex items-center gap-2">
-                <dt className="sr-only">Next available</dt>
+                <dt className="sr-only">{t("home.doctors.next")}</dt>
                 <Clock aria-hidden className="size-4 shrink-0" />
                 <dd>{d.nextSlot}</dd>
               </div>
@@ -68,9 +70,9 @@ export function FeaturedDoctors({ doctors }: { doctors: DoctorSummary[] }) {
               <ButtonLink
                 href={`/doctors/${d.id}`}
                 variant="secondary"
-                aria-label={`View profile of ${d.name}`}
+                aria-label={t("home.doctors.viewProfileOf", { name: d.name })}
               >
-                View profile
+                {t("common.viewProfile")}
               </ButtonLink>
             </div>
           </li>

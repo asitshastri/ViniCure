@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useT } from "@/i18n/client";
 import { isActive, publicNav } from "@/lib/nav";
 import { cn } from "@/lib/cn";
 
 export function HeaderNav() {
   const pathname = usePathname();
+  const { t } = useT();
   return (
-    <nav aria-label="Main" className="hidden items-center gap-1 xl:flex">
+    <nav aria-label={t("nav.main")} className="hidden items-center gap-1 xl:flex">
       {publicNav.map((item) => {
         const active = isActive(pathname, item.href);
         return (
@@ -23,7 +25,7 @@ export function HeaderNav() {
                 : "text-ink-muted hover:bg-primary-tint hover:text-ink",
             )}
           >
-            {item.label}
+            {t(item.key)}
           </Link>
         );
       })}

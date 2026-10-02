@@ -136,5 +136,5 @@ Icons: one set, Phosphor (outline, 1.5 px stroke). No emoji as icons.
 ## 10. Not verified
 
 - Legal wording for consent, privacy, patient rights and grievance contact. Placeholder text only, marked "draft, pending legal review".
-- Whether Hindi and Gujarati need Devanagari and Gujarati font subsets beyond Noto Sans. Check in F-22.
+- Hindi and Gujarati need their own fonts: Noto Sans does not cover them. F-22 added Noto Sans Devanagari and Noto Sans Gujarati as variable fonts that load only when a page uses those letters.
 - Final logo. The human will replace it. Use `Frontend_Inspirations/logos/ViniCure_logo_no_background.png` for now.

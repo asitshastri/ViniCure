@@ -1,14 +1,16 @@
+import { getT } from "@/i18n/server";
 import type { PatientStory } from "@/lib/types";
 import { Section } from "./section";
 
-export function Stories({ stories }: { stories: PatientStory[] }) {
+export async function Stories({ stories }: { stories: PatientStory[] }) {
+  const { t } = await getT();
   const [lead, ...rest] = stories;
   if (!lead) return null;
   return (
     <Section
       id="stories"
-      title="What patients say"
-      intro="Sample stories for design review. Real, consented stories replace these before launch."
+      title={t("home.stories.title")}
+      intro={t("home.stories.intro")}
       tone="tint"
     >
       <div className="grid gap-10 lg:grid-cols-[1.3fr_1fr] lg:gap-16">

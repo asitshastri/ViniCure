@@ -20,6 +20,7 @@ import {
   UsersThree,
   VideoCamera,
 } from "@phosphor-icons/react/ssr";
+import type { MessageKey } from "@/i18n/translate";
 import type { Role } from "@/lib/types";
 
 export type NavIcon = typeof SquaresFour;
@@ -33,12 +34,12 @@ export type RoleNav = {
   account: NavItem[];
 };
 
-export const publicNav: Array<{ label: string; href: string }> = [
-  { label: "Find doctors", href: "/doctors" },
-  { label: "Specialties", href: "/specialties" },
-  { label: "How it works", href: "/how-it-works" },
-  { label: "For doctors", href: "/for-doctors" },
-  { label: "Health blog", href: "/blog" },
+export const publicNav: Array<{ key: MessageKey; href: string }> = [
+  { key: "nav.findDoctors", href: "/doctors" },
+  { key: "nav.specialties", href: "/specialties" },
+  { key: "nav.howItWorks", href: "/how-it-works" },
+  { key: "nav.forDoctors", href: "/for-doctors" },
+  { key: "nav.healthBlog", href: "/blog" },
 ];
 
 const accountItems = (base: string): NavItem[] => [

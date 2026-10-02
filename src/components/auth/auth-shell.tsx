@@ -6,6 +6,8 @@ type AuthShellProps = {
   variant?: "patient" | "staff";
   title: string;
   intro?: string;
+  /** Side-panel heading for patients. Pass a translated string. Staff pages keep their own English heading. */
+  privacyTitle?: string;
   /** Short plain list on the side panel: what happens with the person's data. */
   promises: string[];
   children: ReactNode;
@@ -17,6 +19,7 @@ export function AuthShell({
   variant = "patient",
   title,
   intro,
+  privacyTitle = "Your privacy on ViniCure",
   promises,
   children,
   footer,
@@ -37,7 +40,7 @@ export function AuthShell({
             <ShieldCheck aria-hidden className="text-primary size-6" />
           )}
           <p className="font-display text-lg font-semibold">
-            {staff ? "Staff area" : "Your privacy on ViniCure"}
+            {staff ? "Staff area" : privacyTitle}
           </p>
         </div>
         <ul className={cn("mt-5 grid gap-4", staff ? "text-white/90" : "text-ink-muted")}>
