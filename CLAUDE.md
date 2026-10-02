@@ -47,6 +47,20 @@ Record every consultation in the Progress log: `Reused: <files> -> <what we took
 
 `TODO.md` is the single execution backlog. These rules override any task description.
 
+### Git branching strategy
+- **`main` branch**: stable, merged phases only. Never break it. Merges only after phase completion, full testing (lint, typecheck, build, axe), and code review.
+- **Phase branches**: one branch per major phase (`phase-f-frontend`, `phase-p2-auth`, `phase-p3-backend`, etc.). All work for that phase happens here.
+- **Rules to avoid merge conflicts and slow feedback**:
+  1. Merge to main **only when the entire phase is complete** (all acceptance criteria met, all tests pass, no TODOs).
+  2. Keep phase branches short-lived (target: 2–4 weeks per phase). If a phase stretches longer, check if it should split.
+  3. **Do not branch off phase branches**. All work stays on the phase branch. Rebasing is OK; merges within a phase are not.
+  4. **Rebase phase branch onto main before merge** (no merge commits). This keeps main history clean and avoids conflicts.
+  5. **On conflict during rebase**: stop, resolve, and commit `git rebase --continue`. Do not force-push without reviewing every commit.
+  6. **Tag each phase merge** with `phase-f-done`, `phase-p2-done`, etc., so history is searchable and rollback is clear.
+  7. **Main stays deployable at every commit**. If a phase merge breaks the build, revert immediately and fix on the phase branch, then re-merge.
+
+Cloud sessions and local sessions use the same branch strategy. For cloud reference to viniCare, clone `https://github.com/asitshastri/viniCare.git` into the working directory.
+
 **At the start of every session**
 1. Read `TODO.md`: Current focus, Needs you, Blockers, DISCOVERED.
 2. Read the docs that match the task: `docs/architecture.md`, `docs/backend-architecture.md`, `docs/er_model.md`. Check `docs/reuse-map.md` for entries tagged with this task ID and read those ViniCare files first.
@@ -293,3 +307,13 @@ pnpm build              production build
 ## When unsure
 
 Say so, log it under "Not verified" in the relevant doc, and add a task. Do not guess.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
