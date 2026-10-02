@@ -391,3 +391,38 @@ export type ConsultContext = {
   };
   doctor: { name: string; qualifications: string; registrationNumber: string; council: string };
 };
+
+export type ApplicationStatus = "draft" | "submitted" | "in_review" | "changes_needed" | "approved";
+export type DocState =
+  "missing" | "uploading" | "scanning" | "uploaded" | "accepted" | "replace" | "rejected";
+
+export type ApplicationDoc = {
+  id: string;
+  label: string;
+  hint: string;
+  required: boolean;
+  state: DocState;
+  fileName?: string;
+  /** Plain reason from the reviewer when a document needs replacing. */
+  reason?: string;
+};
+
+export type Qualification = { id: string; degree: string; college: string; year: string };
+
+export type DoctorApplication = {
+  status: ApplicationStatus;
+  details: {
+    name: string;
+    registrationNumber: string;
+    council: string;
+    registrationYear: string;
+    specialty: string;
+    experienceYears: string;
+    languages: string[];
+    feeRupees: string;
+    bio: string;
+    qualifications: Qualification[];
+  };
+  docs: ApplicationDoc[];
+  events: Array<{ when: string; text: string }>;
+};
