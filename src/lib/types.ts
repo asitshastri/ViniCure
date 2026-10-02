@@ -209,3 +209,29 @@ export type AppointmentsResult = {
   all: AppointmentView[];
   nextUp: AppointmentView | null;
 };
+
+export type RecordType = "injury" | "prescriptions" | "reports" | "xray" | "mri" | "ct" | "other";
+export type RecordStatus = "uploading" | "scanning" | "ready" | "rejected";
+
+export type HealthRecord = {
+  id: string;
+  title: string;
+  type: RecordType;
+  kind: "image" | "document";
+  sizeBytes: number;
+  /** IST calendar date, YYYY-MM-DD. */
+  uploadedOn: string;
+  status: RecordStatus;
+  /** Why a rejected file was refused, in plain words. */
+  rejectedReason?: string;
+  note?: string;
+  addedBy: "you" | "doctor";
+  sharedWith?: { doctorId: string; doctorName: string; until: string };
+};
+
+export type ShareTarget = {
+  doctorId: string;
+  doctorName: string;
+  specialty: string;
+  reason: string;
+};
