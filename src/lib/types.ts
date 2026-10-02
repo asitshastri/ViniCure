@@ -426,3 +426,81 @@ export type DoctorApplication = {
   docs: ApplicationDoc[];
   events: Array<{ when: string; text: string }>;
 };
+
+export type AdminUser = {
+  id: string;
+  name: string;
+  role: "patient" | "doctor" | "support" | "admin";
+  phoneMasked: string;
+  joined: string;
+  status: "active" | "suspended" | "pending";
+};
+export type AdminDoctor = {
+  id: string;
+  name: string;
+  specialty: string;
+  registrationNumber: string;
+  rating: number;
+  consultations: number;
+  joined: string;
+  status: "live" | "paused" | "pending";
+};
+export type KycItem = {
+  id: string;
+  name: string;
+  specialty: string;
+  registrationNumber: string;
+  council: string;
+  submitted: string;
+  status: "pending" | "changes_needed" | "approved" | "rejected";
+  docs: Array<{ label: string; state: "ok" | "check" }>;
+  qualifications: string[];
+  note?: string;
+};
+export type AdminAppointment = {
+  id: string;
+  date: string;
+  doctor: string;
+  patient: string;
+  type: ConsultMode;
+  status: "completed" | "upcoming" | "cancelled" | "no_show";
+  feePaise: number;
+  payment: "paid" | "refunded" | "pending";
+};
+export type WeeklyRevenue = { week: string; video: number; audio: number; followup: number };
+export type RefundRequest = {
+  id: string;
+  appointment: string;
+  patient: string;
+  amountPaise: number;
+  reason: string;
+  requested: string;
+  status: "pending" | "approved" | "declined";
+};
+export type AuditEntry = {
+  id: string;
+  when: string;
+  actor: string;
+  role: string;
+  action: string;
+  target: string;
+  kind: "audit" | "phi";
+};
+export type DataRequest = {
+  id: string;
+  patient: string;
+  type: "export" | "deletion" | "correction";
+  received: string;
+  due: string;
+  status: "new" | "in_progress" | "done";
+  legalHold?: boolean;
+};
+export type AttendanceRow = {
+  id: string;
+  doctor: string;
+  scheduledHours: number;
+  onlineHours: number;
+  onTimePercent: number;
+  noShows: number;
+};
+export type DailyCount = { date: string; consultations: number };

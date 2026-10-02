@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 /** Scrolls sideways inside its own box on small screens, so the page never scrolls sideways. */
 export function Table({ className, ...props }: ComponentProps<"table">) {
   return (
-    <div className="border-line bg-surface overflow-x-auto rounded-xl border">
+    <div className="border-line bg-surface relative overflow-x-auto rounded-xl border">
       <table className={cn("w-full min-w-[32rem] text-left text-sm", className)} {...props} />
     </div>
   );

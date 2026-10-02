@@ -53,7 +53,7 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 | Phase | Name | Total | Done | In progress | Blocked |
 |---|---|---|---|---|---|
 | 0 | Bootstrap | 16 | 0 | 0 | 0 |
-| F | Frontend (UI first, mock data) | 23 | 17 | 0 | 0 |
+| F | Frontend (UI first, mock data) | 23 | 18 | 0 | 0 |
 | 1 | Platform foundations | 21 | 0 | 0 | 0 |
 | 2 | Identity and access | 16 | 0 | 0 | 0 |
 | 3 | Cloud staging | 14 | 0 | 0 | 0 |
@@ -66,11 +66,11 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 | 10 | Frontend polish | 6 | 0 | 0 | 0 |
 | 11 | Hardening and launch | 10 | 0 | 0 | 0 |
 | 12 | After launch | 8 | 0 | 0 | 0 |
-| | **Total** | **178** | **17** | **0** | **0** |
+| | **Total** | **178** | **18** | **0** | **0** |
 
 ## Current focus
 
-Phase F (frontend, mock data), in order. F-01 to F-10 done (public site complete). Next F-18 (admin console). Decision D-007: the human asked for UI first. Backend phases (P1 to P9) follow and wire to these screens.
+Phase F (frontend, mock data), in order. F-01 to F-18 done. Next F-19 (support console and break-glass). Decision D-007: the human asked for UI first. Backend phases (P1 to P9) follow and wire to these screens.
 
 ## Needs you
 
@@ -108,6 +108,7 @@ New tasks found while working. Claude Code appends here, the human triages them 
 | 2026-10-02 | F-15 | **[SEC]** The call page must not be reachable by URL alone. P6 checks on the server that the signed-in patient owns the booking, payment is captured, the time window is open and consent is given before issuing a one-user, one-channel token that expires in an hour; the doctor tile, waiting room and reconnect states then come from the real video provider. Local camera preview stays in the tab and is never uploaded. | L | C | Another patient's id returns 404; a token for a different channel is refused; renewal after the session ends is denied (tested). | Fold into P6-06 and P6-07. |
 | 2026-10-02 | F-16 | **[SEC]** The console must be enforced on the server: only the assigned doctor opens it (404 otherwise), prescription lines are validated, the allergy and restricted-medicine checks run again, the registration number comes from the verified record, the prescription is signed and stored encrypted, notes are encrypted, and every file open is audited. Breaking-glass and admin roles never see clinical notes. | L | C | Another doctor gets 404; a restricted medicine is rejected by the API; a tampered registration number is ignored (tested). | Fold into P7 (clinical records). |
 | 2026-10-02 | F-17 | **[SEC]** Doctor KYC needs server-side handling: private encrypted document storage, virus scan, review by staff only, council register check logged, doctors can never set a document or the application to accepted, approval changes the role through an audited admin action. The prototype status values are display only. | L | C | A doctor cannot call an API to approve themselves (tested); documents open only to reviewers through logged signed links. | Fold into P9 (admin and KYC). |
+| 2026-10-02 | F-18 | **[SEC]** The admin console must be enforced on the server: admin role only, every action (KYC decision, refund, data request, user status change, document open) writes an audit entry, refunds and KYC decisions need a fresh sign-in, tables sort and filter only from the allow-lists in SQL, responses never contain clinical text, and the health-record access log is append-only. The prototype checks none of this. | L | C | Non-admin gets 404 on every `/admin/*` route and API (tested); a refund without a fresh sign-in is refused; no admin response includes diagnosis, notes or prescription text (tested); log rows cannot be updated or deleted. | Fold into P9 (admin, audit, PHI log). |
 | 2026-10-02 | F-03 | `next dev` appends an "agent rules" block to `CLAUDE.md` each time it runs. | S | H | Human decides whether to keep it. If kept, commit it. If not, find the Next.js setting that stops it. | Needs you. |
 
 ---
@@ -171,7 +172,7 @@ Rules for every F task:
 - [x] **F-17** (M, C) Doctor onboarding: application form, qualification and registration number fields, KYC document upload states, status tracker (submitted, under review, approved, rejected). *AC:* all states visible.
 
 **Admin and support**
-- [ ] **F-18** (L, C) Admin console: dashboard with charts, users, doctor list and KYC review, appointments, revenue and refunds, audit logs and PHI access log, data requests, attendance. Tables sort and filter from allow-lists. Admin never shows clinical text. Inspired by Hummingbird. *AC:* every page works with mock data. Chart colors pass contrast.
+- [x] **F-18** (L, C) Admin console: dashboard with charts, users, doctor list and KYC review, appointments, revenue and refunds, audit logs and PHI access log, data requests, attendance. Tables sort and filter from allow-lists. Admin never shows clinical text. Inspired by Hummingbird. *AC:* every page works with mock data. Chart colors pass contrast.
 - [ ] **F-19** (M, C) Support console: ticket queue, user lookup, break-glass access dialog (reason, time limit, countdown banner). *AC:* break-glass flow and expiry state visible.
 
 **Quality and finish**
@@ -423,6 +424,7 @@ Newest first. One line per finished task.
 | 2026-10-02 | F-03 | Design tokens in `globals.css` (all 22 contrast pairs pass, one fixed), 20 primitives in `src/components/ui/` (button, field, choice, OTP, card, stat tile, badge, avatar, tabs, accordion, dialog and sheet, toast, tooltip, skeleton, table, pagination, empty state, stepper, logo), dev-only `/design` page. Found and fixed: tab bar stray scrollbar, OTP autofill truncation. Checked ViniCare: nothing relevant | lint pass, types pass, format pass, build pass, axe 0 violations on `/design`, keyboard checks for dialog, tabs and OTP, no sideways scroll at 375px, `/design` returns 404 in production | 5f23f40 |
 | 2026-10-02 | F-02 | Scaffolded Next.js 16.3.8, TS strict, Tailwind 4, App Router in `src/`, fonts via `next/font`, ESLint (no-danger, no-any), Prettier, `.gitignore` (env files excluded), `.nvmrc`, `.env.example`, dev launch config. Covers P0-02, P0-03, P0-04. Checked ViniCare: nothing relevant | lint pass, types pass, format pass, build pass (`/` static) | d705c39 |
 | 2026-10-02 | F-01 | Wrote `docs/design-notes.md`: palette, type, spacing, components, screen inventory with a reference for every screen. Checked ViniCare: route map and home sections used as the panel list | n/a (docs) | d705c39 |
+| 2026-10-02 | F-18 | Admin console under `/admin/*`: dashboard (four tiles, 14-day line chart, needs-attention list that links to the work), users, doctors, doctor review (KYC board with a review dialog: council-check box gates Approve, Ask for changes and Reject need a written reason, opening a document is logged), appointments, attendance, revenue (stacked weekly bars by type, refund queue that asks for the password again, weekly totals), data requests (start and mark done, deletion with a legal hold cannot be closed), audit logs with a second tab for health-record access. Tables sort, filter, search and page from the URL through allow-lists (`parseTableQuery`); junk values fall back to defaults. No clinical text anywhere. Charts are SVG with hover and keyboard focus tooltips, a legend, a Show as table switch, and scroll sideways inside their own box on phones. **Chart palette (dataviz, checked with `validate_palette.js`)**: teal `#0E9494`, amber `#D98A00`, blue `#3B5BA9` in fixed order video, audio, follow-up; all gates pass; amber is 2.7:1 on white, so every chart has a legend, a table view and values in the tooltip (relief rule). The brand teal `#146C6C` failed the chroma floor so it is not used for series. **Dark set not validated yet** (dark theme is a later task). Skills: ui-ux-pro-max, frontend-design and dataviz used. Reused from ViniCare (`src/app/admin/*`): page list, KYC states. Changed: URL-driven tables, reauth for refunds, legal-hold rule, PHI log tab. Found and fixed: screen-reader-only text inside table headers made the page scroll sideways (30 to 370 px) until the table box became the positioning parent; server pages cannot pass functions or imported client constants to charts, so charts take a unit name and colour names | lint pass, types pass, build pass, axe 0 violations on all ten admin pages at 375/768/1024/1440, no sideways scroll, browser run of: junk sort, direction, filter and page values ignored, sort aria, filter, page link, chart tooltip on hover, show as table, wrong then right refund password, KYC gate then short then valid reason, data request start and legal hold, PHI tab, clinical-word scan of every page | PENDING |
 | 2026-10-02 | Planning | Added Phase F (23 frontend tasks, mock data first), decisions D-007 to D-009, updated Dashboard and Current focus. Reviewed 12 inspiration screens and the ViniCare route map (Checked ViniCare: patient, doctor, admin pages listed) | n/a | n/a |
 | 2026-10-02 | Planning | Adapted paths to the real folder layout (`ViniCure_Project`), added `../Frontend_Inspirations`, P0-16, rewrote P0-01 and P0-15 | n/a | n/a |
 | 2026-10-02 | Planning | Added project-context and when-to-consult-ViniCare rules to CLAUDE.md, task P0-15, `.claude/settings.json`, `/port` command | n/a | n/a |
