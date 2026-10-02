@@ -170,3 +170,42 @@ export type Article = {
 export type FaqGroup = { id: string; title: string; items: FaqItem[] };
 
 export type SupportTopic = "booking" | "payment" | "technical" | "records" | "doctor" | "other";
+
+export type AppointmentStatus = "upcoming" | "completed" | "cancelled" | "no_show";
+
+export type Appointment = {
+  id: string;
+  doctorId: string;
+  doctorName: string;
+  specialty: string;
+  registrationNumber: string;
+  /** IST calendar date, YYYY-MM-DD. */
+  date: string;
+  /** IST time, 24-hour HH:mm. */
+  time: string;
+  mode: ConsultMode;
+  forWhom: string;
+  status: AppointmentStatus;
+  feePaise: number;
+  reference: string;
+  hasPrescription: boolean;
+  reviewed: boolean;
+  /** Last day a discounted follow-up can be booked, if one applies. */
+  followUpUntil?: string;
+  followUpFeePaise?: number;
+  cancelledBy?: "patient" | "doctor";
+  refund?: { status: "processed" | "pending" | "none"; amountPaise: number };
+};
+
+/** An appointment plus what the person may do with it right now, worked out for the mock clock. */
+export type AppointmentView = Appointment & {
+  minutesUntil: number;
+  canJoin: boolean;
+  /** Free to cancel or move: more than 2 hours away. */
+  freeChange: boolean;
+};
+
+export type AppointmentsResult = {
+  all: AppointmentView[];
+  nextUp: AppointmentView | null;
+};

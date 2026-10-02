@@ -12,6 +12,7 @@ type Props = {
   doctor: DoctorProfile;
   slotId: string | undefined;
   mode: ConsultMode;
+  followUpEligible: boolean;
   busy: boolean;
   error?: string | undefined;
   onSlot: (id: string) => void;
@@ -22,7 +23,17 @@ type Props = {
 const chip =
   "inline-flex min-h-11 items-center justify-center rounded-lg border px-3 text-sm font-medium tabular-nums transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary";
 
-export function SlotStep({ doctor, slotId, mode, busy, error, onSlot, onMode, onContinue }: Props) {
+export function SlotStep({
+  doctor,
+  slotId,
+  mode,
+  followUpEligible,
+  busy,
+  error,
+  onSlot,
+  onMode,
+  onContinue,
+}: Props) {
   const days = useMemo(() => {
     const map = new Map<string, typeof doctor.slots>();
     for (const s of doctor.slots) map.set(s.date, [...(map.get(s.date) ?? []), s]);
@@ -46,7 +57,9 @@ export function SlotStep({ doctor, slotId, mode, busy, error, onSlot, onMode, on
       label: "Follow-up",
       icon: ArrowsClockwise,
       fee: doctor.followUpFeePaise,
-      disabled: "Available after a first consultation with this doctor",
+      disabled: followUpEligible
+        ? undefined
+        : "Available after a first consultation with this doctor",
     },
   ];
 

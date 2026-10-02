@@ -16,11 +16,14 @@ export default async function BookPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ slot?: string | string[] }>;
+  searchParams: Promise<{ slot?: string | string[]; type?: string | string[] }>;
 }) {
   const doctor = getDoctor((await params).id);
   if (!doctor) notFound();
-  const rawSlot = (await searchParams).slot;
+  const sp = await searchParams;
+  const rawSlot = sp.slot;
+  // The follow-up price is offered only from a completed visit. The server checks this in P4.
+  const followUp = (Array.isArray(sp.type) ? sp.type[0] : sp.type) === "followup";
   const slotParam = Array.isArray(rawSlot) ? rawSlot[0] : rawSlot;
   // Only a slot that belongs to this doctor is accepted from the URL.
   const initialSlotId = doctor.slots.some((s) => s.id === slotParam) ? slotParam : undefined;
@@ -36,7 +39,12 @@ export default async function BookPage({
         ]}
         className="mb-6"
       />
-      <BookingFlow doctor={doctor} initialSlotId={initialSlotId} selfName={selfName} />
+      <BookingFlow
+        doctor={doctor}
+        initialSlotId={initialSlotId}
+        selfName={selfName}
+        followUp={followUp}
+      />
     </div>
   );
 }

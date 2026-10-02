@@ -12,7 +12,12 @@ import { ReviewStep } from "./review-step";
 import { SlotStep } from "./slot-step";
 import { feeFor, SummaryCard } from "./summary-card";
 
-type Props = { doctor: DoctorProfile; initialSlotId: string | undefined; selfName: string };
+type Props = {
+  doctor: DoctorProfile;
+  initialSlotId: string | undefined;
+  selfName: string;
+  followUp?: boolean;
+};
 type Outcome =
   | { kind: "none" }
   | { kind: "paid"; reference: string }
@@ -24,11 +29,11 @@ type Outcome =
 const STEPS = ["Time", "Details", "Pay"];
 const stepTitles = ["Choose a time", "Who is it for?", "Review and pay"];
 
-export function BookingFlow({ doctor, initialSlotId, selfName }: Props) {
+export function BookingFlow({ doctor, initialSlotId, selfName, followUp = false }: Props) {
   const family = getFamilyMembers();
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const [slotId, setSlotId] = useState(initialSlotId);
-  const [mode, setMode] = useState<ConsultMode>("video");
+  const [mode, setMode] = useState<ConsultMode>(followUp ? "followup" : "video");
   const [holdUntil, setHoldUntil] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [slotError, setSlotError] = useState<string>();
@@ -131,6 +136,7 @@ export function BookingFlow({ doctor, initialSlotId, selfName }: Props) {
             doctor={doctor}
             slotId={slotId}
             mode={mode}
+            followUpEligible={followUp}
             busy={busy}
             error={slotError}
             onSlot={setSlotId}
