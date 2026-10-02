@@ -53,7 +53,7 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 | Phase | Name | Total | Done | In progress | Blocked |
 |---|---|---|---|---|---|
 | 0 | Bootstrap | 16 | 0 | 0 | 0 |
-| F | Frontend (UI first, mock data) | 23 | 5 | 0 | 0 |
+| F | Frontend (UI first, mock data) | 23 | 6 | 0 | 0 |
 | 1 | Platform foundations | 21 | 0 | 0 | 0 |
 | 2 | Identity and access | 16 | 0 | 0 | 0 |
 | 3 | Cloud staging | 14 | 0 | 0 | 0 |
@@ -66,11 +66,11 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 | 10 | Frontend polish | 6 | 0 | 0 | 0 |
 | 11 | Hardening and launch | 10 | 0 | 0 | 0 |
 | 12 | After launch | 8 | 0 | 0 | 0 |
-| | **Total** | **178** | **5** | **0** | **0** |
+| | **Total** | **178** | **6** | **0** | **0** |
 
 ## Current focus
 
-Phase F (frontend, mock data), in order. F-01 to F-05 done, next F-06 (sign-in and sign-up). Decision D-007: the human asked for UI first. Backend phases (P1 to P9) follow and wire to these screens.
+Phase F (frontend, mock data), in order. F-01 to F-06 done, next F-07 (doctor directory and profile). Decision D-007: the human asked for UI first. Backend phases (P1 to P9) follow and wire to these screens.
 
 ## Needs you
 
@@ -140,7 +140,7 @@ Rules for every F task:
 
 **Public site**
 - [x] **F-05** (L, C) Home page. Inspired by Med24 and Doccure layout ideas, our own copy and colors. Sections: hero with search for doctor or specialty, how it works in three steps, specialties grid, featured doctors, consultation types, trust strip (registration verified, encrypted records, India-based data), patient stories, app-style benefits, FAQ teaser, final call to action. *AC:* page matches the notes, Lighthouse accessibility above 90.
-- [ ] **F-06** (L, C) Sign-in and sign-up pages. Patient: phone number, OTP entry, resend timer, consent line. Staff: email, password, TOTP step, backup code, forgot and reset password, change password. Doctor application entry. Clear error and lockout messages. No account enumeration wording. *AC:* every state reachable with mock data and keyboard only (covers the UI part of P2-12 and P2-16).
+- [x] **F-06** (L, C) Sign-in and sign-up pages. Patient: phone number, OTP entry, resend timer, consent line. Staff: email, password, TOTP step, backup code, forgot and reset password, change password. Doctor application entry. Clear error and lockout messages. No account enumeration wording. *AC:* every state reachable with mock data and keyboard only (covers the UI part of P2-12 and P2-16).
 - [ ] **F-07** (L, C) Doctor directory and doctor profile. Search, filters (specialty, language, fee, available today), sort from an allow-list, cards, pagination, profile with registration number, qualifications, languages, reviews, fees and next slots. *AC:* filters work on mock data and URL query holds the state.
 - [ ] **F-08** (L, C) Booking flow: slot picker (timezone IST), patient or family member choice, reason, consent, summary with fee, checkout UI (Razorpay-style, mock), success and failure screens, hold timer. *AC:* all steps and failure paths reachable.
 - [ ] **F-09** (M, C) Trust and compliance pages: how it works, specialties list, doctor verification, patient rights, privacy policy, terms, cookie policy, grievance contact. Text is placeholder marked for legal review. *AC:* pages exist, banner says "draft, pending legal review" until P9-10.
@@ -384,6 +384,7 @@ Things Claude Code cannot do for you. Fill the owner and date.
 | 2026-10-02 | D-011 | pnpm build scripts denied for `unrs-resolver` (`allowBuilds` in `pnpm-workspace.yaml`) | It ships prebuilt binaries as optional packages, so no install-time script is needed. Fewer scripts running on install is safer. |
 | 2026-10-02 | D-012 | Logos in `public/brand/` are derived from `ViniCure_Logo.png` (teal on white), not from `ViniCure_logo_no_background.png` | The "no background" file is a 24-bit image with a checkerboard drawn into the pixels, so it has no real transparency. Real transparent versions (`logo.png`, `logo-light.png` in white) were generated. Human will replace the logo later: all uses go through `components/ui/logo.tsx`. |
 | 2026-10-02 | D-013 | Docker setup (P0-07, P0-08) is not needed for Phase F (frontend, mock data). Skip local Dockerfile and compose until Phase 1+ when backend services start | Keeps frontend dev lean. Dockerfile and compose.yml specifications written in Phase 0 planning but implementation deferred to P1-02 when database, cache and services are needed |
+| 2026-10-02 | D-014 | Staff password rule in the UI: 12 or more characters with lower case, upper case, a number and a symbol. Patients have no password. | A working default so the screens are complete. Confirm or change it in the P2 password policy task together with the Argon2id choice. Lockout length (15 minutes) and reset link life (30 minutes) shown in the UI are also placeholders to confirm. |
 | 2026-10-02 | D-009 | No neumorphism, despite the design tool suggesting it | Its own notes rate accessibility risk high (low-contrast edges). Flat surfaces with thin borders and soft shadows instead. |
 
 ## Progress log
@@ -392,6 +393,7 @@ Newest first. One line per finished task.
 
 | Date | Task | What changed | Checks | Commit |
 |---|---|---|---|---|
+| 2026-10-02 | F-06 | Auth pages: `/login` and `/register` (patient phone, OTP with 30 s resend timer, attempt limit, expired and locked states, consent line), `/login/staff` (email and password, TOTP, backup code, lockout), `/forgot-password`, `/reset-password` (`?state=expired` shows the dead-link state), `/change-password`, `/for-doctors` (application entry). Zod schemas in `src/lib/schemas/auth.ts`, mock rules in `src/mocks/auth.ts` behind `src/lib/data/auth.ts`, focusable error summary, show-password button, paste and password managers allowed, a labelled “Prototype only” box lists the fake codes. Replies never say whether an account exists. Skills: `ui-ux-pro-max` (searches: accessible authentication, error summary) and `frontend-design` used, both loaded through the Skill tool. Found and fixed: labels not tied to inputs when a fixed id was used (axe), focus not moved to the code boxes after a step change or wrong code. Checked ViniCare: reference repo not available in the cloud, nothing consulted. Added `zod` 4.6.5 (client validation required by the F rules, same schemas reused on the server later) | lint pass, types pass, build pass (14 routes), axe 0 violations on all 8 pages and on OTP and error states at 375px, no sideways scroll at 375/768/1024/1440, keyboard-only run through patient success, wrong, expired, locked, rate limited, staff invalid, backup code, locked, forgot, change-password summary | PENDING |
 | 2026-10-02 | F-05 | Home page: hero with doctor and specialty search (plain GET form to `/doctors`), sample consultation preview, trust strip, 12 specialties, how it works, 4 featured doctors with registration numbers, consultation types in the dark band, patient stories, benefits, FAQ teaser, final call to action. Data through `src/lib/data/home.ts`, mocks in `src/mocks/home.ts`. Skills: `ui-ux-pro-max` (landing pattern search: marketplace/directory, SKILL.md checklist) and `frontend-design` (plan, avoid generic tells: no caps eyebrows, no accent word) read from `.claude/skills/` because the Skill tool could not load them in a session that started before they were added. Inspired by Med24 (dark services band, stats idea) and Doccure (search, category tiles). Checked ViniCare: reference repo is private and could not be cloned in the cloud, nothing consulted | lint pass, types pass, build pass, axe 0 violations and no sideways scroll at 375/768/1024/1440, screenshots reviewed at 375 and 1440. Lighthouse not run (no tool in the cloud), axe used instead | 6146fab |
 | 2026-10-02 | F-04 | Public header (full nav from 1280px, menu sheet below), footer with emergency notice (112), dashboard shell (sidebar, top bar, native-popover bell and account menu, 4 tabs plus More sheet on phones, focus moves to main on page change), breadcrumbs, page header, mock session through `src/lib/data/session.ts`, role layouts and one stub dashboard per role. Found and fixed: header wrapped at 1024px, footer cramped, empty state heading level skipped. Checked ViniCare: panel routes used for the navigation lists | lint pass, types pass, format pass, build pass (7 routes), axe 0 violations on `/` and all four panels at 375px, popover Escape and focus return, skip link visible on focus, no sideways scroll | 1b5310f |
 | 2026-10-02 | F-03 | Design tokens in `globals.css` (all 22 contrast pairs pass, one fixed), 20 primitives in `src/components/ui/` (button, field, choice, OTP, card, stat tile, badge, avatar, tabs, accordion, dialog and sheet, toast, tooltip, skeleton, table, pagination, empty state, stepper, logo), dev-only `/design` page. Found and fixed: tab bar stray scrollbar, OTP autofill truncation. Checked ViniCare: nothing relevant | lint pass, types pass, format pass, build pass, axe 0 violations on `/design`, keyboard checks for dialog, tabs and OTP, no sideways scroll at 375px, `/design` returns 404 in production | 5f23f40 |

@@ -16,7 +16,7 @@ const columns: Array<{ title: string; links: Array<{ label: string; href: string
     title: "For doctors",
     links: [
       { label: "Join ViniCure", href: "/for-doctors" },
-      { label: "Doctor sign in", href: "/login?role=staff" },
+      { label: "Doctor sign in", href: "/login/staff" },
     ],
   },
   {

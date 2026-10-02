@@ -14,13 +14,24 @@ type FieldProps = {
   hint?: ReactNode;
   error?: string | undefined;
   required?: boolean;
+  /** Use a fixed id for the control, for example so an error summary can link to it. */
+  inputId?: string;
   className?: string;
   children: (props: FieldRenderProps) => ReactNode;
 };
 
 /** Label, helper text and error message wired to one control with ARIA. */
-export function Field({ label, hint, error, required = false, className, children }: FieldProps) {
-  const id = useId();
+export function Field({
+  label,
+  hint,
+  error,
+  required = false,
+  inputId,
+  className,
+  children,
+}: FieldProps) {
+  const autoId = useId();
+  const id = inputId ?? autoId;
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
   const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(" ");

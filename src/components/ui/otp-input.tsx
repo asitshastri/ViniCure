@@ -12,6 +12,8 @@ type OtpInputProps = {
   invalid?: boolean;
   disabled?: boolean;
   describedBy?: string | undefined;
+  /** Focus the first box when the component mounts. Remount it (change `key`) to refocus. */
+  autoFocus?: boolean;
 };
 
 export function OtpInput({
@@ -23,6 +25,7 @@ export function OtpInput({
   invalid = false,
   disabled = false,
   describedBy,
+  autoFocus = false,
 }: OtpInputProps) {
   const refs = useRef<Array<HTMLInputElement | null>>([]);
   const digits = Array.from({ length }, (_, i) => value[i] ?? "");
@@ -93,6 +96,7 @@ export function OtpInput({
           aria-label={`Digit ${index + 1} of ${length}`}
           aria-invalid={invalid || undefined}
           disabled={disabled}
+          autoFocus={autoFocus && index === 0}
           className={cn(
             "border-line-strong bg-surface font-display text-ink h-12 w-11 rounded-lg border text-center text-xl font-semibold transition-colors sm:w-12",
             "aria-invalid:border-danger aria-invalid:ring-danger disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:ring-1",
