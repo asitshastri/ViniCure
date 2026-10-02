@@ -53,7 +53,7 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 | Phase | Name | Total | Done | In progress | Blocked |
 |---|---|---|---|---|---|
 | 0 | Bootstrap | 16 | 0 | 0 | 0 |
-| F | Frontend (UI first, mock data) | 23 | 2 | 0 | 0 |
+| F | Frontend (UI first, mock data) | 23 | 3 | 0 | 0 |
 | 1 | Platform foundations | 21 | 0 | 0 | 0 |
 | 2 | Identity and access | 16 | 0 | 0 | 0 |
 | 3 | Cloud staging | 14 | 0 | 0 | 0 |
@@ -66,7 +66,7 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 | 10 | Frontend polish | 6 | 0 | 0 | 0 |
 | 11 | Hardening and launch | 10 | 0 | 0 | 0 |
 | 12 | After launch | 8 | 0 | 0 | 0 |
-| | **Total** | **178** | **2** | **0** | **0** |
+| | **Total** | **178** | **3** | **0** | **0** |
 
 ## Current focus
 
@@ -129,7 +129,7 @@ Rules for every F task:
 **Foundation**
 - [x] **F-01** (S, C) Review `../Frontend_Inspirations` and the ViniCare panels. Write `docs/design-notes.md` (this is P0-16): palette, type, spacing, radius, component list, screen inventory, and which reference each idea comes from. Use the ui-ux-pro-max search for the starting point. *AC:* notes list every screen in this phase with its inspiration.
 - [x] **F-02** (M, C) Scaffold Next.js (covers P0-02 to P0-04): Node 24, pnpm through corepack, latest patched Next.js after reading the security posts, TypeScript strict, Tailwind 4, App Router, `src/` layout, route groups `(public)`, `(patient)`, `(doctor)`, `(admin)`, ESLint, Prettier, `.gitignore`, `.env.example`. *AC:* `pnpm dev`, `build`, `lint`, `typecheck` pass. Installed version in Decisions.
-- [ ] **F-03** (M, C) Design tokens and primitives: colors, type (Figtree and Noto Sans), spacing, radius, shadows as CSS variables in `globals.css`. Components: Button, Input, Select, Checkbox, OTP input, Card, Badge, Avatar, Tabs, Dialog, Sheet, Toast, Tooltip, Skeleton, Table, Pagination, EmptyState. Icons from one set (Phosphor). Logo component using the files in `Frontend_Inspirations/logos` (temporary: the human will replace the logo). *AC:* a `/design` preview page (dev only) shows every component and state, including focus and disabled.
+- [x] **F-03** (M, C) Design tokens and primitives: colors, type (Figtree and Noto Sans), spacing, radius, shadows as CSS variables in `globals.css`. Components: Button, Input, Select, Checkbox, OTP input, Card, Badge, Avatar, Tabs, Dialog, Sheet, Toast, Tooltip, Skeleton, Table, Pagination, EmptyState. Icons from one set (Phosphor). Logo component using the files in `Frontend_Inspirations/logos` (temporary: the human will replace the logo). *AC:* a `/design` preview page (dev only) shows every component and state, including focus and disabled.
 - [ ] **F-04** (M, C) App shells: public header and footer, language switch placeholder, dashboard shell with sidebar and top bar for patient, doctor, admin and support, mobile bottom navigation (5 items at most), breadcrumbs, notification bell, skip link. *AC:* navigation works at all four widths and by keyboard.
 
 **Public site**
@@ -376,6 +376,7 @@ Things Claude Code cannot do for you. Fill the owner and date.
 | 2026-10-02 | D-008 | Visual direction: soft, trustworthy, professional. Calm teal and slate, off-white surfaces, warm amber and soft red only for alerts | Human asked for soft, trustworthy colors and said the logo will change, so the palette is not tied to it. Logo file used for now: `ViniCure_logo_no_background.png`. |
 | 2026-10-02 | D-010 | Toolchain pins: Next.js 16.3.8 (latest patched, September 2026 security release read first), React 19.3.0, Tailwind 4.3.3, TypeScript 5.9.3, ESLint 9.39.5, pnpm 12.8.1, Node 24 | TypeScript 7 and ESLint 10 are newer, but `eslint-config-next` relies on typescript-eslint 8, so we stay on the versions it is built for. Revisit with P12-07. pnpm is installed with `npm i -g pnpm` because `corepack enable` needs admin rights on this PC. |
 | 2026-10-02 | D-011 | pnpm build scripts denied for `unrs-resolver` (`allowBuilds` in `pnpm-workspace.yaml`) | It ships prebuilt binaries as optional packages, so no install-time script is needed. Fewer scripts running on install is safer. |
+| 2026-10-02 | D-012 | Logos in `public/brand/` are derived from `ViniCure_Logo.png` (teal on white), not from `ViniCure_logo_no_background.png` | The "no background" file is a 24-bit image with a checkerboard drawn into the pixels, so it has no real transparency. Real transparent versions (`logo.png`, `logo-light.png` in white) were generated. Human will replace the logo later: all uses go through `components/ui/logo.tsx`. |
 | 2026-10-02 | D-009 | No neumorphism, despite the design tool suggesting it | Its own notes rate accessibility risk high (low-contrast edges). Flat surfaces with thin borders and soft shadows instead. |
 
 ## Progress log
@@ -384,6 +385,7 @@ Newest first. One line per finished task.
 
 | Date | Task | What changed | Checks | Commit |
 |---|---|---|---|---|
+| 2026-10-02 | F-03 | Design tokens in `globals.css` (all 22 contrast pairs pass, one fixed), 20 primitives in `src/components/ui/` (button, field, choice, OTP, card, stat tile, badge, avatar, tabs, accordion, dialog and sheet, toast, tooltip, skeleton, table, pagination, empty state, stepper, logo), dev-only `/design` page. Found and fixed: tab bar stray scrollbar, OTP autofill truncation. Checked ViniCare: nothing relevant | lint pass, types pass, format pass, build pass, axe 0 violations on `/design`, keyboard checks for dialog, tabs and OTP, no sideways scroll at 375px, `/design` returns 404 in production | pending |
 | 2026-10-02 | F-02 | Scaffolded Next.js 16.3.8, TS strict, Tailwind 4, App Router in `src/`, fonts via `next/font`, ESLint (no-danger, no-any), Prettier, `.gitignore` (env files excluded), `.nvmrc`, `.env.example`, dev launch config. Covers P0-02, P0-03, P0-04. Checked ViniCare: nothing relevant | lint pass, types pass, format pass, build pass (`/` static) | pending |
 | 2026-10-02 | F-01 | Wrote `docs/design-notes.md`: palette, type, spacing, components, screen inventory with a reference for every screen. Checked ViniCare: route map and home sections used as the panel list | n/a (docs) | pending |
 | 2026-10-02 | Planning | Added Phase F (23 frontend tasks, mock data first), decisions D-007 to D-009, updated Dashboard and Current focus. Reviewed 12 inspiration screens and the ViniCare route map (Checked ViniCare: patient, doctor, admin pages listed) | n/a | n/a |

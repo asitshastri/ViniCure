@@ -62,17 +62,18 @@ Soft teal with slate neutrals. The contrast numbers are for text on white or on 
 | `--color-primary-tint` | `#F0F7F7` | Section backgrounds | n/a |
 | `--color-ink` | `#12292B` | Headings and body | 15:1 |
 | `--color-ink-muted` | `#4B6163` | Secondary text | 6.4:1 |
-| `--color-ink-faint` | `#6B8083` | Placeholder and meta, 14px and up only | 4.6:1 |
-| `--color-bg` | `#F6F9F9` | Page background | n/a |
+| `--color-ink-faint` | `#5A6F72` | Placeholder and meta text | 5.3:1 on white, 5.0:1 on page background (first value `#6B8083` failed the check) |
+| `--color-canvas` | `#F6F9F9` | Page background | n/a |
 | `--color-surface` | `#FFFFFF` | Cards | n/a |
-| `--color-border` | `#DCE6E6` | Card and input borders | 1.3:1, so inputs also get a darker 3:1 border `#7E9496` |
+| `--color-line` | `#DCE6E6` | Card and divider lines | 1.3:1, decorative only |
+| `--color-line-strong` | `#7E9496` | Input and control borders | 3.2:1 on white (needs 3:1) |
 | `--color-dock` | `#0C2A30` | Call controls bar, dark band | white text 14:1 |
 | `--color-info` | `#2F6FB0` | Info chips, links in text | 5.2:1 |
 | `--color-success` | `#1F7A4D` on `#E6F4EC` | Confirmed, verified | 5.0:1 |
 | `--color-warning` | `#8A5300` on `#FFF4E0` | Pending, waiting | 5.4:1 |
 | `--color-danger` | `#B3261E` on `#FDECEA` | Errors, allergies, end call | 5.9:1 |
 
-Rules: color never carries meaning alone (add icon or text). Charts use teal, slate and amber, with patterns or direct labels. Values are final only after the F-03 contrast check passes in the browser.
+Rules: color never carries meaning alone (add icon or text). Charts use teal, slate and amber, with patterns or direct labels. All 22 pairs above pass the contrast check (F-03, 2026-10-02). Each `-soft` tone also has a matching text color token, for example `success` on `success-soft`. Tailwind classes use these names: `bg-canvas`, `text-ink-muted`, `border-line-strong`, `bg-primary-soft`.
 
 ## 4. Typography
 
