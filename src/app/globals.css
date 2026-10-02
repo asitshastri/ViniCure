@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-noto-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-figtree), var(--font-noto-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --color-bg: #f6f9f9;
+  --color-ink: #12292b;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+}
