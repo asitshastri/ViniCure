@@ -34,10 +34,15 @@ export function Notice({ tone, title, children, className }: NoticeProps) {
 }
 
 /** Marks screens that only exist for the prototype. Remove when P2 lands. */
-export function PrototypeHint({ children }: { children: ReactNode }) {
+export function PrototypeHint({ children, dark = false }: { children: ReactNode; dark?: boolean }) {
   return (
-    <details className="border-line-strong text-ink-muted mt-6 rounded-xl border border-dashed p-4 text-sm">
-      <summary className="text-ink min-h-6 font-semibold">
+    <details
+      className={cn(
+        "mt-6 rounded-xl border border-dashed p-4 text-sm",
+        dark ? "border-white/50 text-white" : "border-line-strong text-ink-muted",
+      )}
+    >
+      <summary className={cn("min-h-6 font-semibold", dark ? "text-white" : "text-ink")}>
         Prototype only: try the other states
       </summary>
       <div className="mt-2 grid gap-1">{children}</div>
