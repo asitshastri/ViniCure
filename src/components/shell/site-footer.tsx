@@ -25,7 +25,7 @@ const columns: Array<{ title: string; links: Array<{ label: string; href: string
       { label: "Health blog", href: "/blog" },
       { label: "FAQs", href: "/faq" },
       { label: "Contact and support", href: "/support" },
-      { label: "Grievance officer", href: "/support#grievance" },
+      { label: "Grievance officer", href: "/grievance" },
     ],
   },
   {

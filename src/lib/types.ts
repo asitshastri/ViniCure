@@ -133,3 +133,21 @@ export type PaymentResult =
   | { status: "failed"; reason: "declined" | "bank_down" }
   | { status: "pending" }
   | { status: "slot_taken" };
+
+export type LegalSection = {
+  id: string;
+  heading: string;
+  paragraphs: string[];
+  items?: string[];
+};
+
+export type LegalDoc = {
+  slug: string;
+  title: string;
+  summary: string;
+  /** Draft date, shown on the page. */
+  draftDate: string;
+  sections: LegalSection[];
+};
+
+export type SpecialtyWithCount = Specialty & { doctorCount: number };
