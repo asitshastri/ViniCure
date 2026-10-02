@@ -292,3 +292,65 @@ export type ReferralInfo = {
   link: string;
   people: Array<{ id: string; initials: string; status: "invited" | "joined" | "booked" }>;
 };
+
+export type DoctorConsultStatus = "upcoming" | "completed" | "no_show" | "cancelled";
+
+export type DoctorConsult = {
+  id: string;
+  /** IST calendar date and 24-hour time. */
+  date: string;
+  time: string;
+  patientId: string;
+  patientName: string;
+  ageSex: string;
+  reason: string;
+  kind: "new" | "followup";
+  mode: ConsultMode;
+  status: DoctorConsultStatus;
+  allergies: string[];
+};
+
+export type DoctorConsultView = DoctorConsult & { minutesUntil: number; canStart: boolean };
+
+export type DoctorPatient = {
+  id: string;
+  name: string;
+  ageSex: string;
+  lastVisit: string;
+  visits: number;
+  kind: "new" | "followup";
+  allergies: string[];
+  conditions: string[];
+  sharedFiles: number;
+};
+
+export type AvailabilityDay = {
+  day: number;
+  label: string;
+  enabled: boolean;
+  start: string;
+  end: string;
+};
+export type TimeOff = { id: string; from: string; to: string; reason: string };
+
+export type Payout = {
+  id: string;
+  period: string;
+  consultations: number;
+  grossPaise: number;
+  feePaise: number;
+  netPaise: number;
+  status: "paid" | "processing" | "on_hold";
+  paidOn?: string;
+  note?: string;
+};
+
+export type EarningLine = {
+  id: string;
+  date: string;
+  patient: string;
+  mode: ConsultMode;
+  grossPaise: number;
+  netPaise: number;
+  status: "paid" | "processing";
+};
