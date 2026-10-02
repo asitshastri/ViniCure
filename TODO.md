@@ -81,6 +81,7 @@ Phase F (frontend, mock data), in order. F-01 to F-08 done, next F-09 (trust and
 | Start Meta business verification and WhatsApp number | Long lead time. | Start now, needed by P8 | Not started |
 | Decide about the "agent rules" block `next dev` adds to `CLAUDE.md` (tell me keep or remove) | It rewrites a file you own each time the dev server runs. I left it uncommitted. | Any time | Not started |
 | Supply the final logo as a real transparent PNG or SVG (the "no background" file has a checkerboard baked in) | The current logo is a temporary derived copy | Before launch | Not started |
+| Give the GST and invoice rule and the cancellation and refund policy for consultations (placeholders are on the booking review step) | Booking and receipts cannot show final wording without it | Before P5 | Not started |
 | Confirm medical record retention: the old ViniCare backlog assumed 7 years, one source we found says at least 3 years | Sets retention rules, the erasure job and the retention matrix | Before P9-04 | Not started |
 
 ## Blockers
