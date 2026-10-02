@@ -53,7 +53,7 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 | Phase | Name | Total | Done | In progress | Blocked |
 |---|---|---|---|---|---|
 | 0 | Bootstrap | 16 | 0 | 0 | 0 |
-| F | Frontend (UI first, mock data) | 23 | 5 | 0 | 0 |
+| F | Frontend (UI first, mock data) | 23 | 6 | 0 | 0 |
 | 1 | Platform foundations | 21 | 0 | 0 | 0 |
 | 2 | Identity and access | 16 | 0 | 0 | 0 |
 | 3 | Cloud staging | 14 | 0 | 0 | 0 |
@@ -66,7 +66,7 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 | 10 | Frontend polish | 6 | 0 | 0 | 0 |
 | 11 | Hardening and launch | 10 | 0 | 0 | 0 |
 | 12 | After launch | 8 | 0 | 0 | 0 |
-| | **Total** | **178** | **5** | **0** | **0** |
+| | **Total** | **178** | **6** | **0** | **0** |
 
 ## Current focus
 
@@ -139,7 +139,7 @@ Rules for every F task:
 
 **Public site**
 - [x] **F-05** (L, C) Home page. Inspired by Med24 and Doccure layout ideas, our own copy and colors. Sections: hero with search for doctor or specialty, how it works in three steps, specialties grid, featured doctors, consultation types, trust strip (registration verified, encrypted records, India-based data), patient stories, app-style benefits, FAQ teaser, final call to action. *AC:* page matches the notes, Lighthouse accessibility above 90.
-- [ ] **F-06** (L, C) Sign-in and sign-up pages. Patient: phone number, OTP entry, resend timer, consent line. Staff: email, password, TOTP step, backup code, forgot and reset password, change password. Doctor application entry. Clear error and lockout messages. No account enumeration wording. *AC:* every state reachable with mock data and keyboard only (covers the UI part of P2-12 and P2-16).
+- [x] **F-06** (L, C) Sign-in and sign-up pages. Patient: phone number, OTP entry, resend timer, consent line. Staff: email, password, TOTP step, backup code, forgot and reset password, change password. Doctor application entry. Clear error and lockout messages. No account enumeration wording. *AC:* every state reachable with mock data and keyboard only (covers the UI part of P2-12 and P2-16).
 - [ ] **F-07** (L, C) Doctor directory and doctor profile. Search, filters (specialty, language, fee, available today), sort from an allow-list, cards, pagination, profile with registration number, qualifications, languages, reviews, fees and next slots. *AC:* filters work on mock data and URL query holds the state.
 - [ ] **F-08** (L, C) Booking flow: slot picker (timezone IST), patient or family member choice, reason, consent, summary with fee, checkout UI (Razorpay-style, mock), success and failure screens, hold timer. *AC:* all steps and failure paths reachable.
 - [ ] **F-09** (M, C) Trust and compliance pages: how it works, specialties list, doctor verification, patient rights, privacy policy, terms, cookie policy, grievance contact. Text is placeholder marked for legal review. *AC:* pages exist, banner says "draft, pending legal review" until P9-10.
@@ -392,6 +392,7 @@ Newest first. One line per finished task.
 |---|---|---|---|---|
 | 2026-10-02 | F-04 | Public header (full nav from 1280px, menu sheet below), footer with emergency notice (112), dashboard shell (sidebar, top bar, native-popover bell and account menu, 4 tabs plus More sheet on phones, focus moves to main on page change), breadcrumbs, page header, mock session through `src/lib/data/session.ts`, role layouts and one stub dashboard per role. Found and fixed: header wrapped at 1024px, footer cramped, empty state heading level skipped. Checked ViniCare: panel routes used for the navigation lists | lint pass, types pass, format pass, build pass (7 routes), axe 0 violations on `/` and all four panels at 375px, popover Escape and focus return, skip link visible on focus, no sideways scroll | 1b5310f |
 | 2026-10-02 | F-05 | Home page: hero with GET search form to `/doctors`, trust strip, 3 steps, specialties grid, featured doctors (fake, with registration numbers), dark benefits band, patient stories (marked sample), FAQ teaser, final CTA. Data via `src/lib/data/home.ts` and `src/mocks/home.ts`. Inspiration: Med24 (hero, dark band), Doccure (search, category cards). Checked ViniCare: nothing relevant beyond hero and core services | lint pass, types pass, build pass, axe 0 violations at 375/768/1024/1440, no sideways scroll at all four widths | 2122264 |
+| 2026-10-02 | F-06 | Patient phone OTP sign-in and sign-up (resend timer, lockout, send limit, expired and wrong code states), staff email, password, TOTP and backup code, forgot, reset and change password, all through `src/lib/data/auth.ts` mock. Zod 4 added for client validation (justification: one schema source the server reuses in P2). Generic error wording, no enumeration. Checked ViniCare: login pages for field list, nothing reused | lint pass, types pass, build pass, axe 0 serious at 4 widths on 7 pages, Playwright walk of OTP wrong and right code, staff lockout. Found and fixed invalid p-in-p hydration error | PLACEHOLDER |
 | 2026-10-02 | F-03 | Design tokens in `globals.css` (all 22 contrast pairs pass, one fixed), 20 primitives in `src/components/ui/` (button, field, choice, OTP, card, stat tile, badge, avatar, tabs, accordion, dialog and sheet, toast, tooltip, skeleton, table, pagination, empty state, stepper, logo), dev-only `/design` page. Found and fixed: tab bar stray scrollbar, OTP autofill truncation. Checked ViniCare: nothing relevant | lint pass, types pass, format pass, build pass, axe 0 violations on `/design`, keyboard checks for dialog, tabs and OTP, no sideways scroll at 375px, `/design` returns 404 in production | 5f23f40 |
 | 2026-10-02 | F-02 | Scaffolded Next.js 16.3.8, TS strict, Tailwind 4, App Router in `src/`, fonts via `next/font`, ESLint (no-danger, no-any), Prettier, `.gitignore` (env files excluded), `.nvmrc`, `.env.example`, dev launch config. Covers P0-02, P0-03, P0-04. Checked ViniCare: nothing relevant | lint pass, types pass, format pass, build pass (`/` static) | d705c39 |
 | 2026-10-02 | F-01 | Wrote `docs/design-notes.md`: palette, type, spacing, components, screen inventory with a reference for every screen. Checked ViniCare: route map and home sections used as the panel list | n/a (docs) | d705c39 |
