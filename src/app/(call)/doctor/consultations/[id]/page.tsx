@@ -14,6 +14,7 @@ export default async function ConsolePage({ params }: { params: Promise<{ id: st
   if (ctx.consult.status !== "upcoming") {
     return (
       <div className="mx-auto grid max-w-xl gap-4 px-4 py-16">
+        <h1 className="sr-only">Consultation</h1>
         <Notice tone="warning" title="This consultation is closed">
           It has finished, was cancelled, or the patient did not join.
         </Notice>

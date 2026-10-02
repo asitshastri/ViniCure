@@ -9,6 +9,7 @@ import { formatRupees } from "@/lib/format";
 // Amber is below 3:1 contrast on white, so every chart that uses it also has a legend, direct labels and a table view.
 const STYLE = `
 .viz-root{--surface:#fcfcfb;--ink:#12292b;--ink2:#4b6163;--grid:#e6eded;--s1:#0e9494;--s2:#d98a00;--s3:#3b5ba9}
+.viz-root [tabindex]:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
 `;
 
 export type Series = { key: string; label: string; color: keyof typeof COLORS };
@@ -32,7 +33,7 @@ function Frame({
   const id = useId();
   return (
     <figure
-      className="viz-root border-line bg-surface shadow-card rounded-xl border p-5"
+      className="viz-root border-line bg-surface shadow-card max-w-full min-w-0 rounded-xl border p-5"
       style={{ background: "var(--surface)" }}
     >
       <style>{STYLE}</style>
