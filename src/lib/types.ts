@@ -235,3 +235,60 @@ export type ShareTarget = {
   specialty: string;
   reason: string;
 };
+
+export type PatientProfile = {
+  name: string;
+  /** Shown masked. Changing the number needs a new code. */
+  phoneMasked: string;
+  email: string;
+  /** ISO date or empty. */
+  dob: string;
+  sex: "" | "female" | "male" | "other";
+  language: string;
+  emergency: { name: string; relation: string; phone: string };
+};
+
+export type MedicalHistory = {
+  conditions: string[];
+  allergies: string[];
+  medicines: Array<{ id: string; name: string; dose: string }>;
+  updatedOn: string;
+};
+
+export type VitalReading = {
+  id: string;
+  date: string;
+  sys?: number;
+  dia?: number;
+  pulse?: number;
+  spo2?: number;
+  temp?: number;
+  weight?: number;
+  sugar?: number;
+  note?: string;
+};
+
+export type ConsentItem = {
+  id: string;
+  title: string;
+  description: string;
+  /** Needed to give care. Withdrawing it means the account cannot be used for consultations. */
+  required: boolean;
+  granted: boolean;
+  since: string;
+};
+
+export type SignInSession = {
+  id: string;
+  device: string;
+  browser: string;
+  place: string;
+  lastActive: string;
+  current: boolean;
+};
+
+export type ReferralInfo = {
+  code: string;
+  link: string;
+  people: Array<{ id: string; initials: string; status: "invited" | "joined" | "booked" }>;
+};
