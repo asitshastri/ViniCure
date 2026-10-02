@@ -53,7 +53,7 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 | Phase | Name | Total | Done | In progress | Blocked |
 |---|---|---|---|---|---|
 | 0 | Bootstrap | 16 | 0 | 0 | 0 |
-| F | Frontend (UI first, mock data) | 23 | 4 | 0 | 0 |
+| F | Frontend (UI first, mock data) | 23 | 4 | 1 | 0 |
 | 1 | Platform foundations | 21 | 0 | 0 | 0 |
 | 2 | Identity and access | 16 | 0 | 0 | 0 |
 | 3 | Cloud staging | 14 | 0 | 0 | 0 |
@@ -70,7 +70,7 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 
 ## Current focus
 
-Phase F (frontend, mock data), in order, starting with F-01. Decision D-007: the human asked for UI first. Backend phases (P1 to P9) follow and wire to these screens.
+Phase F (frontend, mock data), in order. F-01 to F-04 done, F-05 (Home) in progress. Decision D-007: the human asked for UI first. Backend phases (P1 to P9) follow and wire to these screens.
 
 ## Needs you
 
@@ -138,7 +138,7 @@ Rules for every F task:
 - [x] **F-04** (M, C) App shells: public header and footer, dashboard shell with sidebar and top bar for patient, doctor, admin and support (support console lives under `/staff/*` so it does not nest inside the admin shell), mobile bottom navigation (4 tabs plus a More sheet), breadcrumbs, page header, notification bell, account menu, skip link. The language switch is added in F-22, so no dead control is shown now. *AC:* navigation works at all four widths and by keyboard.
 
 **Public site**
-- [ ] **F-05** (L, C) Home page. Inspired by Med24 and Doccure layout ideas, our own copy and colors. Sections: hero with search for doctor or specialty, how it works in three steps, specialties grid, featured doctors, consultation types, trust strip (registration verified, encrypted records, India-based data), patient stories, app-style benefits, FAQ teaser, final call to action. *AC:* page matches the notes, Lighthouse accessibility above 90.
+- [~] **F-05** (L, C) Home page. Inspired by Med24 and Doccure layout ideas, our own copy and colors. Sections: hero with search for doctor or specialty, how it works in three steps, specialties grid, featured doctors, consultation types, trust strip (registration verified, encrypted records, India-based data), patient stories, app-style benefits, FAQ teaser, final call to action. *AC:* page matches the notes, Lighthouse accessibility above 90.
 - [ ] **F-06** (L, C) Sign-in and sign-up pages. Patient: phone number, OTP entry, resend timer, consent line. Staff: email, password, TOTP step, backup code, forgot and reset password, change password. Doctor application entry. Clear error and lockout messages. No account enumeration wording. *AC:* every state reachable with mock data and keyboard only (covers the UI part of P2-12 and P2-16).
 - [ ] **F-07** (L, C) Doctor directory and doctor profile. Search, filters (specialty, language, fee, available today), sort from an allow-list, cards, pagination, profile with registration number, qualifications, languages, reviews, fees and next slots. *AC:* filters work on mock data and URL query holds the state.
 - [ ] **F-08** (L, C) Booking flow: slot picker (timezone IST), patient or family member choice, reason, consent, summary with fee, checkout UI (Razorpay-style, mock), success and failure screens, hold timer. *AC:* all steps and failure paths reachable.

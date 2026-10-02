@@ -17,3 +17,71 @@ export type MockSession = {
   user: SessionUser;
   notifications: NotificationItem[];
 };
+
+export type SpecialtyIcon =
+  | "general"
+  | "heart"
+  | "child"
+  | "skin"
+  | "women"
+  | "mind"
+  | "bone"
+  | "eye"
+  | "ear"
+  | "tooth"
+  | "diabetes"
+  | "lungs";
+
+export type Specialty = {
+  slug: string;
+  name: string;
+  /** What people usually come for, one short line. */
+  blurb: string;
+  icon: SpecialtyIcon;
+};
+
+export type DoctorSummary = {
+  id: string;
+  name: string;
+  specialty: string;
+  qualifications: string;
+  /** Medical council registration number. Shown wherever a doctor appears. */
+  registrationNumber: string;
+  experienceYears: number;
+  languages: string[];
+  rating: number;
+  reviewCount: number;
+  feePaise: number;
+  nextSlot: string;
+};
+
+export type ConsultationType = {
+  id: string;
+  name: string;
+  description: string;
+  icon: "video" | "audio" | "followup";
+  fromPaise: number;
+};
+
+export type PatientStory = {
+  id: string;
+  quote: string;
+  name: string;
+  place: string;
+  context: string;
+};
+
+export type FaqItem = {
+  id: string;
+  question: string;
+  answer: string;
+};
+
+export type HomeContent = {
+  popularSearches: Specialty[];
+  specialties: Specialty[];
+  featuredDoctors: DoctorSummary[];
+  consultationTypes: ConsultationType[];
+  stories: PatientStory[];
+  faqs: FaqItem[];
+};
