@@ -70,7 +70,7 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 
 ## Current focus
 
-Phase 1 (platform foundations) is finished on branch `phase-p1-foundations`: 20 of 21 tasks done and verified against real Postgres, Valkey, an S3 server and the built containers. P1-02 keeps one open criterion: a CI workflow that applies the migrations (that is P0-09). Next: open the pull request for Phase 1 (rebase on main, checks, tag `phase-p1-done`), then Phase 2 (identity and access). Phase F stays accepted (D-015).
+Phase 1 (platform foundations) is finished and merged to `main` (tag `phase-p1-done`): 20 of 21 tasks done and verified against real Postgres, Valkey, an S3 server and the built containers. P1-02 keeps one open criterion: a CI workflow that applies the migrations (that is P0-09). Next: Phase 2 (identity and access). Phase F stays accepted (D-015).
 
 ## Needs you
 

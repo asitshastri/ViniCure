@@ -47,19 +47,14 @@ Record every consultation in the Progress log: `Reused: <files> -> <what we took
 
 `TODO.md` is the single execution backlog. These rules override any task description.
 
-### Git branching strategy
-- **`main` branch**: stable, merged phases only. Never break it. Merges only after phase completion, full testing (lint, typecheck, build, axe), and code review.
-- **Phase branches**: one branch per major phase (`phase-f-frontend`, `phase-p2-auth`, `phase-p3-backend`, etc.). All work for that phase happens here.
-- **Rules to avoid merge conflicts and slow feedback**:
-  1. Merge to main **only when the entire phase is complete** (all acceptance criteria met, all tests pass, no TODOs).
-  2. Keep phase branches short-lived (target: 2–4 weeks per phase). If a phase stretches longer, check if it should split.
-  3. **Do not branch off phase branches**. All work stays on the phase branch. Rebasing is OK; merges within a phase are not.
-  4. **Rebase phase branch onto main before merge** (no merge commits). This keeps main history clean and avoids conflicts.
-  5. **On conflict during rebase**: stop, resolve, and commit `git rebase --continue`. Do not force-push without reviewing every commit.
-  6. **Tag each phase merge** with `phase-f-done`, `phase-p2-done`, etc., so history is searchable and rollback is clear.
-  7. **Main stays deployable at every commit**. If a phase merge breaks the build, revert immediately and fix on the phase branch, then re-merge.
+### Git workflow (simple, decided 2026-10-04)
+- Work directly on `main`. No phase branches.
+- Finish one task, check it (lint, typecheck, tests, build), commit it with the task ID, and push `main` to GitHub.
+- A phase is finished when all its tasks are done or their open items are logged in `TODO.md`. Tag it then: `phase-f-done`, `phase-p1-done`, and so on.
+- `main` must always build and pass tests. If a commit breaks it, fix it or revert it right away.
+- Never force-push or rewrite history without asking the human.
 
-Cloud sessions and local sessions use the same branch strategy. For cloud reference to viniCare, clone `https://github.com/asitshastri/viniCare.git` into the working directory.
+Cloud sessions and local sessions use the same workflow. For cloud reference to viniCare, clone `https://github.com/asitshastri/viniCare.git` into the working directory.
 
 **At the start of every session**
 1. Read `TODO.md`: Current focus, Needs you, Blockers, DISCOVERED.
