@@ -1,7 +1,9 @@
 import { configureApi } from "./api/deps";
+import { AuditService, MemoryAuditStore } from "./audit/audit";
 import { configureCache, createCache } from "./cache";
 import { getConfig } from "./config/config";
 import { Crypto, LocalKeyProvider, configureCrypto } from "./crypto/crypto";
+import { MemoryDurableStore, createIdempotency } from "./idempotency/idempotency";
 import { logger } from "./logging/logger";
 import { RateLimiter } from "./rate-limit/limiter";
 
@@ -25,10 +27,29 @@ export function bootstrap(): void {
   });
   configureApi({ rateLimit: limiter.check, trustedProxyHops: config.TRUSTED_PROXY_HOPS });
 
+  let crypto: Crypto | undefined;
   if (config.CRYPTO_PROVIDER === "local" && config.LOCAL_DEV_KEY) {
-    configureCrypto(new Crypto(new LocalKeyProvider(config.LOCAL_DEV_KEY)));
+    crypto = new Crypto(new LocalKeyProvider(config.LOCAL_DEV_KEY));
+    configureCrypto(crypto);
   } else if (config.CRYPTO_PROVIDER === "kms") {
     // The KMS client and wrapped keys arrive with the AWS setup (P3-06).
     logger.warn({ event: "crypto_not_configured", provider: "kms" });
+  }
+
+  // Development and tests use in-memory stores. In production these stay unset until
+  // the Postgres stores exist (P1-02 onward), so audited and idempotent routes refuse
+  // to run instead of running unrecorded.
+  if (config.NODE_ENV !== "production") {
+    configureApi({ audit: new AuditService(new MemoryAuditStore()).writer });
+    if (crypto) {
+      configureApi({
+        idempotency: createIdempotency({
+          cache,
+          store: new MemoryDurableStore(),
+          crypto,
+          env: config.APP_ENV,
+        }),
+      });
+    }
   }
 }
