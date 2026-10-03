@@ -1,9 +1,13 @@
 import { configureApi } from "./api/deps";
 import { AuditService, MemoryAuditStore } from "./audit/audit";
+import { PgAuditStore } from "./audit/repo";
 import { configureCache, createCache } from "./cache";
 import { getConfig } from "./config/config";
 import { Crypto, LocalKeyProvider, configureCrypto } from "./crypto/crypto";
+import { configureDatabase, queryable } from "./db/pool";
 import { MemoryDurableStore, createIdempotency } from "./idempotency/idempotency";
+import { PgDurableStore } from "./idempotency/repo";
+import { installSignalHandlers } from "./lifecycle";
 import { logger } from "./logging/logger";
 import { RateLimiter } from "./rate-limit/limiter";
 
@@ -36,10 +40,24 @@ export function bootstrap(): void {
     logger.warn({ event: "crypto_not_configured", provider: "kms" });
   }
 
-  // Development and tests use in-memory stores. In production these stay unset until
-  // the Postgres stores exist (P1-02 onward), so audited and idempotent routes refuse
-  // to run instead of running unrecorded.
-  if (config.NODE_ENV !== "production") {
+  // With a database, audit and idempotency records go to Postgres. Without one, development
+  // uses in-memory stores. In production they stay unset until the database is configured, so
+  // audited and idempotent routes refuse to run instead of running unrecorded.
+  const database = configureDatabase(config);
+  if (database) {
+    const db = queryable(database);
+    configureApi({ audit: new AuditService(new PgAuditStore(db)).writer });
+    if (crypto) {
+      configureApi({
+        idempotency: createIdempotency({
+          cache,
+          store: new PgDurableStore(db),
+          crypto,
+          env: config.APP_ENV,
+        }),
+      });
+    }
+  } else if (config.NODE_ENV !== "production") {
     configureApi({ audit: new AuditService(new MemoryAuditStore()).writer });
     if (crypto) {
       configureApi({
@@ -52,4 +70,7 @@ export function bootstrap(): void {
       });
     }
   }
+
+  // Close pools when the process is told to stop. Next.js decides when to exit.
+  installSignalHandlers({ exit: false });
 }

@@ -19,10 +19,22 @@ All ports listen on this computer only. The passwords in `compose.yml` are throw
 
 Stop everything: `docker compose -f docker/compose.yml down`. Add `-v` to also delete the data.
 
+## Database logins
+
+First start creates two roles (see `postgres-init/01-roles.sql`). Put these in `.env.local`:
+
+```
+DATABASE_MIGRATION_URL=postgres://migrator:dev-only-change-me@localhost:5432/vinicure
+DATABASE_URL=postgres://app:dev-only-change-me@localhost:5432/vinicure
+VALKEY_URL=redis://localhost:6379
+```
+
+Apply the migrations with `pnpm db:migrate`. The `app` role can change data but not the schema. If you change `postgres-init`, run `docker compose -f docker/compose.yml down -v` first so it runs again.
+
 ## Running the integration tests
 
 ```bash
-VALKEY_TEST_URL=redis://localhost:6379 pnpm test
+VALKEY_TEST_URL=redis://localhost:6379 \nMINIO_TEST_ENDPOINT=http://localhost:9000 \nDATABASE_TEST_URL=postgres://app:dev-only-change-me@localhost:5432/vinicure \npnpm test
 ```
 
 More variables (for example `MINIO_TEST_ENDPOINT`) are listed in the integration test files, which skip themselves when their variable is not set.
