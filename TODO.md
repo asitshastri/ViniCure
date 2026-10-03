@@ -76,7 +76,7 @@ Phase 1 (platform foundations) is finished on branch `phase-p1-foundations`: 20 
 
 | Ask | Why | Needed by | Status |
 |---|---|---|---|
-| Install Docker Desktop (needs admin rights; enable WSL2) and confirm `docker --version` works | `docker` is not installed on this PC. Needed to run the real Postgres, Valkey and MinIO tests and to build the worker and web images, which close P1-01, P1-07, P1-08, P1-10, P1-12. Then run: `docker compose -f docker/compose.yml up -d` | Now, to close Phase 1 | **Blocking 6 tasks** |
+| Install Docker Desktop | Done 2026-10-04 (version 29.8.1). Local services start with `docker compose -f docker/compose.yml up -d`. If `docker` is not found in a new terminal, add `C:\Program Files\Docker\Dockeresourcesin` to PATH | n/a | Done |
 | Triage the DISCOVERED rows: confirm each goes to the phase in its Notes column (OK is enough) | Keeps the [SEC] rows from being forgotten. Each row is raised again when its phase starts. | When each phase starts | Deferred (D-016) |
 | Reference-repo cleanup (P0-15), see the ask above | Blocks P0-13 reuse map | Before P0-13, or the first port task | Deferred (D-016) |
 | Create accounts when their task starts: Razorpay (P5), video provider such as 100ms (P6), AWS account and domain (P3), Sentry (P1-18), SMS/email providers (P8) | Each needs your identity, payment method or approval. I will list the exact ask the day the task starts. | At each task | Deferred (D-016) |
