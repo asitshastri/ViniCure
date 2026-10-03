@@ -5,6 +5,8 @@ export type HeaderOptions = {
   nonce: string;
   production: boolean;
   pathname: string;
+  /** Extra origins the browser may send data to, such as the error-tracking ingest host. */
+  connectOrigins?: readonly string[];
 };
 
 /** Pages that may use the camera and microphone: the patient and doctor call screens only. */
@@ -17,7 +19,8 @@ export function allowsMedia(pathname: string): boolean {
 export function buildCsp({
   nonce,
   production,
-}: Pick<HeaderOptions, "nonce" | "production">): string {
+  connectOrigins = [],
+}: Pick<HeaderOptions, "nonce" | "production" | "connectOrigins">): string {
   const directives = [
     "default-src 'self'",
     // strict-dynamic lets the nonce-approved Next.js scripts load their chunks.
@@ -29,7 +32,7 @@ export function buildCsp({
     "font-src 'self'",
     "media-src 'self' blob:",
     // Development needs a websocket for hot reload. The video SDK origin is added with P6.
-    `connect-src 'self'${production ? "" : " ws://localhost:* ws://127.0.0.1:*"}`,
+    `connect-src 'self'${connectOrigins.map((origin) => ` ${origin}`).join("")}${production ? "" : " ws://localhost:* ws://127.0.0.1:*"}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

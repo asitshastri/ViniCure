@@ -1,7 +1,19 @@
+import * as Sentry from "@sentry/nextjs";
+
 // Runs once when the server starts. In production an invalid configuration
 // stops the process here, before any request is served.
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   const { bootstrap } = await import("./lib/bootstrap");
   bootstrap();
+
+  const dsn = process.env.SENTRY_DSN;
+  if (dsn) {
+    const { sentryBaseOptions } = await import("./lib/observability/scrub");
+    Sentry.init({
+      ...sentryBaseOptions(dsn, process.env.SENTRY_ENVIRONMENT ?? process.env.APP_ENV ?? "unknown"),
+    });
+  }
 }
+
+export const onRequestError = Sentry.captureRequestError;

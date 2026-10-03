@@ -90,6 +90,8 @@ const schema = z.object({
 
   // Monitoring
   SENTRY_DSN: z.url().optional(),
+  // Public by design: the browser needs it to report errors.
+  NEXT_PUBLIC_SENTRY_DSN: z.url().optional(),
   SENTRY_ENVIRONMENT: optionalString,
 
   // Budgets

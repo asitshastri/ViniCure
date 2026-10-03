@@ -11,6 +11,11 @@ function allowedOrigins(): string[] {
   return [new URL(config.APP_URL).origin, ...config.AUTH_TRUSTED_ORIGINS];
 }
 
+function connectOrigins(): string[] {
+  const dsn = getConfig().NEXT_PUBLIC_SENTRY_DSN;
+  return dsn ? [new URL(dsn).origin] : [];
+}
+
 export function proxy(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
   const production = process.env.NODE_ENV === "production";
@@ -41,7 +46,12 @@ export function proxy(request: NextRequest): NextResponse {
   }
 
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
-  const headers = securityHeaders({ nonce, production, pathname });
+  const headers = securityHeaders({
+    nonce,
+    production,
+    pathname,
+    connectOrigins: connectOrigins(),
+  });
 
   // Next.js reads the CSP from the request to put the nonce on its own scripts.
   const requestHeaders = new Headers(request.headers);

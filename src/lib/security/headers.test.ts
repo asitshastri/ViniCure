@@ -18,6 +18,15 @@ describe("CSP", () => {
     expect(prod).toContain("upgrade-insecure-requests");
   });
 
+  it("adds only the listed extra connect origins", () => {
+    const csp = buildCsp({
+      nonce: "N",
+      production: true,
+      connectOrigins: ["https://o1.ingest.sentry.io"],
+    });
+    expect(csp).toContain("connect-src 'self' https://o1.ingest.sentry.io;");
+  });
+
   it("allows eval and websockets only in development", () => {
     const dev = buildCsp({ nonce: "N", production: false });
     expect(dev).toContain("'unsafe-eval'");
