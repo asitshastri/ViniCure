@@ -2,9 +2,9 @@ import { S3Client } from "@aws-sdk/client-s3";
 import { describe, expect, it } from "vitest";
 import { S3ObjectStore, StorageService } from "./storage";
 
-// Runs against MinIO from docker/compose.yml. Skipped unless MINIO_TEST_ENDPOINT is set:
-//   MINIO_TEST_ENDPOINT=http://localhost:9000 pnpm test
-const endpoint = process.env.MINIO_TEST_ENDPOINT;
+// Runs against MinIO from docker/compose.yml. Skipped unless S3_TEST_ENDPOINT is set:
+//   S3_TEST_ENDPOINT=http://localhost:9000 pnpm test
+const endpoint = process.env.S3_TEST_ENDPOINT;
 
 const PDF = Buffer.from("%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n");
 

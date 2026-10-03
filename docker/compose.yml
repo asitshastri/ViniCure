@@ -39,31 +39,36 @@ services:
     image: axllent/mailpit:latest
     ports: ["127.0.0.1:8025:8025", "127.0.0.1:1025:1025"]
 
-  minio:
-    image: minio/minio:latest
-    command: ["server", "/data", "--console-address", ":9001"]
+  # S3-compatible storage. S3's images are no longer published, so RustFS stands in locally.
+  s3:
+    image: rustfs/rustfs:latest
     environment:
-      MINIO_ROOT_USER: dev
-      MINIO_ROOT_PASSWORD: dev-only-change-me
+      RUSTFS_ACCESS_KEY: dev
+      RUSTFS_SECRET_KEY: dev-only-change-me
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
     ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
-    volumes: ["miniodata:/data"]
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
+    volumes: ["s3data:/data"]
 
   # One-off job: creates the two private buckets, then exits.
-  minio-init:
-    image: minio/mc:latest
-    depends_on:
-      minio: { condition: service_healthy }
+  s3-init:
+    image: amazon/aws-cli:latest
+    depends_on: [s3]
+    environment:
+      AWS_ACCESS_KEY_ID: dev
+      AWS_SECRET_ACCESS_KEY: dev-only-change-me
+      AWS_DEFAULT_REGION: ap-south-1
     entrypoint: >
       /bin/sh -c "
-      mc alias set local http://minio:9000 dev dev-only-change-me &&
-      mc mb --ignore-existing local/vinicure-files local/vinicure-exports &&
-      mc anonymous set none local/vinicure-files &&
-      mc anonymous set none local/vinicure-exports &&
+      for b in vinicure-files vinicure-exports; do
+        for i in 1 2 3 4 5 6 7 8 9 10; do
+          aws --endpoint-url http://s3:9000 s3api head-bucket --bucket $$b 2>/dev/null && break;
+          aws --endpoint-url http://s3:9000 s3api create-bucket --bucket $$b 2>/dev/null && break;
+          sleep 3;
+        done;
+      done;
       echo buckets ready"
     restart: "no"
 
@@ -99,15 +104,23 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
 
+  # The web image always runs in production mode, so it needs production-shaped settings.
+  # These are throwaway local values. A `kms` crypto provider is not wired yet (P3), so
+  # encrypted features and idempotency stay off in this container.
   web:
     profiles: ["app"]
     build: { context: .., dockerfile: docker/Dockerfile, target: web }
     environment:
-      NODE_ENV: development
-      APP_URL: http://localhost:3000
+      APP_ENV: staging
+      APP_URL: https://localhost:3000
       DATABASE_URL: postgres://app:dev-only-change-me@postgres:5432/vinicure
       VALKEY_URL: redis://valkey:6379
-      LOCAL_DEV_KEY: a-local-development-key-of-32-chars-min
+      AUTH_SECRET: local-only-secret-at-least-thirty-two-chars
+      CRYPTO_PROVIDER: kms
+      KMS_KEY_ID: local-placeholder
+      S3_BUCKET_FILES: vinicure-files
+      S3_BUCKET_EXPORTS: vinicure-exports
+      S3_REGION: ap-south-1
     ports: ["127.0.0.1:3000:3000"]
     depends_on:
       migrate: { condition: service_completed_successfully }
@@ -116,4 +129,4 @@ services:
 volumes:
   pgdata:
   valkeydata:
-  miniodata:
+  s3data:

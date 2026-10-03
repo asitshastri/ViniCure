@@ -59,6 +59,7 @@ export function configureDatabase(
     applicationName,
   });
   holder.db = db;
+  logger.info({ event: "db_configured", poolMax: config.DATABASE_POOL_MAX });
   registerReadinessCheck("database", async () => void (await db.pool.query("SELECT 1")));
   registerShutdownHook("database", () => closeDatabase());
   return db;

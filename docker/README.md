@@ -1,6 +1,6 @@
 # Local services
 
-Start Postgres, Valkey, Mailpit, MinIO and ClamAV:
+Start Postgres, Valkey, Mailpit, S3 test server and ClamAV:
 
 ```bash
 docker compose -f docker/compose.yml up -d
@@ -11,7 +11,7 @@ docker compose -f docker/compose.yml ps
 | ----------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------ |
 | Postgres 17 | `localhost:5432`, user `vinicure`, database `vinicure` | Main database                                                                        |
 | Valkey 8    | `localhost:6379`                                       | Rate limits, idempotency, short-lived state                                          |
-| MinIO       | `localhost:9000` (API), `localhost:9001` (console)     | Fake S3. Buckets `vinicure-files` and `vinicure-exports` are created by `minio-init` |
+| S3 test server       | `localhost:9000` (API), `localhost:9001` (console)     | Fake S3. Buckets `vinicure-files` and `vinicure-exports` are created by `s3-init` |
 | Mailpit     | `localhost:8025` (inbox), `localhost:1025` (SMTP)      | Catches outgoing email                                                               |
 | ClamAV      | `localhost:3310`                                       | Virus scanning. The first start downloads signatures and takes a few minutes         |
 
@@ -34,7 +34,7 @@ Apply the migrations with `pnpm db:migrate`. The `app` role can change data but 
 ## Running the integration tests
 
 ```bash
-VALKEY_TEST_URL=redis://localhost:6379 \nMINIO_TEST_ENDPOINT=http://localhost:9000 \nDATABASE_TEST_URL=postgres://app:dev-only-change-me@localhost:5432/vinicure \npnpm test
+VALKEY_TEST_URL=redis://localhost:6379 \nS3_TEST_ENDPOINT=http://localhost:9000 \nDATABASE_TEST_URL=postgres://app:dev-only-change-me@localhost:5432/vinicure \npnpm test
 ```
 
-More variables (for example `MINIO_TEST_ENDPOINT`) are listed in the integration test files, which skip themselves when their variable is not set.
+More variables (for example `S3_TEST_ENDPOINT`) are listed in the integration test files, which skip themselves when their variable is not set.

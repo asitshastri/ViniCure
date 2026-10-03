@@ -71,26 +71,51 @@ export class RedisCache implements CacheStore {
     this.client.on("error", () => {});
   }
 
+  /**
+   * With the offline queue off, a command sent before the connection is ready fails at once.
+   * Wait briefly for the first connection, but fail fast when the server is really down.
+   */
+  private async ready(): Promise<void> {
+    if (this.client.status === "ready") return;
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.client.off("ready", onReady);
+        reject(new Error("cache not connected"));
+      }, 2000);
+      const onReady = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      this.client.once("ready", onReady);
+      if (this.client.status === "ready") onReady();
+    });
+  }
+
   async get(key: string) {
+    await this.ready();
     return this.client.get(key);
   }
 
   async set(key: string, value: string, ttlMs: number) {
     assertTtl(ttlMs);
+    await this.ready();
     await this.client.set(key, value, "PX", ttlMs);
   }
 
   async setIfAbsent(key: string, value: string, ttlMs: number) {
     assertTtl(ttlMs);
+    await this.ready();
     return (await this.client.set(key, value, "PX", ttlMs, "NX")) === "OK";
   }
 
   async del(key: string) {
+    await this.ready();
     await this.client.del(key);
   }
 
   async incrWindow(key: string, windowMs: number) {
     assertTtl(windowMs);
+    await this.ready();
     const [count, ttl] = (await this.client.eval(INCR_WINDOW, 1, key, String(windowMs))) as [
       number,
       number,
@@ -99,11 +124,13 @@ export class RedisCache implements CacheStore {
   }
 
   async peekWindow(key: string) {
+    await this.ready();
     const [value, ttl] = await Promise.all([this.client.get(key), this.client.pttl(key)]);
     return { count: value ? Number(value) : 0, ttlMs: Math.max(0, ttl) };
   }
 
   async ping() {
+    await this.ready();
     if ((await this.client.ping()) !== "PONG") throw new Error("cache ping failed");
   }
 
