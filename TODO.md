@@ -55,8 +55,8 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 | 0 | Bootstrap | 16 | 1 | 0 | 0 |
 | F | Frontend (UI first, mock data) | 23 | 23 | 0 | 0 |
 | 1 | Platform foundations | 21 | 20 | 1 | 0 |
-| 2 | Identity and access | 18 | 0 | 0 | 0 |
-| 3 | Cloud staging | 14 | 0 | 0 | 0 |
+| 2 | Identity and access | 18 | 2 | 0 | 0 |
+| 3 | Cloud staging | 15 | 0 | 0 | 0 |
 | 4 | Directory and scheduling | 10 | 0 | 0 | 0 |
 | 5 | Payments | 11 | 0 | 0 | 0 |
 | 6 | Video consultation | 11 | 0 | 0 | 0 |
@@ -64,9 +64,9 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 | 8 | Notifications and jobs | 8 | 0 | 0 | 0 |
 | 9 | Compliance and admin | 13 | 0 | 0 | 0 |
 | 10 | Frontend polish | 6 | 0 | 0 | 0 |
-| 11 | Hardening and launch | 10 | 0 | 0 | 0 |
+| 11 | Hardening and launch | 11 | 0 | 0 | 0 |
 | 12 | After launch | 8 | 0 | 0 | 0 |
-| | **Total** | **181** | **44** | **1** | **0** |
+| | **Total** | **183** | **46** | **1** | **0** |
 
 ## Current focus
 
@@ -81,7 +81,7 @@ esourcesin` to PATH | n/a | Done |
 | Triage the DISCOVERED rows: confirm each goes to the phase in its Notes column (OK is enough) | Keeps the [SEC] rows from being forgotten. Each row is raised again when its phase starts. | When each phase starts | Deferred (D-016) |
 | Reference-repo cleanup (P0-15), see the ask above | Blocks P0-13 reuse map | Before P0-13, or the first port task | Deferred (D-016) |
 | Create accounts when their task starts: Razorpay (P5), video provider such as 100ms (P6), AWS account and domain (P3), Sentry (P1-18), SMS/email providers (P8) | Each needs your identity, payment method or approval. I will list the exact ask the day the task starts. | At each task | Deferred (D-016) |
-| Google Cloud OAuth client for patient sign-in | Done 2026-10-04: client ID and secret are in `.env.local` (git-ignored). The secret was pasted in chat, so before launch create a new secret in Google Cloud and replace it. Still to do later: add the production redirect URI, and start Google's app verification before launch (takes days to weeks) | Production redirect URI at P3, verification before launch | Done for local |
+| Google Cloud OAuth client for patient sign-in | Done 2026-10-04: client ID and secret are in `.env.local` (git-ignored). The secret was pasted in chat, so before launch create a new secret in Google Cloud and replace it. Still to do later (now tasks P3-15 and P11-11): add the staging and production redirect URIs, and start Google app verification 4 weeks before launch | Production redirect URI at P3, verification before launch | Done for local |
 | Start DLT registration with an SMS provider (principal entity, sender ID, templates) | Long lead time. Blocks OTP and reminders in production. | Start now, needed by P8 | Not started |
 | Clean the reference copy: delete `node_modules`, `.next`, `.vercel`, move `.env*` out, rename old `CLAUDE.md`, set read-only (commands in the setup guide, task P0-15) | Lets Claude Code consult ViniCare without reading secrets | Before the first session | Not started |
 | Start Meta business verification and WhatsApp number | Long lead time. | Start now, needed by P8 | Not started |
@@ -257,6 +257,7 @@ Rules for every F task:
 - [ ] **P3-12** (M, C) CD pipeline: build, push to ECR, migrate, deploy staging, smoke tests, manual approval, production, rollback. *AC:* rollback rehearsed in staging.
 - [ ] **P3-13** (S, H) Choose and register the domain, set DNS. *AC:* domain resolves to staging.
 - [ ] **P3-14** (S, C) Staging smoke test: deploy the skeleton and see `/api/ready` green through CloudFront. *AC:* evidence in log.
+- [ ] **P3-15** (S, C+H) Google sign-in on staging: add the staging redirect URI (`https://<staging-domain>/api/auth/callback/google`) to the OAuth client in Google Cloud, set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in Secrets Manager (never in the image or repo), set `AUTH_TRUSTED_ORIGINS`. Human does the Google Cloud console steps. *AC:* Google sign-in works on staging with a test account.
 
 ## Phase 4: Directory and scheduling
 
@@ -362,6 +363,7 @@ Rules for every F task:
 - [ ] **P11-08** (M, H) Legal and accounting sign-off: notices, consents, retention, telemedicine compliance, invoices. *AC:* written sign-off.
 - [ ] **P11-09** (L, H) Pilot with a few doctors and patients, collect feedback. *AC:* feedback triaged into tasks.
 - [ ] **P11-10** (M, C+H) Go-live checklist, DNS cutover, monitoring watch. *AC:* checklist complete.
+- [ ] **P11-11** **[SEC]** (S, C+H) Google sign-in production readiness. Human: (1) add the production redirect URI to the OAuth client, (2) publish the OAuth consent screen and submit it for Google's app verification (privacy policy URL, authorized domain, scopes openid/email/profile; takes days to weeks, start 4 weeks before launch, until approved only listed test users can sign in), (3) create a NEW client secret for production and delete the old one, because the development secret was pasted in chat on 2026-10-04. Claude: move the new secret into Secrets Manager and check that no secret remains in `.env.local`, the repo or logs. *AC:* verification approved, a non-test Google account signs in on production, old secret deleted.
 
 ## Phase 12: After launch
 
