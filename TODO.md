@@ -55,18 +55,18 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 | 0 | Bootstrap | 16 | 1 | 0 | 0 |
 | F | Frontend (UI first, mock data) | 23 | 23 | 0 | 0 |
 | 1 | Platform foundations | 21 | 20 | 1 | 0 |
-| 2 | Identity and access | 16 | 0 | 0 | 0 |
+| 2 | Identity and access | 18 | 0 | 0 | 0 |
 | 3 | Cloud staging | 14 | 0 | 0 | 0 |
 | 4 | Directory and scheduling | 10 | 0 | 0 | 0 |
 | 5 | Payments | 11 | 0 | 0 | 0 |
 | 6 | Video consultation | 11 | 0 | 0 | 0 |
-| 7 | Clinical records | 11 | 0 | 0 | 0 |
+| 7 | Clinical records | 12 | 0 | 0 | 0 |
 | 8 | Notifications and jobs | 8 | 0 | 0 | 0 |
 | 9 | Compliance and admin | 13 | 0 | 0 | 0 |
 | 10 | Frontend polish | 6 | 0 | 0 | 0 |
 | 11 | Hardening and launch | 10 | 0 | 0 | 0 |
 | 12 | After launch | 8 | 0 | 0 | 0 |
-| | **Total** | **178** | **44** | **1** | **0** |
+| | **Total** | **181** | **44** | **1** | **0** |
 
 ## Current focus
 
@@ -76,10 +76,12 @@ Phase 1 (platform foundations) is finished and merged to `main` (tag `phase-p1-d
 
 | Ask | Why | Needed by | Status |
 |---|---|---|---|
-| Install Docker Desktop | Done 2026-10-04 (version 29.8.1). Local services start with `docker compose -f docker/compose.yml up -d`. If `docker` is not found in a new terminal, add `C:\Program Files\Docker\Dockeresourcesin` to PATH | n/a | Done |
+| Install Docker Desktop | Done 2026-10-04 (version 29.8.1). Local services start with `docker compose -f docker/compose.yml up -d`. If `docker` is not found in a new terminal, add `C:\Program Files\Docker\Docker
+esourcesin` to PATH | n/a | Done |
 | Triage the DISCOVERED rows: confirm each goes to the phase in its Notes column (OK is enough) | Keeps the [SEC] rows from being forgotten. Each row is raised again when its phase starts. | When each phase starts | Deferred (D-016) |
 | Reference-repo cleanup (P0-15), see the ask above | Blocks P0-13 reuse map | Before P0-13, or the first port task | Deferred (D-016) |
 | Create accounts when their task starts: Razorpay (P5), video provider such as 100ms (P6), AWS account and domain (P3), Sentry (P1-18), SMS/email providers (P8) | Each needs your identity, payment method or approval. I will list the exact ask the day the task starts. | At each task | Deferred (D-016) |
+| Create a Google Cloud OAuth client for patient sign-in (free). Steps: console.cloud.google.com, new project, OAuth consent screen (External), add scopes openid, email, profile, create an OAuth client ID (Web), add the redirect URI I give you. Send me the client ID; keep the secret out of chat and put it in `.env.local` | Google sign-in for patients (P2-17) | When P2-17 starts | Not started |
 | Start DLT registration with an SMS provider (principal entity, sender ID, templates) | Long lead time. Blocks OTP and reminders in production. | Start now, needed by P8 | Not started |
 | Clean the reference copy: delete `node_modules`, `.next`, `.vercel`, move `.env*` out, rename old `CLAUDE.md`, set read-only (commands in the setup guide, task P0-15) | Lets Claude Code consult ViniCare without reading secrets | Before the first session | Not started |
 | Start Meta business verification and WhatsApp number | Long lead time. | Start now, needed by P8 | Not started |
@@ -220,7 +222,7 @@ Rules for every F task:
 
 ## Phase 2: Identity and access
 
-- [ ] **P2-01** (M, C) Better Auth tables: generate, rename to `users` and `auth_*`, use UUID IDs if possible, review the SQL, add the migration. Confirm UUID support. *AC:* migration applies. Decision logged.
+- [~] **P2-01** (M, C) Better Auth tables: generate, rename to `users` and `auth_*`, use UUID IDs if possible, review the SQL, add the migration. Confirm UUID support. *AC:* migration applies. Decision logged.
 - [ ] **P2-02** **[SEC]** (M, C) Better Auth setup behind `modules/identity`: Postgres adapter, cookie flags, session lifetimes, trusted origins. *AC:* test checks cookie flags and lifetimes.
 - [ ] **P2-03** **[SEC]** (M, C) Phone OTP with the MSG91 adapter (fake first), `signUpOnVerification`, E.164 normalization, +91 allow-list. Confirm where OTPs are stored. *AC:* sign-in works with the fake SMS. OTP never appears in logs.
 - [ ] **P2-04** **[SEC]** (M, C) OTP abuse controls: hCaptcha, per-phone and per-IP limits, daily SMS budget cap with alert. *AC:* abuse-scenario tests pass.
@@ -236,6 +238,8 @@ Rules for every F task:
 - [ ] **P2-14** **[SEC]** (M, C) Security test suite: SQL injection and XSS payloads, CSRF and Origin checks, broken-auth cases, rate-limit bypass attempts, privilege escalation, upload abuse. Extend it as features land. *AC:* runs in CI and fails the build on any success of an attack case.
 - [ ] **P2-15** **[SEC]** (M, C) Password hashing and lockout: confirm the algorithm Better Auth uses, configure Argon2id if supported (else bcrypt or scrypt per OWASP), failed-attempt backoff and temporary lockout for staff, other sessions invalidated on password change or reset. *AC:* tests prove each behavior. Choice recorded in ADR-004.
 - [ ] **P2-16** **[SEC]** (M, C) Staff password reset by emailed link: single-use token with short expiry, 3 requests per 15 minutes per IP, the same response whether or not the email exists, other sessions invalidated on reset. *AC:* tests for account enumeration, token reuse, expiry, rate limit and session invalidation.
+- [ ] **P2-17** **[SEC]** (M, C+H) Google sign-in for patients (OpenID Connect through Better Auth) and safe account linking: store Google's `sub`, never match by email or phone, link only from a signed-in session after proving the new method, staff cannot use Google. Human creates the Google Cloud OAuth client (Needs you). *AC:* tests: a Google account with the same email as an existing account does not take it over; linking needs a session; staff Google sign-in is refused.
+- [ ] **P2-18** **[SEC]** (L, C) Phone recycling defence (D-019): risk-based step-up (new device, 90 days idle, 180 days since phone check, recent number change), limited session until a second method is proven (Google, emailed code or recovery code), recovery codes, trusted devices, number change flow, 180-day phone re-verification, new-device sign-in alerts with "not me". *AC:* tests: a phone-only sign-in on a new device cannot read records; a recovery code works once; changing the number revokes other sessions and detaches the old number; an unverified number gets no clinical notifications.
 
 ## Phase 3: Cloud staging
 
@@ -308,6 +312,7 @@ Rules for every F task:
 - [ ] **P7-09** (M, C) Drug interaction advisory adapter. Evaluate an Indian-relevant data source and label output as advisory. *AC:* decision logged.
 - [ ] **P7-10** (M, C) AI triage behind a flag: consent, redaction, budget, disclaimer. It never creates prescriptions. *AC:* tests.
 - [ ] **P7-11** (L, C) UI: doctor consultation screen (notes and prescription builder, shown beside the video in the P6-07 split screen), patient records and prescriptions. *AC:* Playwright flows.
+- [ ] **P7-12** **[SEC]** (M, C) 24-hour share links for prescriptions and reports (D-019): 256-bit token stored as a hash, one resource, 24 hours, max 5 opens, revocable, date-of-birth check with 5 attempts, every open logged to the PHI access log and notified, not sent to unverified numbers. *AC:* tests: expired, revoked, reused beyond max opens, wrong date of birth five times, token for one document cannot open another, no link ever contains personal data.
 
 ## Phase 8: Notifications and jobs
 
@@ -417,6 +422,7 @@ Things Claude Code cannot do for you. Fill the owner and date.
 | 2026-10-03 | D-016 | Human-only setup items (installs, accounts, cleanups, triage) are handled when the task that needs them starts, not up front. Each stays listed in Needs you with its trigger task. | Human decision. Claude must stop and ask at that task, not skip it silently. |
 | 2026-10-03 | D-017 | Idempotency records are keyed by a hash of caller, route and client key; the response body is stored encrypted, not as jsonb, and the cache holds only the request hash | Valkey must hold no patient data, and a replayed response can contain identifiers. `er_model.md` updated. |
 | 2026-10-04 | D-018 | Drizzle ORM is used for typed queries only; the numbered SQL files in `db/migrations` stay the source of truth and drizzle-kit is not used. Database tests that need roles, grants, triggers, partitions and migrations run on PGlite (a real PostgreSQL 18 engine in the test process, no Docker). Concurrency and pool tests run on the Docker Postgres 17 integration suite | Drizzle only builds queries, so it coexists with hand-written SQL. PGlite has one connection, so it cannot prove double-booking behaviour. |
+| 2026-10-04 | D-019 | Identity model: the account is the identity and the phone is only a sign-in method. Patients can use phone OTP and Google, linked to one account. Phone-only sign-in gets a limited session when it looks risky (new device, 90 days idle, 180 days since phone check, recent number change) until a second method is proven. Prescriptions and reports can be shared by 24-hour links that open one document and ask for the date of birth. Aadhaar and PAN stay uncollected (any government identity later through ABHA after legal review). Staff stay on email, password and TOTP | Human concern: Indian operators reassign numbers after about 90 days, so a new owner could take over an old patient account. Researched 2026-10-04. Docs updated: backend-architecture section 3, er_model (3 new tables), ADR-004. |
 
 ## Progress log
 

@@ -154,9 +154,34 @@ Session rules (proposals):
 - Sensitive actions (refund, role change, break-glass, data erase) require a fresh login within 15 minutes.
 - Users can list and revoke their own sessions. "Sign out everywhere" revokes all.
 - Origin check on every mutating request, in addition to SameSite.
-- Account linking between different identities is off unless explicitly designed.
+- Account linking: a patient can link Google and a phone number to one account only while signed in to that account and after proving the new method (see "Identity model and phone recycling" below). Linking is never done by matching an email or a phone number alone. Staff accounts never link to Google.
 - Staff passwords: Argon2id if the auth library supports it, otherwise bcrypt or scrypt with OWASP-recommended parameters (confirm in P2-15). Failed attempts back off and then lock the account temporarily. Changing or resetting a password invalidates other sessions.
 - Suspicious sign-in patterns (many failures, new device, unusual location) alert the user and admins (P9-12).
+
+### Identity model and phone recycling (decision D-019)
+
+Problem: an Indian mobile number that is deactivated is reassigned to a new person after about 90 days. If a phone number alone proves who a patient is, the new owner can sign in to an old patient's records.
+
+Rules:
+1. **The account is the identity, not the phone.** Every patient has an internal user ID. Sign-in methods are attached to it: phone OTP, Google (OpenID Connect, stored as Google's stable `sub`, never matched by email), and later ABHA. A patient can have more than one.
+2. **Risk-based step-up.** Phone OTP alone opens the account only when the sign-in is low risk. It is high risk when any of these holds: the device is new, the account has not been active for 90 days or more, the phone was last verified more than 180 days ago, or the phone number was changed recently. A high-risk sign-in over phone alone gets a limited session: no clinical records, no prescriptions, no documents, no payments. To unlock, the patient proves a second method: Google sign-in, a code sent to a verified email, or a recovery code. A patient with no second method can still book and pay, and is asked to add one.
+3. **Recovery codes.** Ten single-use codes shown once at signup of a second method or on request, stored as hashes. Using one is logged and notifies the patient.
+4. **Changing a number.** Verify the new number by OTP and prove the account by a second method. The old number is detached at once, every other session is revoked, and the patient is told through every other contact method.
+5. **Re-verification.** The phone is re-verified by OTP at least every 180 days (the 90-day recycling window plus margin). A number that fails this check is marked unverified and receives no links or clinical notifications.
+6. **Sign-in alerts.** A sign-in from a new device sends a notice to the patient's other contact methods. "This was not me" revokes all sessions and forces a step-up.
+7. **Trusted devices.** A device the patient has unlocked with a second method is remembered for 30 days (random token in an HttpOnly cookie, stored as a hash). Revocable from the sessions screen.
+8. **Aadhaar and PAN are not collected.** The Supreme Court (2018) removed private entities' general right to use Aadhaar for verification, and the 2019 amendment allows only voluntary use through UIDAI-approved routes. If government identity is ever needed, it goes through ABHA under ABDM, with consent, in a later phase after legal review.
+9. **Staff** are unchanged: email, password and mandatory TOTP, no Google, no phone-only sign-in.
+
+### Time-limited links for prescriptions and reports (decision D-019)
+
+A prescription or report can be shared by a link sent through SMS, WhatsApp or email.
+- The link holds a random 256-bit token. Only a hash is stored. It opens exactly one resource (a PDF), never the account.
+- It is valid for 24 hours, can be revoked by the patient or doctor, and has a maximum number of opens (default 5).
+- Before showing anything the page asks for a second check: the patient's date of birth. Five wrong answers kill the link. This protects against a link sent to a recycled number.
+- Every open writes a PHI access log entry (purpose `patient_self` or `treatment`) and notifies the patient.
+- Links are not sent to a phone number marked unverified (rule 5).
+- Signed-in patients (after step-up when it applies) see the same documents without a link.
 
 OTP abuse controls (SMS cost abuse is a business-flow risk):
 - Captcha token required on OTP send (hCaptcha, already used in ViniCare).

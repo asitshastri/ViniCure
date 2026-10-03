@@ -1,7 +1,7 @@
 # ViniCure data model
 
 Status: planning baseline v1, 2 October 2026
-Database: PostgreSQL. 50 tables in seven parts, plus pg-boss's own `pgboss` schema for jobs.
+Database: PostgreSQL. 53 tables in seven parts, plus pg-boss's own `pgboss` schema for jobs.
 Read with: `architecture.md`, `backend-architecture.md`, `../TODO.md`.
 
 The model is built from the ViniCare review. Differences from ViniCare's Firestore collections are listed in section 8.
@@ -85,6 +85,9 @@ Phase: **MVP** is the first release. **Later** is after launch or behind a flag.
 | 48 | `abdm_consents` | 6 | Later (ABDM) | ABDM consent artefacts |
 | 49 | `files` | 7 | MVP | Registry of every stored file |
 | 50 | `idempotency_keys` | 7 | MVP | Safe retries for writes |
+| 51 | `recovery_codes` | 1 | MVP | Single-use account recovery codes (hashed) |
+| 52 | `trusted_devices` | 1 | MVP | Devices unlocked with a second method, for risk-based sign-in |
+| 53 | `share_links` | 7 | MVP | 24-hour links to one prescription or report (D-019) |
 
 ---
 
@@ -101,6 +104,8 @@ erDiagram
   users ||--o{ auth_sessions : has
   users ||--o{ auth_accounts : has
   users ||--o| auth_two_factor : has
+  users ||--o{ recovery_codes : has
+  users ||--o{ trusted_devices : trusts
   users ||--o{ user_roles : has
   roles ||--o{ user_roles : grants
   users ||--o{ patients : manages
@@ -116,6 +121,9 @@ erDiagram
     boolean email_verified
     text phone_number UK
     boolean phone_number_verified
+    timestamptz phone_verified_at
+    timestamptz last_active_at
+    timestamptz phone_changed_at
     boolean two_factor_enabled
     text status
     timestamptz created_at
@@ -147,6 +155,22 @@ erDiagram
     uuid user_id FK
     text secret_enc
     text backup_codes_enc
+  }
+  recovery_codes {
+    uuid id PK
+    uuid user_id FK
+    text code_hash
+    timestamptz used_at
+    timestamptz created_at
+  }
+  trusted_devices {
+    uuid id PK
+    uuid user_id FK
+    text device_hash UK
+    timestamptz unlocked_at
+    timestamptz expires_at
+    timestamptz last_seen_at
+    timestamptz revoked_at
   }
   roles {
     smallint id PK
@@ -744,6 +768,8 @@ erDiagram
 ```
 
 `idempotency_keys` holds a hash of caller, route and client key (never the raw key), the request hash, and the response body encrypted with the crypto module (D-017). `state` is `in_progress` or `completed`. Rows expire after 24 hours and a cleanup job removes them.
+
+`share_links` (D-019): `id`, `token_hash` (unique), `resource_type` (`prescription`, `document`), `resource_id`, `patient_id`, `created_by` (user), `expires_at` (24 hours), `revoked_at`, `max_opens`, `open_count`, `failed_checks`, `created_at`. The raw token is shown once and never stored.
 
 `files.purpose` values: `kyc`, `patient_document`, `prescription_pdf`, `invoice_pdf`, `recording`, `export`.
 
