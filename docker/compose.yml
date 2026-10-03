@@ -1,0 +1,82 @@
+# Local development services. Not for production. Ports are bound to this
+# computer only. The passwords below are throwaway values for local use.
+#
+#   docker compose -f docker/compose.yml up -d
+#
+# The app itself runs on the host with `pnpm dev`. The `app` profile (migrate,
+# web, worker containers) is added with P1-12.
+name: vinicure
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: vinicure
+      POSTGRES_PASSWORD: dev-only-change-me
+      POSTGRES_DB: vinicure
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vinicure -d vinicure"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    command: ["valkey-server", "--appendonly", "yes"]
+    ports: ["127.0.0.1:6379:6379"]
+    volumes: ["valkeydata:/data"]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports: ["127.0.0.1:8025:8025", "127.0.0.1:1025:1025"]
+
+  minio:
+    image: minio/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: dev
+      MINIO_ROOT_PASSWORD: dev-only-change-me
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
+    volumes: ["miniodata:/data"]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # One-off job: creates the two private buckets, then exits.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio: { condition: service_healthy }
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 dev dev-only-change-me &&
+      mc mb --ignore-existing local/vinicure-files local/vinicure-exports &&
+      mc anonymous set none local/vinicure-files &&
+      mc anonymous set none local/vinicure-exports &&
+      echo buckets ready"
+    restart: "no"
+
+  clamav:
+    image: clamav/clamav:stable
+    ports: ["127.0.0.1:3310:3310"]
+    # The first start downloads virus signatures and takes a few minutes.
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 120s
+
+volumes:
+  pgdata:
+  valkeydata:
+  miniodata:

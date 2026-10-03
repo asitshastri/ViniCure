@@ -1,0 +1,263 @@
+import { randomUUID } from "node:crypto";
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { AppError } from "../errors/app-error";
+import {
+  PURPOSE_POLICY,
+  detectType,
+  extensionFor,
+  type DetectedType,
+  type FilePurpose,
+} from "./policy";
+
+// Storage module (S3, MinIO locally). Every object is private. Clients upload and
+// download only through short-lived presigned URLs, and the stored name is a
+// random key, never the file name the client sent.
+
+export type StorageConfig = {
+  buckets: { files: string; exports: string };
+  region: string;
+  /** MinIO endpoint in development. Empty in production. */
+  endpoint?: string;
+  /** Lifetime of presigned URLs in seconds. */
+  signedUrlTtlSeconds: number;
+};
+
+export type UploadSlot = {
+  storageKey: string;
+  bucket: string;
+  url: string;
+  /** The client must send exactly these headers or the signature fails. */
+  headers: { "Content-Type": string; "Content-Length": string };
+  expiresAt: Date;
+};
+
+export type ObjectInfo = { sizeBytes: number; contentType: string | undefined };
+
+/** The part of S3 the service uses, so tests can run without a server. */
+export interface ObjectStore {
+  presignPut(args: {
+    bucket: string;
+    key: string;
+    contentType: string;
+    contentLength: number;
+    ttlSeconds: number;
+  }): Promise<string>;
+  presignGet(args: {
+    bucket: string;
+    key: string;
+    ttlSeconds: number;
+    contentType: string;
+    disposition: string;
+  }): Promise<string>;
+  head(bucket: string, key: string): Promise<ObjectInfo | null>;
+  readHead(bucket: string, key: string, bytes: number): Promise<Uint8Array>;
+  delete(bucket: string, key: string): Promise<void>;
+}
+
+export class S3ObjectStore implements ObjectStore {
+  readonly client: S3Client;
+
+  constructor(config: Pick<StorageConfig, "region" | "endpoint">, client?: S3Client) {
+    this.client =
+      client ??
+      new S3Client({
+        region: config.region,
+        ...(config.endpoint ? { endpoint: config.endpoint, forcePathStyle: true } : {}),
+        // Credentials come from the default chain: the task role in AWS, env vars locally.
+        requestHandler: { requestTimeout: 5000, connectionTimeout: 2000 },
+        maxAttempts: 2,
+      });
+  }
+
+  presignPut(a: {
+    bucket: string;
+    key: string;
+    contentType: string;
+    contentLength: number;
+    ttlSeconds: number;
+  }) {
+    return getSignedUrl(
+      this.client,
+      new PutObjectCommand({
+        Bucket: a.bucket,
+        Key: a.key,
+        ContentType: a.contentType,
+        ContentLength: a.contentLength,
+      }),
+      { expiresIn: a.ttlSeconds, signableHeaders: new Set(["content-type", "content-length"]) },
+    );
+  }
+
+  presignGet(a: {
+    bucket: string;
+    key: string;
+    ttlSeconds: number;
+    contentType: string;
+    disposition: string;
+  }) {
+    return getSignedUrl(
+      this.client,
+      new GetObjectCommand({
+        Bucket: a.bucket,
+        Key: a.key,
+        ResponseContentType: a.contentType,
+        ResponseContentDisposition: a.disposition,
+      }),
+      { expiresIn: a.ttlSeconds },
+    );
+  }
+
+  async head(bucket: string, key: string): Promise<ObjectInfo | null> {
+    try {
+      const out = await this.client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+      return { sizeBytes: out.ContentLength ?? 0, contentType: out.ContentType };
+    } catch (error) {
+      if ((error as { name?: string }).name === "NotFound") return null;
+      throw error;
+    }
+  }
+
+  async readHead(bucket: string, key: string, bytes: number): Promise<Uint8Array> {
+    const out = await this.client.send(
+      new GetObjectCommand({ Bucket: bucket, Key: key, Range: `bytes=0-${bytes - 1}` }),
+    );
+    return (await out.Body?.transformToByteArray()) ?? new Uint8Array();
+  }
+
+  async delete(bucket: string, key: string): Promise<void> {
+    await this.client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+  }
+}
+
+/** Name used for the download, with anything that could break a header or path removed. */
+export function safeDownloadName(name: string | undefined, fallback: string): string {
+  const cleaned = (name ?? "")
+    .normalize("NFKD")
+    .replace(/[^\w.\- ]+/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/^\.+/, "")
+    .trim()
+    .slice(0, 80);
+  return cleaned || fallback;
+}
+
+const KEY_SHAPE = /^[a-z_]+\/\d{4}\/[0-9a-f-]{36}\.[a-z0-9]{2,4}$/;
+
+export class StorageService {
+  constructor(
+    private readonly store: ObjectStore,
+    private readonly config: StorageConfig,
+    private readonly now: () => number = Date.now,
+  ) {}
+
+  /** The random storage key for a new object. The client's file name is never part of it. */
+  newKey(purpose: FilePurpose, type: DetectedType): string {
+    const year = new Date(this.now()).getUTCFullYear();
+    return `${purpose}/${year}/${randomUUID()}.${extensionFor(type)}`;
+  }
+
+  /** Checks the request against the purpose policy, then returns a presigned PUT slot. */
+  async createUploadSlot(input: {
+    purpose: FilePurpose;
+    contentType: string;
+    sizeBytes: number;
+  }): Promise<UploadSlot> {
+    const policy = PURPOSE_POLICY[input.purpose];
+    if (!policy || !policy.clientUpload) {
+      throw new AppError("file_rejected", { detail: "This kind of file cannot be uploaded here." });
+    }
+    const type = policy.types.find((allowed) => allowed === input.contentType);
+    if (!type) throw new AppError("file_rejected", { detail: "This file type is not allowed." });
+    if (
+      !Number.isInteger(input.sizeBytes) ||
+      input.sizeBytes <= 0 ||
+      input.sizeBytes > policy.maxBytes
+    ) {
+      throw new AppError("file_rejected", { detail: "This file is too large or empty." });
+    }
+
+    const bucket = this.config.buckets[policy.bucket];
+    const storageKey = this.newKey(input.purpose, type);
+    const ttl = this.config.signedUrlTtlSeconds;
+    const url = await this.store.presignPut({
+      bucket,
+      key: storageKey,
+      contentType: type,
+      contentLength: input.sizeBytes,
+      ttlSeconds: ttl,
+    });
+    return {
+      storageKey,
+      bucket,
+      url,
+      headers: { "Content-Type": type, "Content-Length": String(input.sizeBytes) },
+      expiresAt: new Date(this.now() + ttl * 1000),
+    };
+  }
+
+  /**
+   * The "complete" step: the object exists, its size matches what was declared and is within
+   * the limit, and its first bytes really are the declared type. Anything else is deleted.
+   */
+  async verifyUpload(input: {
+    purpose: FilePurpose;
+    storageKey: string;
+    declaredType: string;
+    declaredSizeBytes: number;
+  }): Promise<{ type: DetectedType; sizeBytes: number }> {
+    const policy = PURPOSE_POLICY[input.purpose];
+    if (!KEY_SHAPE.test(input.storageKey) || !input.storageKey.startsWith(`${input.purpose}/`)) {
+      throw new AppError("file_rejected", { detail: "Unknown file." });
+    }
+    const bucket = this.config.buckets[policy.bucket];
+    const info = await this.store.head(bucket, input.storageKey);
+    if (!info) throw new AppError("file_rejected", { detail: "The upload did not arrive." });
+
+    const reject = async (detail: string): Promise<never> => {
+      await this.store.delete(bucket, input.storageKey);
+      throw new AppError("file_rejected", { detail });
+    };
+    if (info.sizeBytes > policy.maxBytes || info.sizeBytes !== input.declaredSizeBytes) {
+      return reject("The file size does not match.");
+    }
+    const detected = detectType(await this.store.readHead(bucket, input.storageKey, 16));
+    if (!detected || !policy.types.includes(detected) || detected !== input.declaredType) {
+      return reject("The file content does not match its type.");
+    }
+    return { type: detected, sizeBytes: info.sizeBytes };
+  }
+
+  /** A short-lived link to read one object. Always sent as a download, never rendered by the site. */
+  async createDownloadUrl(input: {
+    purpose: FilePurpose;
+    storageKey: string;
+    type: DetectedType;
+    fileName?: string;
+  }): Promise<{ url: string; expiresAt: Date }> {
+    const policy = PURPOSE_POLICY[input.purpose];
+    if (!KEY_SHAPE.test(input.storageKey) || !input.storageKey.startsWith(`${input.purpose}/`)) {
+      throw new AppError("not_found");
+    }
+    const name = safeDownloadName(input.fileName, `file.${extensionFor(input.type)}`);
+    const ttl = this.config.signedUrlTtlSeconds;
+    const url = await this.store.presignGet({
+      bucket: this.config.buckets[policy.bucket],
+      key: input.storageKey,
+      ttlSeconds: ttl,
+      contentType: input.type,
+      disposition: `attachment; filename="${name}"`,
+    });
+    return { url, expiresAt: new Date(this.now() + ttl * 1000) };
+  }
+
+  async remove(purpose: FilePurpose, storageKey: string): Promise<void> {
+    await this.store.delete(this.config.buckets[PURPOSE_POLICY[purpose].bucket], storageKey);
+  }
+}
