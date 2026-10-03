@@ -32,5 +32,5 @@ It would remove code to maintain but moves sign-in data and recovery decisions t
 ## Not verified
 
 - Better Auth's phone plugin may not support our risk rules directly. P2-03 and P2-18 confirm what is built on top of it.
-- Where OTPs are stored (Valkey versus `auth_verifications`). Confirm in P2-03.
+- OTPs are stored in `auth_verifications.value` (clear text, 5 minutes, 3 attempts), not in Valkey (answered in P2-03). Decide in P2-13 whether to hash them with a custom `verifyOTP`.
 - Argon2id support. Confirm in P2-15.

@@ -1,4 +1,5 @@
 import { betterAuth, type BetterAuthOptions } from "better-auth";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import type { Role } from "../../lib/api/types";
 import { uuidv7 } from "../../lib/ids";
 import { identityModels } from "./schema";
@@ -91,6 +92,20 @@ export function buildAuthOptions(deps: IdentityDeps): BetterAuthOptions {
 
     // Our own rate limiter (src/lib/rate-limit) guards /api/auth through withApi.
     rateLimit: { enabled: false },
+
+    hooks: {
+      // Better Auth checks Origin only on requests that carry cookies. Every state-changing
+      // request must come from our own origin, cookie or not: otherwise any website could make
+      // a visitor's browser ask us to send SMS codes. A request with no Origin header (not a
+      // browser) is left to the rate limits and captcha.
+      before: createAuthMiddleware(async (ctx) => {
+        const origin = ctx.request?.headers.get("origin");
+        if (!origin || ctx.request?.method === "GET") return;
+        if (!ctx.context.trustedOrigins.includes(origin)) {
+          throw new APIError("FORBIDDEN", { message: "Invalid origin" });
+        }
+      }),
+    },
 
     databaseHooks: {
       session: {
