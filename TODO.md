@@ -52,9 +52,9 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 
 | Phase | Name | Total | Done | In progress | Blocked |
 |---|---|---|---|---|---|
-| 0 | Bootstrap | 16 | 0 | 0 | 0 |
+| 0 | Bootstrap | 16 | 1 | 0 | 0 |
 | F | Frontend (UI first, mock data) | 23 | 23 | 0 | 0 |
-| 1 | Platform foundations | 21 | 0 | 0 | 0 |
+| 1 | Platform foundations | 21 | 15 | 6 | 6 |
 | 2 | Identity and access | 16 | 0 | 0 | 0 |
 | 3 | Cloud staging | 14 | 0 | 0 | 0 |
 | 4 | Directory and scheduling | 10 | 0 | 0 | 0 |
@@ -66,17 +66,17 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 | 10 | Frontend polish | 6 | 0 | 0 | 0 |
 | 11 | Hardening and launch | 10 | 0 | 0 | 0 |
 | 12 | After launch | 8 | 0 | 0 | 0 |
-| | **Total** | **178** | **23** | **0** | **0** |
+| | **Total** | **178** | **39** | **6** | **6** |
 
 ## Current focus
 
-Phase F (frontend, mock data), in order. Phase F is complete: F-01 to F-23 done. `docs/ui-wiring.md` accepted (D-015, mocks stay until real data is wired area by area). Still waiting for the human to review the Needs you table and the DISCOVERED [SEC] rows before P1 and P2 start. Decision D-007: the human asked for UI first. Backend phases (P1 to P9) follow and wire to these screens.
+Phase 1 (platform foundations) on branch `phase-p1-foundations`. All 21 tasks are written and tested. 15 are fully done. 6 (P1-01, P1-02, P1-07, P1-08, P1-10, P1-12) are code-complete and wait only for checks that need Docker or a CI workflow: a real Postgres, Valkey and MinIO test run, and building the container images. **Next step needs you: install Docker Desktop** (first row of Needs you), then I run the integration suite and close those six. Phase F stays accepted (D-015, mocks remain until real data is wired area by area). Phase 2 (identity) starts after P1 closes.
 
 ## Needs you
 
 | Ask | Why | Needed by | Status |
 |---|---|---|---|
-| Install Docker Desktop (needs admin rights; enable WSL2) and confirm `docker --version` works | Postgres, Valkey, MinIO, ClamAV and Mailpit run in Docker. `docker` is not installed on this PC. | Before P1-01 tests, P1-02, P1-07, P1-10, P1-11 | Not started |
+| Install Docker Desktop (needs admin rights; enable WSL2) and confirm `docker --version` works | `docker` is not installed on this PC. Needed to run the real Postgres, Valkey and MinIO tests and to build the worker and web images, which close P1-01, P1-07, P1-08, P1-10, P1-12. Then run: `docker compose -f docker/compose.yml up -d` | Now, to close Phase 1 | **Blocking 6 tasks** |
 | Triage the DISCOVERED rows: confirm each goes to the phase in its Notes column (OK is enough) | Keeps the [SEC] rows from being forgotten. Each row is raised again when its phase starts. | When each phase starts | Deferred (D-016) |
 | Reference-repo cleanup (P0-15), see the ask above | Blocks P0-13 reuse map | Before P0-13, or the first port task | Deferred (D-016) |
 | Create accounts when their task starts: Razorpay (P5), video provider such as 100ms (P6), AWS account and domain (P3), Sentry (P1-18), SMS/email providers (P8) | Each needs your identity, payment method or approval. I will list the exact ask the day the task starts. | At each task | Deferred (D-016) |
