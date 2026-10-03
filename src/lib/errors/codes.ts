@@ -7,6 +7,11 @@ export const ERROR_CODES = {
     title: "Bad request",
     detail: "The request could not be understood.",
   },
+  captcha_failed: {
+    status: 400,
+    title: "Captcha check failed",
+    detail: "Complete the check and try again.",
+  },
   invalid_json: {
     status: 400,
     title: "Invalid JSON",

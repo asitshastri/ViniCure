@@ -240,6 +240,7 @@
             "type": "string",
             "enum": [
               "bad_request",
+              "captcha_failed",
               "invalid_json",
               "unauthenticated",
               "payment_signature_invalid",

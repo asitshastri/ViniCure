@@ -4,12 +4,14 @@ import {
   emailContract,
   paymentContract,
   scannerContract,
+  captchaContract,
   smsContract,
   videoContract,
   whatsAppContract,
 } from "./contract";
 import {
   FakeAiProvider,
+  FakeCaptchaVerifier,
   FakeEmailProvider,
   FakeFileScanner,
   FakePaymentProvider,
@@ -53,4 +55,9 @@ describe("fake failure switch", () => {
     scanner.broken.add("files/x");
     expect(await scanner.scan({ storageKey: "files/x" })).toEqual({ status: "error" });
   });
+});
+
+captchaContract(() => {
+  const captcha = new FakeCaptchaVerifier();
+  return { captcha, issue: () => captcha.issue() };
 });

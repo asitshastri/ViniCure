@@ -1,8 +1,13 @@
 import { getConfig } from "../../lib/config/config";
 import { getDatabase, queryable } from "../../lib/db/pool";
 import { globalSingleton } from "../../lib/singleton";
+import { HCaptchaVerifier } from "../../lib/adapters/hcaptcha";
 import { getSmsProvider } from "../../lib/adapters/registry";
+import { getCache } from "../../lib/cache";
+import { logger } from "../../lib/logging/logger";
+import { RateLimiter } from "../../lib/rate-limit/limiter";
 import { createAuth, type Auth } from "./auth";
+import { guardOtpRequest, type OtpGuardDeps } from "./otp-guard";
 import { createPhonePlugin } from "./phone";
 import { IdentityRepo } from "./repo";
 
@@ -44,6 +49,43 @@ export function getAuth(): Auth {
   return holder.auth;
 }
 
+const guardHolder = globalSingleton("otp-guard", () => ({
+  deps: undefined as OtpGuardDeps | undefined,
+}));
+
+function getOtpGuardDeps(): OtpGuardDeps {
+  if (guardHolder.deps) return guardHolder.deps;
+  const config = getConfig();
+  const cache = getCache();
+  guardHolder.deps = {
+    limiter: new RateLimiter({
+      cache,
+      env: config.APP_ENV,
+      hashSecret: config.AUTH_SECRET ?? DEV_SECRET,
+    }),
+    captcha: config.HCAPTCHA_SECRET
+      ? new HCaptchaVerifier({ secret: config.HCAPTCHA_SECRET, siteKey: config.HCAPTCHA_SITE_KEY })
+      : undefined,
+    cache,
+    env: config.APP_ENV,
+    dailySmsCap: config.SMS_DAILY_CAP,
+    allowedCountryCodes: config.ALLOWED_PHONE_COUNTRY_CODES,
+    production: config.NODE_ENV === "production",
+    trustedProxyHops: config.TRUSTED_PROXY_HOPS,
+    alert: (event, data) => logger.warn({ event: `otp_${event}`, security: true, ...data }),
+  };
+  return guardHolder.deps;
+}
+
+/**
+ * Abuse controls for the OTP routes (limits, captcha, daily SMS budget). Call before handing a
+ * request to Better Auth. Throws an AppError when the request must stop.
+ */
+export function guardAuthRequest(request: Request): Promise<void> {
+  return guardOtpRequest(request, getOtpGuardDeps());
+}
+
 export function resetAuthForTest(): void {
   holder.auth = undefined;
+  guardHolder.deps = undefined;
 }

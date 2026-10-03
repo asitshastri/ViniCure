@@ -81,6 +81,11 @@ export interface EmailProvider {
   }): Promise<{ providerId: string }>;
 }
 
+/** Bot check (hCaptcha). `success` is false for a bad, expired or reused token. */
+export interface CaptchaVerifier {
+  verify(input: { token: string; ip?: string }): Promise<{ success: boolean }>;
+}
+
 export interface FileScanner {
   scan(input: { storageKey: string }): Promise<{ status: "clean" | "infected" | "error" }>;
 }

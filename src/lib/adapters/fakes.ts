@@ -6,6 +6,7 @@ import {
   type EmailProvider,
   type FileScanner,
   type PaymentProvider,
+  type CaptchaVerifier,
   type SmsProvider,
   type VideoProvider,
   type WhatsAppProvider,
@@ -271,5 +272,24 @@ export class FakeAiProvider implements AiProvider {
       suggestedSpecialties: ["general_physician"],
       disclaimer: "This is a suggestion, not a diagnosis. A doctor will decide.",
     };
+  }
+}
+
+/** Accepts the tokens it was given, once each, like a real captcha provider. */
+export class FakeCaptchaVerifier implements CaptchaVerifier {
+  readonly failures = new FailureSwitch();
+  private readonly valid = new Set<string>();
+
+  /** Makes a token that verify() will accept one time. */
+  issue(): string {
+    const token = `captcha_${randomUUID()}`;
+    this.valid.add(token);
+    return token;
+  }
+
+  async verify(input: { token: string; ip?: string }) {
+    this.failures.check();
+    requireText("token", input.token);
+    return { success: this.valid.delete(input.token) };
   }
 }

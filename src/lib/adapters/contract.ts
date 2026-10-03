@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   AdapterError,
   type AiProvider,
+  type CaptchaVerifier,
   type EmailProvider,
   type FileScanner,
   type PaymentProvider,
@@ -316,6 +317,31 @@ export function aiContract(make: () => AiProvider) {
       const ai = make();
       await rejectsWith(ai.triage({ redactedText: "", locale: "en" }), "invalid_input");
       await rejectsWith(ai.triage({ redactedText: "cough", locale: "" }), "invalid_input");
+    });
+  });
+}
+
+export type CaptchaTestKit = {
+  captcha: CaptchaVerifier;
+  /** A token the provider will accept once. */
+  issue: () => string;
+};
+
+export function captchaContract(make: () => CaptchaTestKit) {
+  describe("CaptchaVerifier contract", () => {
+    it("accepts a good token once and then refuses the same token", async () => {
+      const { captcha, issue } = make();
+      const token = issue();
+      expect(await captcha.verify({ token, ip: "203.0.113.5" })).toEqual({ success: true });
+      expect(await captcha.verify({ token, ip: "203.0.113.5" })).toEqual({ success: false });
+    });
+    it("refuses an unknown token", async () => {
+      expect(await make().captcha.verify({ token: "not-a-real-token" })).toEqual({
+        success: false,
+      });
+    });
+    it("rejects a blank token as invalid input", async () => {
+      await rejectsWith(make().captcha.verify({ token: "" }), "invalid_input");
     });
   });
 }
