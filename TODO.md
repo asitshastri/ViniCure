@@ -70,12 +70,16 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 
 ## Current focus
 
-Phase F (frontend, mock data), in order. Phase F is complete: F-01 to F-23 done. Waiting for the human to review `docs/ui-wiring.md`, the Needs you table and the DISCOVERED [SEC] rows before P1 and P2 start. Decision D-007: the human asked for UI first. Backend phases (P1 to P9) follow and wire to these screens.
+Phase F (frontend, mock data), in order. Phase F is complete: F-01 to F-23 done. `docs/ui-wiring.md` accepted (D-015, mocks stay until real data is wired area by area). Still waiting for the human to review the Needs you table and the DISCOVERED [SEC] rows before P1 and P2 start. Decision D-007: the human asked for UI first. Backend phases (P1 to P9) follow and wire to these screens.
 
 ## Needs you
 
 | Ask | Why | Needed by | Status |
 |---|---|---|---|
+| Install Docker Desktop (needs admin rights; enable WSL2) and confirm `docker --version` works | Postgres, Valkey, MinIO, ClamAV and Mailpit run in Docker. `docker` is not installed on this PC. | Before P1-01 tests, P1-02, P1-07, P1-10, P1-11 | Not started |
+| Triage the DISCOVERED rows: confirm each goes to the phase in its Notes column (OK is enough) | Keeps the [SEC] rows from being forgotten. Each row is raised again when its phase starts. | When each phase starts | Deferred (D-016) |
+| Reference-repo cleanup (P0-15), see the ask above | Blocks P0-13 reuse map | Before P0-13, or the first port task | Deferred (D-016) |
+| Create accounts when their task starts: Razorpay (P5), video provider such as 100ms (P6), AWS account and domain (P3), Sentry (P1-18), SMS/email providers (P8) | Each needs your identity, payment method or approval. I will list the exact ask the day the task starts. | At each task | Deferred (D-016) |
 | Start DLT registration with an SMS provider (principal entity, sender ID, templates) | Long lead time. Blocks OTP and reminders in production. | Start now, needed by P8 | Not started |
 | Clean the reference copy: delete `node_modules`, `.next`, `.vercel`, move `.env*` out, rename old `CLAUDE.md`, set read-only (commands in the setup guide, task P0-15) | Lets Claude Code consult ViniCare without reading secrets | Before the first session | Not started |
 | Start Meta business verification and WhatsApp number | Long lead time. | Start now, needed by P8 | Not started |
@@ -408,6 +412,8 @@ Things Claude Code cannot do for you. Fill the owner and date.
 | 2026-10-02 | D-013 | Docker setup (P0-07, P0-08) is not needed for Phase F (frontend, mock data). Skip local Dockerfile and compose until Phase 1+ when backend services start | Keeps frontend dev lean. Dockerfile and compose.yml specifications written in Phase 0 planning but implementation deferred to P1-02 when database, cache and services are needed |
 | 2026-10-02 | D-014 | Staff password rule in the UI: 12 or more characters with lower case, upper case, a number and a symbol. Patients have no password. | A working default so the screens are complete. Confirm or change it in the P2 password policy task together with the Argon2id choice. Lockout length (15 minutes) and reset link life (30 minutes) shown in the UI are also placeholders to confirm. |
 | 2026-10-02 | D-009 | No neumorphism, despite the design tool suggesting it | Its own notes rate accessibility risk high (low-contrast edges). Flat surfaces with thin borders and soft shadows instead. |
+| 2026-10-03 | D-015 | `docs/ui-wiring.md` reviewed and accepted. Mocks stay in place (mock doctors, patients, bookings, admin data) for building and testing the whole site. Real data and real doctors are wired in one area at a time later, using the wiring table. | Human decision. Security rules are unchanged: the fake session and open panels must never be deployed (DISCOVERED F-04 blocks the staging deploy P3-14). |
+| 2026-10-03 | D-016 | Human-only setup items (installs, accounts, cleanups, triage) are handled when the task that needs them starts, not up front. Each stays listed in Needs you with its trigger task. | Human decision. Claude must stop and ask at that task, not skip it silently. |
 
 ## Progress log
 
