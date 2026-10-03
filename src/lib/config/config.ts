@@ -42,6 +42,10 @@ const schema = z.object({
   VALKEY_URL: z.string().min(1).optional(),
   VALKEY_TLS: flag,
 
+  // Google sign-in for patients (P2-17). Both are needed together.
+  GOOGLE_CLIENT_ID: optionalString,
+  GOOGLE_CLIENT_SECRET: optionalString,
+
   // Auth
   AUTH_SECRET: z.string().min(32, "AUTH_SECRET must be at least 32 characters").optional(),
   AUTH_TRUSTED_ORIGINS: csv.default([]),
