@@ -710,7 +710,6 @@ Every stored file has one row in `files`. Other tables point to it with `file_id
 erDiagram
   users ||--o{ files : owns
   patients ||--o{ files : "about"
-  users ||--o{ idempotency_keys : makes
   users {
     uuid id PK
   }
@@ -733,15 +732,18 @@ erDiagram
     timestamptz deleted_at
   }
   idempotency_keys {
-    text key PK
-    uuid user_id FK
+    text scope_hash PK
     text request_hash
+    text state
     int response_status
-    jsonb response_body
+    text response_content_type
+    text response_body_enc
     timestamptz created_at
     timestamptz expires_at
   }
 ```
+
+`idempotency_keys` holds a hash of caller, route and client key (never the raw key), the request hash, and the response body encrypted with the crypto module (D-017). `state` is `in_progress` or `completed`. Rows expire after 24 hours and a cleanup job removes them.
 
 `files.purpose` values: `kyc`, `patient_document`, `prescription_pdf`, `invoice_pdf`, `recording`, `export`.
 
