@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
 import type { Logger } from "pino";
+import { globalSingleton } from "../singleton";
 import { logger as defaultLogger } from "../logging/logger";
 
 // Application-level envelope encryption for free-text clinical fields
@@ -173,14 +174,14 @@ export class Crypto {
   }
 }
 
-let shared: Crypto | undefined;
+const holder = globalSingleton("crypto", () => ({ shared: undefined as Crypto | undefined }));
 
 /** Wires the process-wide crypto from configuration (see config.ts). */
 export function configureCrypto(crypto: Crypto): void {
-  shared = crypto;
+  holder.shared = crypto;
 }
 
 export function getCrypto(): Crypto {
-  if (!shared) throw new Error("crypto is not configured");
-  return shared;
+  if (!holder.shared) throw new Error("crypto is not configured");
+  return holder.shared;
 }

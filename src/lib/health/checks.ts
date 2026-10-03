@@ -1,10 +1,12 @@
+import { globalSingleton } from "../singleton";
+
 // Readiness checks. Each module that depends on a service (database, cache,
 // storage) registers a read-only check at start-up. A check must not write.
 
 export type ReadinessCheck = () => Promise<void>;
 
 const CHECK_TIMEOUT_MS = 2000;
-const checks = new Map<string, ReadinessCheck>();
+const checks = globalSingleton("readiness-checks", () => new Map<string, ReadinessCheck>());
 
 export function registerReadinessCheck(name: string, check: ReadinessCheck): void {
   checks.set(name, check);

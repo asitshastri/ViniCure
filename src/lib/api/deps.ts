@@ -1,3 +1,4 @@
+import { globalSingleton } from "../singleton";
 import type { Actor, AuditSpec, RateLimitDecision, RateLimitInput } from "./types";
 
 // The pieces withApi() needs from other modules. Each later task plugs its real
@@ -33,20 +34,20 @@ export type ApiDeps = {
   trustedProxyHops?: number;
 };
 
-let current: ApiDeps = {};
+const state = globalSingleton("api-deps", () => ({ current: {} as ApiDeps }));
 
 export function configureApi(deps: ApiDeps): void {
-  current = { ...current, ...deps };
+  state.current = { ...state.current, ...deps };
 }
 
 export function resetApiConfig(): void {
-  current = {};
+  state.current = {};
 }
 
 export function getApiDeps(): ApiDeps {
-  return current;
+  return state.current;
 }
 
 export function isProduction(): boolean {
-  return current.production ?? process.env.NODE_ENV === "production";
+  return state.current.production ?? process.env.NODE_ENV === "production";
 }
