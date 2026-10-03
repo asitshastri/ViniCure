@@ -32,10 +32,11 @@ function setup(options: { allowed?: string[] } = {}) {
     baseUrl: ORIGIN,
     trustedOrigins: [ORIGIN],
     production: true,
-    rolesOf: async () => ["patient"],
+    accountState: async () => ({ roles: ["patient"], twoFactorEnabled: false, status: "active" }),
     plugins: [
       createPhonePlugin({
         sms,
+        isStaff: async () => false,
         allowedCountryCodes: options.allowed ?? ["+91"],
         onVerified: async (id) => void verified.push(id),
         onSmsFailure: (kind) => void failures.push(kind),

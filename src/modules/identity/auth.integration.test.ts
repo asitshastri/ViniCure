@@ -32,7 +32,7 @@ describe.skipIf(!url)("Better Auth on real Postgres", () => {
       baseUrl: origin,
       trustedOrigins: [origin],
       production: true,
-      rolesOf: (id) => repo.rolesOf(id),
+      accountState: (id) => repo.accountState(id),
       emailAndPassword: { enabled: true },
     });
   };

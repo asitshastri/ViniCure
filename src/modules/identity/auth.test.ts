@@ -29,7 +29,7 @@ function setup(options: { production: boolean; roles?: Role[] }) {
     baseUrl: options.production ? "https://vinicure.example" : "http://localhost:3000",
     trustedOrigins: [options.production ? "https://vinicure.example" : "http://localhost:3000"],
     production: options.production,
-    rolesOf: async () => roles.current,
+    accountState: async () => ({ roles: roles.current, twoFactorEnabled: true, status: "active" }),
     emailAndPassword: { enabled: true, disableSignUp: false },
   });
   const origin = options.production ? "https://vinicure.example" : "http://localhost:3000";
@@ -117,7 +117,7 @@ describe("session lifetimes", () => {
       baseUrl: "https://vinicure.example",
       trustedOrigins: [],
       production: true,
-      rolesOf: async () => [],
+      accountState: async () => null,
     });
     expect(options.session?.cookieCache?.enabled).toBe(false);
     expect(options.session?.freshAge).toBe(FRESH_LOGIN_SECONDS);

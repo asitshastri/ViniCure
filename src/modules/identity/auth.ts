@@ -1,9 +1,9 @@
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
-import type { Role } from "../../lib/api/types";
 import { uuidv7 } from "../../lib/ids";
 import { identityModels } from "./schema";
 import { PATIENT_SESSION_SECONDS, FRESH_LOGIN_SECONDS, sessionExpiry } from "./session-policy";
+import { sessionRefusal, type AccountState } from "./staff";
 
 // Better Auth set-up (decision D-003, ADR-004). Only this module imports better-auth: the rest of
 // the code calls the functions exported from src/modules/identity.
@@ -20,8 +20,8 @@ export type IdentityDeps = {
   trustedOrigins: readonly string[];
   /** Secure cookies and the __Host- prefix are on whenever this is true. */
   production: boolean;
-  /** The roles of a user, read when a session is created or renewed. */
-  rolesOf: (userId: string) => Promise<readonly Role[]>;
+  /** Roles, two-factor state and status of a user, read whenever a session is about to be created. */
+  accountState: (userId: string) => Promise<AccountState | null>;
   /** How many proxies sit in front of the app, for reading the client address. */
   trustedProxyHops?: number;
   /** Extra Better Auth plugins and sign-in methods, added by later tasks (P2-03, P2-05, P2-17). */
@@ -111,7 +111,16 @@ export function buildAuthOptions(deps: IdentityDeps): BetterAuthOptions {
       session: {
         create: {
           before: async (session) => {
-            const roles = await deps.rolesOf(session.userId);
+            const state = await deps.accountState(session.userId);
+            // No session for a missing, locked or deleted account, and none for a staff account
+            // that has not enrolled its authenticator (see staff.ts). This holds for every
+            // sign-in method, so a new method cannot forget the rule.
+            if (!state || sessionRefusal(state)) {
+              throw new APIError("FORBIDDEN", {
+                message: "Sign-in is not available for this account.",
+              });
+            }
+            const roles = state.roles;
             const now = new Date();
             return {
               data: { ...session, expiresAt: sessionExpiry({ roles, createdAt: now }) },

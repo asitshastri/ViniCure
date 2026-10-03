@@ -9,6 +9,8 @@ import { RateLimiter } from "../../lib/rate-limit/limiter";
 import { createAuth, type Auth } from "./auth";
 import { guardOtpRequest, type OtpGuardDeps } from "./otp-guard";
 import { createPhonePlugin } from "./phone";
+import { isStaff } from "./session-policy";
+import { createStaffPlugins, staffEmailAndPassword } from "./staff";
 import { IdentityRepo } from "./repo";
 
 // The public face of the identity module. The rest of the code imports from here, never from
@@ -35,10 +37,13 @@ export function getAuth(): Auth {
     baseUrl: config.APP_URL,
     trustedOrigins: [new URL(config.APP_URL).origin, ...config.AUTH_TRUSTED_ORIGINS],
     production,
-    rolesOf: (userId) => repo.rolesOf(userId),
+    accountState: (userId) => repo.accountState(userId),
+    emailAndPassword: staffEmailAndPassword,
     trustedProxyHops: config.TRUSTED_PROXY_HOPS,
     plugins: [
+      ...createStaffPlugins(),
       createPhonePlugin({
+        isStaff: async (userId) => isStaff(await repo.rolesOf(userId)),
         // Resolved at send time so a missing real provider fails the send, not the whole auth route.
         sms: { sendTemplate: (input) => getSmsProvider().sendTemplate(input) },
         allowedCountryCodes: config.ALLOWED_PHONE_COUNTRY_CODES,
