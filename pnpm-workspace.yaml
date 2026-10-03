@@ -2,3 +2,4 @@ allowBuilds:
   unrs-resolver: false
 minimumReleaseAgeExclude:
   - "@types/node@24.19.1"
+  - pino@10.4.0
