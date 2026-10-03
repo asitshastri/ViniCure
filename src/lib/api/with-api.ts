@@ -183,6 +183,8 @@ export function withApi<
     idempotent: config.idempotent ?? false,
     audited: config.audit !== undefined,
     hasBody: config.body !== undefined,
+    doc: config.doc,
+    schemas: { body: config.body, query: config.query, params: config.params },
   });
 
   return async function route(request: Request, context?: RouteContext): Promise<Response> {

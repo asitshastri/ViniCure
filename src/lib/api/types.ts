@@ -62,6 +62,15 @@ export type RouteConfig<
   audit?: AuditSpec;
   /** Largest accepted request body in bytes. Default 65536. */
   maxBodyBytes?: number;
+  /** Text for the OpenAPI document. A route without a summary fails the CI check. */
+  doc?: RouteDoc;
+};
+
+export type RouteDoc = {
+  summary: string;
+  tags?: string[];
+  /** Shape of the 200 response, for the document only. */
+  response?: z.ZodType;
 };
 
 export type Parsed<S extends z.ZodType | undefined> = S extends z.ZodType ? z.output<S> : undefined;
