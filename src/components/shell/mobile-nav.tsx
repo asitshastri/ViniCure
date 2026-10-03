@@ -6,12 +6,14 @@ import { useState } from "react";
 import { List } from "@phosphor-icons/react/ssr";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { useT } from "@/i18n/client";
 import { isActive, publicNav } from "@/lib/nav";
 import { cn } from "@/lib/cn";
 
 export function MobileNav() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const { t } = useT();
   const close = () => setOpen(false);
 
   return (
@@ -20,14 +22,14 @@ export function MobileNav() {
         variant="secondary"
         size="icon"
         className="xl:hidden"
-        aria-label="Open menu"
+        aria-label={t("common.openMenu")}
         aria-haspopup="dialog"
         onClick={() => setOpen(true)}
       >
         <List aria-hidden className="size-6" />
       </Button>
-      <Dialog open={open} onClose={close} title="Menu" variant="sheet">
-        <nav aria-label="Mobile">
+      <Dialog open={open} onClose={close} title={t("common.menu")} variant="sheet">
+        <nav aria-label={t("nav.mobile")}>
           <ul className="flex flex-col">
             {publicNav.map((item) => (
               <li key={item.href}>
@@ -42,7 +44,7 @@ export function MobileNav() {
                       : "text-ink hover:bg-primary-tint",
                   )}
                 >
-                  {item.label}
+                  {t(item.key)}
                 </Link>
               </li>
             ))}
@@ -50,10 +52,10 @@ export function MobileNav() {
         </nav>
         <div className="flex flex-col gap-3 pt-2">
           <ButtonLink href="/doctors" size="lg" onClick={close}>
-            Book consultation
+            {t("common.bookConsultation")}
           </ButtonLink>
           <ButtonLink href="/login" variant="secondary" size="lg" onClick={close}>
-            Sign in
+            {t("common.signIn")}
           </ButtonLink>
         </div>
       </Dialog>

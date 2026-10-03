@@ -1,5 +1,6 @@
 import { SiteFooter } from "@/components/shell/site-footer";
 import { SiteHeader } from "@/components/shell/site-header";
+import { StatePreview } from "@/components/states/state-preview";
 import { SkipLink } from "@/components/shell/skip-link";
 
 export default function PublicLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -8,7 +9,7 @@ export default function PublicLayout({ children }: Readonly<{ children: React.Re
       <SkipLink />
       <SiteHeader />
       <main id="main" tabIndex={-1} className="min-h-[60dvh] outline-none">
-        {children}
+        <StatePreview>{children}</StatePreview>
       </main>
       <SiteFooter />
     </>

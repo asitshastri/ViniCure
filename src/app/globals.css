@@ -76,8 +76,12 @@
 }
 
 @theme inline {
-  --font-sans: var(--font-noto-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-figtree), var(--font-noto-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans:
+    var(--font-noto-sans), var(--font-noto-devanagari), var(--font-noto-gujarati), ui-sans-serif,
+    system-ui, sans-serif;
+  --font-display:
+    var(--font-figtree), var(--font-noto-sans), var(--font-noto-devanagari),
+    var(--font-noto-gujarati), ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {

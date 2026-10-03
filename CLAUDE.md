@@ -198,9 +198,11 @@ Tests ship with the code. A new route needs an entry in the access-control matri
 
 ## Frontend
 
+- **Mandatory:** every time you make or design any frontend (page, screen, component, layout, style), use the `ui-ux-pro-max` and `frontend-design` skills first. No exceptions, including small changes and fixes.
 - CSP via `src/proxy.ts`. No `dangerouslySetInnerHTML`. Escape rendered content. Error boundaries.
 - Route guards in the UI are for experience only. The backend enforces access.
 - No secrets in client code. Load heavy SDKs (video) only where needed.
+- Design skills: before designing or building any frontend screen or component, invoke the `ui-ux-pro-max` skill and the `frontend-design` skill, and follow both. Where a skill suggestion conflicts with a decision in `TODO.md` (for example D-009, no neumorphism) or a security rule, the decision and the rule win. Both skills are committed in `.claude/skills/` (ui-ux-pro-max from nextlevelbuilder, MIT; frontend-design from anthropics/skills), so cloud sessions have them. Do not skip them. If one fails to load, say so in the report and follow `docs/design-notes.md`.
 
 ---
 
