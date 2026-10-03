@@ -56,6 +56,13 @@ Record every consultation in the Progress log: `Reused: <files> -> <what we took
 
 Cloud sessions and local sessions use the same workflow. For cloud reference to viniCare, clone `https://github.com/asitshastri/viniCare.git` into the working directory.
 
+**When the human is away (autonomous mode, decided 2026-10-04)**
+- Keep working until the usage limit is reached, and start again when it renews. Do not stop to ask.
+- If a task needs the human (opinion, review, answer, account, key, admin-level install, legal or medical decision), add a row to "Questions for the human" in `TODO.md`, mark the task `[!]` with the reason, and move to the next task that is not blocked. Never guess a legal, tax, medical or security-policy answer.
+- npm packages are not questions: install them when needed, with exact versions, inside the 24-hour release-age rule, with no new exclusions, and say why in the commit message.
+- Commit and push to `main` after each finished task. Keep `main` building and passing tests.
+- At the start of the next session with the human, ask the queued questions first.
+
 **At the start of every session**
 1. Read `TODO.md`: Current focus, Needs you, Blockers, DISCOVERED.
 2. Read the docs that match the task: `docs/architecture.md`, `docs/backend-architecture.md`, `docs/er_model.md`. Check `docs/reuse-map.md` for entries tagged with this task ID and read those ViniCare files first.

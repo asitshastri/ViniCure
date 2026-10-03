@@ -94,6 +94,17 @@ esourcesin` to PATH | n/a | Done |
 | Decide which government photo ID types doctors may upload for KYC (Aadhaar and PAN are not collected without legal review) and the allowed consultation fee range | The onboarding form says “to be confirmed” for both | Before P9 | Not started |
 | Confirm medical record retention: the old ViniCare backlog assumed 7 years, one source we found says at least 3 years | Sets retention rules, the erasure job and the retention matrix | Before P9-04 | Not started |
 
+## Questions for the human (ask these when the human is back)
+
+When the human is away (asleep or offline) Claude keeps working and never waits. If a task needs the human's opinion, review, answer, account, key or a system-level install, Claude adds a row here, marks that task `[!]` with the reason, and moves on to the next task that is not blocked. At the start of the next session with the human, read this table aloud first, collect the answers, record them in Decisions, clear the rows, and unblock the tasks.
+
+Packages and libraries (npm dependencies) are not questions: install them when needed, within the supply-chain rules (exact versions, 24-hour release-age rule, no new exclusions, justify in the commit message). Only installs that need admin rights or a new paid or third-party service go in this table.
+
+| Added | Task | Question or need | Why it matters | What Claude did meanwhile |
+|---|---|---|---|---|
+| 2026-10-04 | P2-17 | The cloud session cannot see `.env.local`, so the Google client ID and secret are not there. Re-enter them in the cloud environment (or tell me to keep P2-17 for a local session) | Google sign-in cannot be tested live without them | Builds P2-17 against a fake Google provider and leaves the live check for the morning |
+| 2026-10-04 | All | The cloud session has no Docker. Real-server tests (Postgres 17, Valkey, S3, containers) skip there | They only run on the local PC | Uses the in-process Postgres (PGlite) tests; the human runs the full suite locally and says if anything fails |
+
 ## Blockers
 
 None.
