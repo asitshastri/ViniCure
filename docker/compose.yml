@@ -3,8 +3,8 @@
 #
 #   docker compose -f docker/compose.yml up -d
 #
-# The app itself runs on the host with `pnpm dev`. The `app` profile (migrate,
-# web, worker containers) is added with P1-12.
+# The app itself runs on the host with `pnpm dev`. To run the built containers too:
+#   docker compose -f docker/compose.yml --profile app up -d --build
 name: vinicure
 
 services:
@@ -77,6 +77,41 @@ services:
       timeout: 10s
       retries: 30
       start_period: 120s
+
+  # --- The `app` profile: the built images, for checking the containers end to end. ---
+
+  migrate:
+    profiles: ["app"]
+    build: { context: .., dockerfile: docker/Dockerfile, target: migrate }
+    environment:
+      DATABASE_MIGRATION_URL: postgres://migrator:dev-only-change-me@postgres:5432/vinicure
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
+  worker:
+    profiles: ["app"]
+    build: { context: .., dockerfile: docker/Dockerfile, target: worker }
+    environment:
+      DATABASE_URL: postgres://app:dev-only-change-me@postgres:5432/vinicure
+      NODE_ENV: development
+    ports: ["127.0.0.1:3001:3001"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  web:
+    profiles: ["app"]
+    build: { context: .., dockerfile: docker/Dockerfile, target: web }
+    environment:
+      NODE_ENV: development
+      APP_URL: http://localhost:3000
+      DATABASE_URL: postgres://app:dev-only-change-me@postgres:5432/vinicure
+      VALKEY_URL: redis://valkey:6379
+      LOCAL_DEV_KEY: a-local-development-key-of-32-chars-min
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      valkey: { condition: service_healthy }
 
 volumes:
   pgdata:

@@ -1,0 +1,12 @@
+.git
+.next
+node_modules
+dist
+.env
+.env.*
+!.env.example
+*.log
+Frontend_Inspirations
+docs
+.claude
+coverage
