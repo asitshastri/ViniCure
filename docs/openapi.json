@@ -5,6 +5,80 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/api/auth/*": {
+      "get": {
+        "summary": "Authentication endpoints (read)",
+        "tags": [
+          "identity"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "public_read",
+        "x-auth": "public",
+        "x-roles": [],
+        "x-audited": false
+      },
+      "post": {
+        "summary": "Authentication endpoints (sign-in, sign-out and similar)",
+        "tags": [
+          "identity"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "write",
+        "x-auth": "public",
+        "x-roles": [],
+        "x-audited": false
+      }
+    },
     "/api/health": {
       "get": {
         "summary": "Liveness check",

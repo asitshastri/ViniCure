@@ -150,7 +150,7 @@ Important rule: Better Auth's two-factor step applies to credential sign-in endp
 
 Session rules (proposals):
 - Cookie: HttpOnly, Secure, SameSite=Lax, `__Host-` prefix.
-- Patient sessions up to 14 days idle. Staff sessions 8 hours.
+- Patient sessions last 14 days from sign-in. Staff sessions last 8 hours from sign-in. Sessions are never renewed (decision D-021): Better Auth renews by one global lifetime, which would stretch a staff session to 14 days.
 - Sensitive actions (refund, role change, break-glass, data erase) require a fresh login within 15 minutes.
 - Users can list and revoke their own sessions. "Sign out everywhere" revokes all.
 - Origin check on every mutating request, in addition to SameSite.
