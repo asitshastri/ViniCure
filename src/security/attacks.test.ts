@@ -214,6 +214,8 @@ describe("static guards: no SQL built from text, no raw HTML, no code evaluation
     "BILLABLE",
     // Payout repo: a constant column list.
     "PAYOUT_COLUMNS",
+    // Consultation repo: a constant column list.
+    "PARTICIPANT_COLUMNS",
   ]);
 
   it("repo files use template expressions in SQL only from the reviewed list", () => {

@@ -54,7 +54,7 @@ const EXPECT: Record<Resource, Record<string, (keyof typeof who)[]>> = {
     review: ["owner"],
     updateStatus: ["assignedDoctor"],
   },
-  consultation: { join: ["assignedDoctor"] }, // owner needs paid and in window: tested below
+  consultation: { join: ["assignedDoctor"], end: ["assignedDoctor"] }, // owner needs paid and in window: tested below
   clinicalNote: { read: ["assignedDoctor"], write: ["assignedDoctor"] },
   prescription: { read: ["owner", "assignedDoctor"], write: ["assignedDoctor"] },
   healthRecord: { read: ["owner", "assignedDoctor"], write: ["owner", "assignedDoctor"] },
@@ -94,7 +94,7 @@ describe("every cell of the matrix, without break-glass", () => {
           );
           if (!decision.allow) {
             // The owner is told why a join is not open yet (tested below); everyone else gets 404.
-            const ownerJoin = resource === "consultation" && name === "owner";
+            const ownerJoin = resource === "consultation" && action === "join" && name === "owner";
             expect(decision.status).toBe(ownerJoin ? "forbidden" : "not_found");
           }
         }

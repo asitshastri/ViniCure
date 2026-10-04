@@ -92,7 +92,8 @@ export const MATRIX = {
   },
   consultation: {
     owner: ["join"],
-    assignedDoctor: ["join"],
+    // Only the assigned doctor ends a consultation (for everyone).
+    assignedDoctor: ["join", "end"],
   },
   clinicalNote: {
     assignedDoctor: ["read", "write"],
