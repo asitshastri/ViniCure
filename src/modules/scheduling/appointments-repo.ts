@@ -35,6 +35,36 @@ function toRow(r: Record<string, unknown>): AppointmentRow {
   };
 }
 
+export type AppointmentDetail = AppointmentRow & {
+  doctorName: string;
+  doctorUserId: string | null;
+  patientName: string;
+  patientAccountUserId: string;
+  rescheduleCount: number;
+  /** start_at with full precision, for the page cursor. */
+  cursorTime: string;
+};
+
+const DETAIL_COLUMNS =
+  COLUMNS +
+  ", d.display_name AS doctor_name, d.user_id AS doctor_user_id, p.full_name AS patient_name," +
+  " p.account_user_id AS patient_account_user_id, a.reschedule_count," +
+  " to_char(a.start_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS cursor_time";
+const DETAIL_FROM =
+  " FROM appointments a JOIN doctors d ON d.id = a.doctor_id JOIN patients p ON p.id = a.patient_id";
+
+function toDetail(r: Record<string, unknown>): AppointmentDetail {
+  return {
+    ...toRow(r),
+    doctorName: String(r.doctor_name),
+    doctorUserId: r.doctor_user_id === null ? null : String(r.doctor_user_id),
+    patientName: String(r.patient_name),
+    patientAccountUserId: String(r.patient_account_user_id),
+    rescheduleCount: Number(r.reschedule_count),
+    cursorTime: String(r.cursor_time),
+  };
+}
+
 export type NewHold = {
   id: string;
   patientId: string;
@@ -138,5 +168,123 @@ export class AppointmentRepo {
       id,
     ]);
     return rows[0] ? toRow(rows[0]) : null;
+  }
+
+  // ---- reading ----
+
+  /** One appointment with who it is for and who it is with. The caller decides access. */
+  async findDetail(id: string): Promise<AppointmentDetail | null> {
+    const { rows } = await this.db.query(
+      "SELECT " + DETAIL_COLUMNS + DETAIL_FROM + " WHERE a.id = $1",
+      [id],
+    );
+    return rows[0] ? toDetail(rows[0]) : null;
+  }
+
+  /** Bookings for the people on one account, newest first, after a (start, id) cursor. */
+  async listForAccount(input: {
+    accountUserId: string;
+    after?: { key: string; id: string };
+    limit: number;
+  }): Promise<AppointmentDetail[]> {
+    const params: unknown[] = [input.accountUserId];
+    let cursor = "";
+    if (input.after) {
+      params.push(input.after.key, input.after.id);
+      cursor = " AND (a.start_at, a.id) < ($2::timestamptz, $3::uuid)";
+    }
+    params.push(input.limit);
+    const { rows } = await this.db.query(
+      "SELECT " +
+        DETAIL_COLUMNS +
+        DETAIL_FROM +
+        " WHERE p.account_user_id = $1 AND a.status <> 'expired'" +
+        cursor +
+        " ORDER BY a.start_at DESC, a.id DESC LIMIT $" +
+        String(params.length),
+      params,
+    );
+    return rows.map(toDetail);
+  }
+
+  /** A doctor's confirmed, not yet finished appointments, soonest first. */
+  async listForDoctor(input: {
+    doctorUserId: string;
+    after?: { key: string; id: string };
+    limit: number;
+  }): Promise<AppointmentDetail[]> {
+    const params: unknown[] = [input.doctorUserId];
+    let cursor = "";
+    if (input.after) {
+      params.push(input.after.key, input.after.id);
+      cursor = " AND (a.start_at, a.id) > ($2::timestamptz, $3::uuid)";
+    }
+    params.push(input.limit);
+    const { rows } = await this.db.query(
+      "SELECT " +
+        DETAIL_COLUMNS +
+        DETAIL_FROM +
+        " WHERE d.user_id = $1 AND a.status IN ('scheduled', 'in_progress') AND a.end_at > now()" +
+        cursor +
+        " ORDER BY a.start_at, a.id LIMIT $" +
+        String(params.length),
+      params,
+    );
+    return rows.map(toDetail);
+  }
+
+  // ---- changing ----
+
+  /**
+   * Moves an appointment to a new status only if it is still in `from`, and writes the history
+   * row in the same statement. False when someone else moved it first.
+   */
+  async transition(input: {
+    id: string;
+    from: string;
+    to: string;
+    changedBy: string | null;
+    reason: string | null;
+  }): Promise<boolean> {
+    const { rows } = await this.db.query(
+      `WITH moved AS (
+         UPDATE appointments SET status = $3, hold_expires_at = NULL
+          WHERE id = $1 AND status = $2 RETURNING id
+       ), logged AS (
+         INSERT INTO appointment_status_history (appointment_id, from_status, to_status, changed_by, reason)
+         SELECT id, $2, $3, $4, $5 FROM moved
+       )
+       SELECT id FROM moved`,
+      [input.id, input.from, input.to, input.changedBy, input.reason],
+    );
+    return rows.length === 1;
+  }
+
+  /**
+   * Moves a confirmed appointment to another time of the same doctor. Applies only while it is
+   * still scheduled, has not started, and has been moved fewer than `maxReschedules` times. A
+   * taken time raises the exclusion error (23P01). The history row is written with it.
+   */
+  async reschedule(input: {
+    id: string;
+    startAt: Date;
+    endAt: Date;
+    changedBy: string;
+    maxReschedules: number;
+  }): Promise<boolean> {
+    const { rows } = await this.db.query(
+      `WITH moved AS (
+         UPDATE appointments
+            SET start_at = $2, end_at = $3, reschedule_count = reschedule_count + 1
+          WHERE id = $1 AND status = 'scheduled' AND start_at > now() AND reschedule_count < $5
+          RETURNING id
+       ), logged AS (
+         INSERT INTO appointment_status_history (appointment_id, from_status, to_status, changed_by, reason)
+         SELECT id, 'scheduled', 'scheduled', $4, 'rescheduled' FROM moved
+       )
+       SELECT id FROM moved`,
+      [input.id, input.startAt, input.endAt, input.changedBy, input.maxReschedules],
+    );
+    return rows.length === 1;
   }
 }

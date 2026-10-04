@@ -87,7 +87,7 @@ export const MATRIX = {
   appointment: {
     owner: ["read", "cancel", "reschedule"],
     assignedDoctor: ["read", "updateStatus", "cancel"],
-    admin: ["read"],
+    admin: ["read", "cancel"],
     support: ["read"],
   },
   consultation: {

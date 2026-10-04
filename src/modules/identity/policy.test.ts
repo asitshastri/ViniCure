@@ -49,7 +49,7 @@ const EXPECT: Record<Resource, Record<string, (keyof typeof who)[]>> = {
   },
   appointment: {
     read: ["owner", "assignedDoctor", "admin", "superAdmin", "support"],
-    cancel: ["owner", "assignedDoctor"],
+    cancel: ["owner", "assignedDoctor", "admin", "superAdmin"],
     reschedule: ["owner"],
     updateStatus: ["assignedDoctor"],
   },

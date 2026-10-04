@@ -1,5 +1,5 @@
 import { withApi } from "@/lib/api/with-api";
-import { getAppointments, holdBody } from "@/modules/scheduling";
+import { appointmentsQuery, getAppointments, holdBody } from "@/modules/scheduling";
 
 // A patient holds a slot (P4-05). Idempotent: a retry with the same key replays the answer.
 // The fee is copied by the server; no amount is accepted from the client.
@@ -23,4 +23,20 @@ export const POST = withApi(
       status: 201,
       headers: { "Content-Type": "application/json" },
     }),
+);
+
+// The bookings on the signed-in patient's account, newest first, with a cursor.
+export const GET = withApi(
+  {
+    method: "GET",
+    path: "/api/v1/appointments",
+    auth: "session",
+    roles: ["patient"],
+    roleDenied: "not_found",
+    fullSession: true,
+    rateLimit: "auth_read",
+    query: appointmentsQuery,
+    doc: { summary: "List my appointments", tags: ["scheduling"] },
+  },
+  async ({ actor, query }) => getAppointments().list(actor, query),
 );

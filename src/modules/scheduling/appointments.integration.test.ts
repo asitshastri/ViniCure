@@ -52,7 +52,7 @@ describe.skipIf(!url)("slot holds under concurrency (real Postgres)", () => {
     );
     await pool.query(
       `INSERT INTO doctor_availability_rules (id, doctor_id, weekday, start_time, end_time, slot_minutes, valid_from)
-       VALUES ($1,$2,1,'09:00','11:00',30,'2026-01-01')`,
+       VALUES ($1,$2,1,'09:00','12:00',30,'2026-01-01')`,
       [uuidv7(), doctorId],
     );
   });
@@ -145,5 +145,45 @@ describe.skipIf(!url)("slot holds under concurrency (real Postgres)", () => {
       ),
     );
     expect(results.every((r) => r.status === "fulfilled")).toBe(true);
+  });
+
+  it("two cancels and a reschedule at the same moment: one cancel wins, no double history", async () => {
+    const owner = await newPerson();
+    const doctorUser = uuidv7();
+    await pool.query("INSERT INTO users (id, name, email) VALUES ($1,'D',$2)", [
+      doctorUser,
+      `${doctorUser}@no-email.invalid`,
+    ]);
+    await pool.query("UPDATE doctors SET user_id = $1 WHERE id = $2", [doctorUser, doctorId]);
+    const held = await service.hold(
+      owner.principal,
+      holdBody.parse({
+        patientId: owner.patientId,
+        doctorId,
+        startAt: new Date("2026-11-02T11:00:00+05:30").toISOString(),
+      }),
+    );
+    await pool.query(
+      "UPDATE appointments SET status = 'scheduled', hold_expires_at = NULL WHERE id = $1",
+      [held.id],
+    );
+    const all = await Promise.allSettled([
+      service.cancel(owner.principal, held.id, { reason: "other" }),
+      service.cancel({ userId: doctorUser, roles: ["doctor"] }, held.id, {
+        reason: "doctor_unavailable",
+      }),
+      service.reschedule(owner.principal, held.id, {
+        startAt: new Date("2026-11-02T11:30:00+05:30").toISOString(),
+      }),
+    ]);
+    expect(all.filter((r) => r.status === "fulfilled").length).toBeGreaterThanOrEqual(1);
+    for (const r of all) {
+      if (r.status === "rejected") expect((r.reason as AppError).status).toBe(409);
+    }
+    const cancels = await pool.query(
+      "SELECT count(*)::int AS n FROM appointment_status_history WHERE appointment_id = $1 AND to_status LIKE 'cancelled%'",
+      [held.id],
+    );
+    expect(cancels.rows[0]?.n).toBe(1);
   });
 });
