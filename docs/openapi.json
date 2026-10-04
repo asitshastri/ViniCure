@@ -460,6 +460,624 @@
         "x-roles": [],
         "x-audited": false
       }
+    },
+    "/api/v1/patients": {
+      "get": {
+        "summary": "List the patient profiles on this account",
+        "tags": [
+          "identity"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Sign in required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "auth_read",
+        "x-auth": "session",
+        "x-roles": [
+          "patient"
+        ],
+        "x-audited": false,
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      },
+      "post": {
+        "summary": "Add a patient profile (self or family member)",
+        "tags": [
+          "identity"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Sign in required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "write",
+        "x-auth": "session",
+        "x-roles": [
+          "patient"
+        ],
+        "x-audited": true,
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "relation": {
+                    "type": "string",
+                    "enum": [
+                      "self",
+                      "spouse",
+                      "child",
+                      "parent",
+                      "sibling",
+                      "other"
+                    ]
+                  },
+                  "fullName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 100,
+                    "pattern": "^[\\p{L}\\p{M}][\\p{L}\\p{M} .'-]*$"
+                  },
+                  "dob": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "gender": {
+                    "type": "string",
+                    "enum": [
+                      "female",
+                      "male",
+                      "other",
+                      "undisclosed"
+                    ]
+                  },
+                  "addressLine": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 200
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "city": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 80
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "state": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 80
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "pincode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[1-9]\\d{5}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "bloodGroup": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "A+",
+                          "A-",
+                          "B+",
+                          "B-",
+                          "AB+",
+                          "AB-",
+                          "O+",
+                          "O-"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "relation",
+                  "fullName",
+                  "dob",
+                  "gender"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patients/{id}": {
+      "delete": {
+        "summary": "Remove a family member's profile (soft delete)",
+        "tags": [
+          "identity"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Sign in required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "write",
+        "x-auth": "session",
+        "x-roles": [
+          "patient"
+        ],
+        "x-audited": true,
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      },
+      "get": {
+        "summary": "Read one patient profile",
+        "tags": [
+          "identity"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Sign in required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "auth_read",
+        "x-auth": "session",
+        "x-roles": [
+          "patient"
+        ],
+        "x-audited": false,
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      },
+      "patch": {
+        "summary": "Change a patient profile",
+        "tags": [
+          "identity"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Sign in required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "write",
+        "x-auth": "session",
+        "x-roles": [
+          "patient"
+        ],
+        "x-audited": true,
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "relation": {
+                    "type": "string",
+                    "enum": [
+                      "self",
+                      "spouse",
+                      "child",
+                      "parent",
+                      "sibling",
+                      "other"
+                    ]
+                  },
+                  "fullName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 100,
+                    "pattern": "^[\\p{L}\\p{M}][\\p{L}\\p{M} .'-]*$"
+                  },
+                  "dob": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "gender": {
+                    "type": "string",
+                    "enum": [
+                      "female",
+                      "male",
+                      "other",
+                      "undisclosed"
+                    ]
+                  },
+                  "addressLine": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 200
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "city": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 80
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "state": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 80
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "pincode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[1-9]\\d{5}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "bloodGroup": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "A+",
+                          "A-",
+                          "B+",
+                          "B-",
+                          "AB+",
+                          "AB-",
+                          "O+",
+                          "O-"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
