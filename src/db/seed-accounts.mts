@@ -200,46 +200,53 @@ export async function seedAccounts(env: Record<string, string | undefined>) {
     // one open for joining right now, one tomorrow, one finished.
     const doctor1 = demos[0];
     if (doctor1 && first) {
-      const has = await db.query("SELECT 1 FROM appointments WHERE patient_id = $1 LIMIT 1", [
+      const bookPaid = async (at: number, status: string, tag: string) => {
+        const id = uuidv7();
+        const start = new Date(at);
+        await db.query(
+          `INSERT INTO appointments (id, patient_id, doctor_id, booked_by_user_id, start_at, end_at, status, fee_paise)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 30000)`,
+          [
+            id,
+            first.profileId,
+            doctor1.id,
+            first.userId,
+            start,
+            new Date(start.getTime() + 30 * 60_000),
+            status,
+          ],
+        );
+        await db.query(
+          `INSERT INTO payments (id, appointment_id, payer_user_id, amount_paise, status, gateway_order_id, gateway_payment_id, idempotency_key, captured_at)
+           VALUES ($1, $2, $3, 30000, 'captured', $4, $5, $6, now())`,
+          [
+            uuidv7(),
+            id,
+            first.userId,
+            `order_demo_${tag}_${randomBytes(4).toString("hex")}`,
+            `pay_demo_${tag}_${randomBytes(4).toString("hex")}`,
+            `demo-seed-${id}`,
+          ],
+        );
+      };
+      const HOUR = 3_600_000;
+      const any = await db.query("SELECT 1 FROM appointments WHERE patient_id = $1 LIMIT 1", [
         first.profileId,
       ]);
-      if (has.rows.length === 0) {
-        const HOUR = 3_600_000;
-        const slots = [
-          { at: Date.now() + 3 * 60_000, status: "scheduled" },
-          { at: Date.now() + 26 * HOUR, status: "scheduled" },
-          { at: Date.now() - 72 * HOUR, status: "completed" },
-        ];
-        for (const [i, slot] of slots.entries()) {
-          const id = uuidv7();
-          const start = new Date(slot.at);
-          await db.query(
-            `INSERT INTO appointments (id, patient_id, doctor_id, booked_by_user_id, start_at, end_at, status, fee_paise)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 30000)`,
-            [
-              id,
-              first.profileId,
-              doctor1.id,
-              first.userId,
-              start,
-              new Date(start.getTime() + 30 * 60_000),
-              slot.status,
-            ],
-          );
-          await db.query(
-            `INSERT INTO payments (id, appointment_id, payer_user_id, amount_paise, status, gateway_order_id, gateway_payment_id, idempotency_key, captured_at)
-             VALUES ($1, $2, $3, 30000, 'captured', $4, $5, $6, now())`,
-            [
-              uuidv7(),
-              id,
-              first.userId,
-              `order_demo_${i}_${randomBytes(4).toString("hex")}`,
-              `pay_demo_${i}_${randomBytes(4).toString("hex")}`,
-              `demo-seed-${id}`,
-            ],
-          );
-        }
+      if (any.rows.length === 0) {
+        await bookPaid(Date.now() + 26 * HOUR, "scheduled", "next");
+        await bookPaid(Date.now() - 72 * HOUR, "completed", "past");
       }
+      // Every run makes sure there is a paid booking that can be joined right now (the window
+      // opens 10 minutes before the start and closes 30 minutes after the end), so a video visit
+      // can be tried at any time by running the seed again.
+      const open = await db.query(
+        `SELECT 1 FROM appointments
+          WHERE patient_id = $1 AND doctor_id = $2 AND status IN ('scheduled', 'in_progress')
+            AND start_at < now() + interval '8 minutes' AND end_at > now() - interval '20 minutes'`,
+        [first.profileId, doctor1.id],
+      );
+      if (open.rows.length === 0) await bookPaid(Date.now() + 2 * 60_000, "scheduled", "now");
     }
   } finally {
     await pool.end();
