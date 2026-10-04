@@ -30,7 +30,24 @@ pnpm db:migrate
 pnpm dev                                        # http://localhost:3000
 ```
 
-To browse the prototype screens without signing in, put `UI_MOCK_SESSION=true` in `.env.local` (development only; production refuses it).
+The local settings in `.env.local` (a secret for sessions, a key for encryption, the storage and virus-scanner addresses) are throwaway values made on your own computer. Real provider keys (Agora, Razorpay) are added there by you and never go in the repository.
+
+### Test accounts to try every screen
+
+```bash
+pnpm db:seed --demo --accounts   # demo doctors, test accounts and a few paid bookings (local computer only)
+pnpm dev                         # the website, http://localhost:3000
+pnpm worker                      # the background jobs (invoices, file scans, reminders)
+```
+
+| Who                                                                                                                      | How to sign in                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Patients **6000000001**, **6000000002**, **6000000003**                                                                  | /login. The one-time code is printed in the terminal that runs `pnpm dev` (a line starting `[dev sms]`, local only)                           |
+| Admin `admin@vinicure.test`, support `support@vinicure.test`, doctors `doctor1@vinicure.test` to `doctor3@vinicure.test` | /login/staff. The password is `DEV_PASSWORD` in `src/db/seed-accounts.mts`. The authenticator code: `pnpm dev:code admin` (or `doctor1`, ...) |
+
+Patient 6000000001 has three paid bookings with doctor 1's demo profile: one that opens for joining right now, one tomorrow and one finished. Running the seed again puts the test patients back to "never signed in", so their next sign-in is trusted at once. The authenticator secrets are kept in `.dev-accounts.json`, which git ignores.
+
+, put `UI_MOCK_SESSION=true` in `.env.local` (development only; production refuses it).
 
 ## Check your work
 

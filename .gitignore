@@ -26,6 +26,9 @@ test-results/
 Thumbs.db
 .claude/settings.local.json
 
+# local test accounts and their authenticator secrets (pnpm db:seed --demo --accounts)
+.dev-accounts.json
+
 # worker build output
 /dist/
 

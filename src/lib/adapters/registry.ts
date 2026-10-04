@@ -2,6 +2,7 @@ import { getConfig } from "../config/config";
 import { globalSingleton } from "../singleton";
 import { getStorage } from "../storage";
 import { ClamAvScanner } from "./clamav";
+import { DevConsoleSms } from "./dev-sms";
 import { AgoraProvider } from "./agora";
 import {
   FakeEmailProvider,
@@ -41,6 +42,11 @@ export function getSmsProvider(): SmsProvider {
   if (holder.sms) return holder.sms;
   refuseFakeInProduction("SMS");
   holder.sms = new FakeSmsProvider();
+  // On a developer machine only, show the message in the server terminal so a person can sign in
+  // by hand. Never when APP_ENV is staging or production (a code in a log is a leaked code).
+  if (getConfig().APP_ENV === "local" && getConfig().NODE_ENV !== "production") {
+    holder.sms = new DevConsoleSms(holder.sms);
+  }
   return holder.sms;
 }
 

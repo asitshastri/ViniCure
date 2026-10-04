@@ -1,6 +1,10 @@
 import { randomBytes } from "node:crypto";
-import { RtcRole, RtcTokenBuilder } from "agora-token";
+// agora-token is a CommonJS package: the worker loads it as plain Node ESM, where only the default
+// export is available, so the names are taken from it (a named import crashed the worker at start).
+import agoraToken from "agora-token";
 import { AdapterError, type VideoProvider } from "./types";
+
+const { RtcRole, RtcTokenBuilder } = agoraToken;
 
 // Agora video (P6-02), behind the VideoProvider interface (ADR-008).
 //

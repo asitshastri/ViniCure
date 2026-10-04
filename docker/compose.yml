@@ -45,6 +45,8 @@ services:
     environment:
       RUSTFS_ACCESS_KEY: dev
       RUSTFS_SECRET_KEY: dev-only-change-me
+      # Throwaway local key so server-side encryption (which our server asks for) works here.
+      RUSTFS_SSE_S3_MASTER_KEY: "eqsjRC0+zP82Sie2W6fwmVhBML8Ha2HCdbTSJ1q8388="
       RUSTFS_VOLUMES: /data
       RUSTFS_ADDRESS: ":9000"
       RUSTFS_CONSOLE_ENABLE: "true"
