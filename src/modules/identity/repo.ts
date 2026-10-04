@@ -2,6 +2,14 @@ import type { Role } from "../../lib/api/types";
 import type { Queryable } from "../../lib/db/queryable";
 import type { AccountState } from "./staff";
 
+export type SessionRow = {
+  id: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: Date;
+  expiresAt: Date;
+};
+
 export const MAX_INVITATION_ATTEMPTS = 5;
 export type InvitableRole = "doctor" | "admin" | "support";
 export type OpenInvitation = {
@@ -206,5 +214,43 @@ export class IdentityRepo {
     );
     const row = rows[0];
     return row && row.user_id ? String(row.user_id) : null;
+  }
+
+  // ---- Sessions (P2-10) ----
+
+  /** The user's live sessions, newest first. The token is never selected. */
+  async listSessions(userId: string): Promise<SessionRow[]> {
+    const { rows } = await this.db.query(
+      `SELECT id, ip_address, user_agent, created_at, expires_at
+         FROM auth_sessions WHERE user_id = $1 AND expires_at > now()
+        ORDER BY created_at DESC, id LIMIT 50`,
+      [userId],
+    );
+    return rows.map((row) => ({
+      id: String(row.id),
+      ipAddress: row.ip_address === null ? null : String(row.ip_address),
+      userAgent: row.user_agent === null ? null : String(row.user_agent),
+      createdAt: row.created_at as Date,
+      expiresAt: row.expires_at as Date,
+    }));
+  }
+
+  /** Deletes one session of this user. False when it is not theirs or already gone. */
+  async revokeSession(userId: string, sessionId: string): Promise<boolean> {
+    const { rows } = await this.db.query(
+      `DELETE FROM auth_sessions WHERE id = $1 AND user_id = $2 RETURNING id`,
+      [sessionId, userId],
+    );
+    return rows.length === 1;
+  }
+
+  /** Deletes the user's sessions, all of them or all but one. Returns how many went. */
+  async revokeSessions(userId: string, keepSessionId?: string): Promise<number> {
+    const { rows } = await this.db.query(
+      `DELETE FROM auth_sessions WHERE user_id = $1 AND ($2::uuid IS NULL OR id <> $2::uuid)
+       RETURNING id`,
+      [userId, keepSessionId ?? null],
+    );
+    return rows.length;
   }
 }

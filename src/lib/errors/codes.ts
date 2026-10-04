@@ -24,6 +24,11 @@ export const ERROR_CODES = {
     detail: "The payment could not be verified.",
   },
   forbidden: { status: 403, title: "Forbidden", detail: "You do not have access to this." },
+  fresh_login_required: {
+    status: 403,
+    title: "Sign in again",
+    detail: "For your safety, sign in again to do this.",
+  },
   consent_required: {
     status: 403,
     title: "Consent required",

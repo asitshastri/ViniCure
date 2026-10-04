@@ -54,6 +54,8 @@ export type RouteConfig<
   /** What a caller with the wrong role sees. Admin routes use "not_found" so they stay hidden. */
   roleDenied?: "forbidden" | "not_found";
   rateLimit: RateLimitTier;
+  /** Needs a sign-in within the last 15 minutes (sensitive actions). Older sessions get 403. */
+  freshLogin?: boolean;
   body?: Body;
   query?: Query;
   params?: Params;

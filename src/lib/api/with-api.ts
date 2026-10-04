@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Logger } from "pino";
 import type { z } from "zod";
+import { isFreshLogin } from "../../modules/identity/session-policy";
 import { AppError, errors } from "../errors/app-error";
 import { problemResponse, zodToIssues } from "../errors/problem";
 import { logger as rootLogger, newRequestId, requestLogger } from "../logging/logger";
@@ -204,6 +205,7 @@ export function withApi<
     roles: config.roles ?? [],
     roleDenied: config.roleDenied ?? "forbidden",
     rateLimit: config.rateLimit,
+    freshLogin: config.freshLogin ?? false,
     idempotent: config.idempotent ?? false,
     audited: config.audit !== undefined,
     hasBody: config.body !== undefined,
@@ -237,6 +239,10 @@ export function withApi<
         logger = requestLogger({ requestId, route: config.path, method: config.method, userId });
         // 3. Role.
         checkRoles(actor, config);
+        // Sensitive actions need a recent sign-in. No sign-in time on record counts as stale.
+        if (config.freshLogin && !(actor.lastSignInAt && isFreshLogin(actor.lastSignInAt))) {
+          throw new AppError("fresh_login_required");
+        }
         // Second rate limit, per user.
         await enforceRateLimit(config, request, actor.userId, logger);
       }

@@ -102,6 +102,7 @@ describe("the matrix covers exactly the routes that exist", () => {
           roleDenied: route.roleDenied,
           rateLimit: route.rateLimit,
           audited: route.audited,
+          freshLogin: route.freshLogin,
         },
         key(route),
       ).toEqual({
@@ -110,6 +111,7 @@ describe("the matrix covers exactly the routes that exist", () => {
         roleDenied: want.roleDenied,
         rateLimit: want.rateLimit,
         audited: want.audited,
+        freshLogin: want.freshLogin,
       });
     }
   });
@@ -144,6 +146,7 @@ describe("the running routes enforce the matrix", () => {
     userId: `user-${role}`,
     roles: [role],
     sessionId: "s",
+    lastSignInAt: new Date(),
   });
   const call = (route: RouteEntry, init: { origin?: string } = {}) => {
     const url = `${ORIGIN}${route.path.replace(/:\w+/g, "x".repeat(32)).replace("/*", "/probe")}`;
@@ -185,6 +188,24 @@ describe("the running routes enforce the matrix", () => {
           else expect([401, 403, 404], label).not.toContain(status);
         } else {
           expect(status, label).toBe(entry.roleDenied === "not_found" ? 404 : 403);
+        }
+      }
+    }
+  });
+
+  it("routes marked fresh-login refuse an old or unknown sign-in time, and only those", async () => {
+    for (const route of routes) {
+      const entry = ACCESS_MATRIX[key(route) as keyof typeof ACCESS_MATRIX];
+      if (!entry || entry.auth === "public") continue;
+      const role = entry.roles[0] ?? "patient";
+      for (const lastSignInAt of [new Date(Date.now() - 16 * 60_000), undefined]) {
+        current = { actor: { ...actorFor(role), lastSignInAt } };
+        const res = await call(route);
+        if (entry.freshLogin) {
+          expect(res.status, key(route)).toBe(403);
+          expect((await res.json()).code, key(route)).toBe("fresh_login_required");
+        } else {
+          expect(res.status, key(route)).not.toBe(403);
         }
       }
     }

@@ -40,7 +40,8 @@
         "x-rate-limit-tier": "public_read",
         "x-auth": "public",
         "x-roles": [],
-        "x-audited": false
+        "x-audited": false,
+        "x-fresh-login": false
       },
       "post": {
         "summary": "Authentication endpoints (sign-in, sign-out and similar)",
@@ -76,7 +77,8 @@
         "x-rate-limit-tier": "write",
         "x-auth": "public",
         "x-roles": [],
-        "x-audited": false
+        "x-audited": false,
+        "x-fresh-login": false
       }
     },
     "/api/health": {
@@ -131,7 +133,8 @@
         "x-rate-limit-tier": "public_read",
         "x-auth": "public",
         "x-roles": [],
-        "x-audited": false
+        "x-audited": false,
+        "x-fresh-login": false
       }
     },
     "/api/ready": {
@@ -203,7 +206,8 @@
         "x-rate-limit-tier": "public_read",
         "x-auth": "public",
         "x-roles": [],
-        "x-audited": false
+        "x-audited": false,
+        "x-fresh-login": false
       }
     },
     "/api/v1/admin/invitations": {
@@ -276,6 +280,7 @@
           "super_admin"
         ],
         "x-audited": true,
+        "x-fresh-login": true,
         "security": [
           {
             "sessionCookie": []
@@ -369,6 +374,7 @@
         "x-auth": "public",
         "x-roles": [],
         "x-audited": true,
+        "x-fresh-login": false,
         "requestBody": {
           "required": true,
           "content": {
@@ -458,7 +464,8 @@
         "x-rate-limit-tier": "otp_verify",
         "x-auth": "public",
         "x-roles": [],
-        "x-audited": false
+        "x-audited": false,
+        "x-fresh-login": false
       }
     },
     "/api/v1/patients": {
@@ -519,6 +526,7 @@
           "patient"
         ],
         "x-audited": false,
+        "x-fresh-login": false,
         "security": [
           {
             "sessionCookie": []
@@ -592,6 +600,7 @@
           "patient"
         ],
         "x-audited": true,
+        "x-fresh-login": false,
         "security": [
           {
             "sessionCookie": []
@@ -794,6 +803,7 @@
           "patient"
         ],
         "x-audited": true,
+        "x-fresh-login": false,
         "security": [
           {
             "sessionCookie": []
@@ -878,6 +888,7 @@
           "patient"
         ],
         "x-audited": false,
+        "x-fresh-login": false,
         "security": [
           {
             "sessionCookie": []
@@ -962,6 +973,7 @@
           "patient"
         ],
         "x-audited": true,
+        "x-fresh-login": false,
         "security": [
           {
             "sessionCookie": []
@@ -1078,6 +1090,211 @@
           }
         }
       }
+    },
+    "/api/v1/sessions": {
+      "delete": {
+        "summary": "Sign out everywhere (or everywhere else with scope=others)",
+        "tags": [
+          "identity"
+        ],
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "default": "all",
+              "type": "string",
+              "enum": [
+                "all",
+                "others"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Sign in required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "write",
+        "x-auth": "session",
+        "x-roles": [],
+        "x-audited": true,
+        "x-fresh-login": false,
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      },
+      "get": {
+        "summary": "List where you are signed in",
+        "tags": [
+          "identity"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Sign in required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "auth_read",
+        "x-auth": "session",
+        "x-roles": [],
+        "x-audited": false,
+        "x-fresh-login": false,
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/sessions/{id}": {
+      "delete": {
+        "summary": "End one of your other sessions",
+        "tags": [
+          "identity"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Sign in required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "write",
+        "x-auth": "session",
+        "x-roles": [],
+        "x-audited": true,
+        "x-fresh-login": false,
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -1118,6 +1335,7 @@
               "unauthenticated",
               "payment_signature_invalid",
               "forbidden",
+              "fresh_login_required",
               "consent_required",
               "outside_join_window",
               "not_found",

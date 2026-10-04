@@ -20,6 +20,7 @@ export const POST = withApi(
     roles: ["admin", "super_admin"],
     roleDenied: "not_found",
     rateLimit: "admin",
+    freshLogin: true,
     body,
     audit: { action: "invitation.create", entity: "invitation" },
     doc: { summary: "Invite a staff member by email", tags: ["identity", "admin"] },

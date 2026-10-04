@@ -12,6 +12,7 @@ import { guardOtpRequest, type OtpGuardDeps } from "./otp-guard";
 import { invitationCrypto } from "./invitation-crypto";
 import { InvitationService } from "./invitations";
 import { createPhonePlugin } from "./phone";
+import { SessionService } from "./sessions";
 import { isStaff } from "./session-policy";
 import { createStaffPlugins, staffEmailAndPassword } from "./staff";
 import { IdentityRepo } from "./repo";
@@ -136,6 +137,11 @@ export function getInvitations(): InvitationService {
 }
 
 export { INVITABLE_ROLES } from "./invitations";
+export { expiredSessionCookie } from "./sessions";
+
+export function getSessions(): SessionService {
+  return new SessionService(getRepo());
+}
 
 export function resetAuthForTest(): void {
   holder.auth = undefined;
