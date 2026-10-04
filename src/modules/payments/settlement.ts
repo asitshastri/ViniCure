@@ -31,6 +31,8 @@ type Deps = {
   refunds: RefundService;
   /** Runs as soon as a payment is known to be captured (the earnings ledger, P5-06). Must be safe to repeat. */
   onCaptured?: (payment: PaymentRow) => Promise<void>;
+  /** Runs once the appointment is confirmed for a captured payment (the invoice, P5-08). Best effort: a failure is logged, never fails the payment. */
+  onConfirmed?: (payment: PaymentRow) => Promise<void>;
 };
 
 export class SettlementService {
@@ -85,6 +87,12 @@ export class SettlementService {
           : "the booking was no longer open",
       );
       return "refunded";
+    }
+    try {
+      await this.deps.onConfirmed?.(current);
+    } catch (error) {
+      // The daily check finds a booking that never got its invoice.
+      logger.error({ event: "payment_confirmed_hook_failed", err: error });
     }
     return "captured";
   }

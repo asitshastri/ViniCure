@@ -77,6 +77,12 @@ const schema = z.object({
   /** Points the adapter at a stand-in for Razorpay's API (tests and local work). Never in production. */
   RAZORPAY_API_BASE: z.url().optional(),
   /** The platform's share of each payment in hundredths of a percent (1000 = 10%). 0 until the business sets the rate. */
+  /** Tax included in the consultation fee, in hundredths of a percent, shown on invoices. 0 until the accountant confirms it. */
+  INVOICE_TAX_BPS: z.coerce.number().int().min(0).max(10_000).default(0),
+  /** Who issues the invoice, as printed on it. Left out of the PDF when not set. */
+  INVOICE_SELLER_NAME: z.string().min(1).max(120).optional(),
+  INVOICE_SELLER_ADDRESS: z.string().min(1).max(300).optional(),
+  INVOICE_SELLER_TAX_ID: z.string().min(1).max(40).optional(),
   PLATFORM_FEE_BPS: z.coerce.number().int().min(0).max(10_000).default(0),
   MSG91_AUTH_KEY: optionalString,
   MSG91_SENDER_ID: optionalString,

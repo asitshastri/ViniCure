@@ -1,3 +1,4 @@
+import { getQueue } from "../lib/queue/producer";
 import { getConfig } from "../lib/config/config";
 import { queryable, getDatabase } from "../lib/db/pool";
 import type { Handlers } from "../lib/queue/queue";
@@ -6,6 +7,8 @@ import { DirectoryRepo } from "../modules/directory/repo";
 import { DirectoryService } from "../modules/directory/service";
 import { getStorage } from "../lib/storage";
 import { AppointmentRepo } from "../modules/scheduling/appointments-repo";
+import { createInvoiceServiceFrom } from "../modules/payments/invoice-wiring";
+import { PaymentRepo } from "../modules/payments/repo";
 import { createPaymentServices } from "../modules/payments/wiring";
 import { txRunner } from "../lib/db/pool";
 import { getPaymentProvider } from "../lib/adapters/registry";
@@ -23,6 +26,9 @@ function payments() {
     // The worker re-queues nothing from inside a job; a lost job is found again by the sweep.
     enqueue: async () => undefined,
     feeBps: () => getConfig().PLATFORM_FEE_BPS,
+    // A payment settled by the worker (webhook) asks for its invoice the same way the web does.
+    enqueueInvoice: async (paymentId) =>
+      (await getQueue()).enqueue("invoice.render_pdf", { paymentId }),
   });
 }
 
@@ -32,6 +38,20 @@ export const handlers: Handlers = {
   "payment.webhook.process": async ({ eventId }, { logger }) => {
     const result = await payments().webhook.process(eventId);
     logger.info({ event: "payment_event_processed", result });
+  },
+  // Draws a payment's invoice (P5-08). Safe to run again: it issues once and finishes only the
+  // missing steps. A storage outage throws, so the queue retries.
+  "invoice.render_pdf": async ({ paymentId }, { logger }) => {
+    const db = queryable(getDatabase());
+    const invoices = createInvoiceServiceFrom({
+      db,
+      tx: txRunner(),
+      payments: new PaymentRepo(db, txRunner()),
+      storage: getStorage,
+      config: getConfig,
+    });
+    const result = await invoices.issueAndRender(paymentId);
+    logger.info({ event: "invoice_job_done", result });
   },
   // Daily check of our books against the gateway (P5-06). Repairs missing ledger entries and
   // raises one alert line for anything else; it never moves money.

@@ -65,8 +65,17 @@ class MemoryObjectStore implements ObjectStore {
     this.deleted.push(`${bucket}/${key}`);
     this.objects.delete(`${bucket}/${key}`);
   }
-  put(bucket: string, key: string, head: Uint8Array, size: number) {
+  seed(bucket: string, key: string, head: Uint8Array, size: number) {
     this.objects.set(`${bucket}/${key}`, { head, size, type: "x" });
+  }
+  readonly written: { bucket: string; key: string; body: Uint8Array; contentType: string }[] = [];
+  async put(a: { bucket: string; key: string; body: Uint8Array; contentType: string }) {
+    this.written.push(a);
+    this.objects.set(`${a.bucket}/${a.key}`, {
+      head: a.body.subarray(0, 16),
+      size: a.body.byteLength,
+      type: a.contentType,
+    });
   }
 }
 
@@ -157,7 +166,7 @@ describe("complete step", () => {
       contentType: "application/pdf",
       sizeBytes: size,
     });
-    store.put(slot.bucket, slot.storageKey, head, size);
+    store.seed(slot.bucket, slot.storageKey, head, size);
     return slot;
   };
   const verify = (key: string, size = 2000, type = "application/pdf") =>
@@ -279,5 +288,43 @@ describe("presigned URLs from the real S3 client (offline)", () => {
       'attachment; filename="report.pdf"',
     );
     expect(url.searchParams.get("response-content-type")).toBe("application/pdf");
+  });
+});
+
+describe("files the server makes itself", () => {
+  const pdf = (n: number) => {
+    const b = new Uint8Array(n);
+    b.set(PDF);
+    return b;
+  };
+
+  it("stores a PDF under a random key and returns its size and hash", async () => {
+    const out = await service.storeGenerated({ purpose: "invoice_pdf", bytes: pdf(100) });
+    expect(out.storageKey).toMatch(/^invoice_pdf\/\d{4}\/[0-9a-f-]{36}\.pdf$/);
+    expect(out).toMatchObject({ type: "application/pdf", sizeBytes: 100 });
+    expect(out.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(store.written).toHaveLength(1);
+    expect(store.written[0]).toMatchObject({ bucket: "vc-files", contentType: "application/pdf" });
+  });
+
+  it("refuses purposes that clients upload to, content that is not the allowed type, and bad sizes", async () => {
+    for (const purpose of ["kyc", "patient_document"] as const) {
+      await expect(service.storeGenerated({ purpose, bytes: pdf(100) })).rejects.toMatchObject({
+        code: "file_rejected",
+      });
+    }
+    await expect(
+      service.storeGenerated({ purpose: "invoice_pdf", bytes: JPG }),
+    ).rejects.toMatchObject({ code: "file_rejected" });
+    await expect(
+      service.storeGenerated({ purpose: "invoice_pdf", bytes: new Uint8Array() }),
+    ).rejects.toMatchObject({ code: "file_rejected" });
+    await expect(
+      service.storeGenerated({
+        purpose: "invoice_pdf",
+        bytes: pdf(PURPOSE_POLICY.invoice_pdf.maxBytes + 1),
+      }),
+    ).rejects.toMatchObject({ code: "file_rejected" });
+    expect(store.written).toHaveLength(0);
   });
 });

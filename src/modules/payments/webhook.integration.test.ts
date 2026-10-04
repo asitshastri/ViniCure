@@ -218,4 +218,86 @@ describe.skipIf(!url)("payment webhook on real Postgres", () => {
       ).rows[0]?.amount_refunded_paise,
     ).toBe(10000);
   });
+
+  it("invoices drawn at the same moment get numbers with no repeats and no gaps; one payment drawn by many workers gets one invoice", async () => {
+    const { InvoiceService } = await import("./invoice");
+    const { InvoiceRepo } = await import("./invoice-repo");
+    const { StorageService } = await import("../../lib/storage/storage");
+    const stored = new Map<string, number>();
+    const storage = new StorageService(
+      {
+        presignPut: async () => "x",
+        presignGet: async () => "x",
+        head: async () => null,
+        readHead: async () => new Uint8Array(),
+        read: async () => (async function* () {})(),
+        put: async (a) => void stored.set(a.key, a.body.byteLength),
+        delete: async (_b, k) => void stored.delete(k),
+      },
+      { buckets: { files: "f", exports: "e" }, region: "ap-south-1", signedUrlTtlSeconds: 300 },
+    );
+    const db: Queryable = {
+      query: async (text, params) => ({
+        rows: (await pool.query(text, params)).rows as Record<string, unknown>[],
+      }),
+    };
+    const invoices = new InvoiceService({
+      repo: new InvoiceRepo(db, {
+        async transaction<T>(fn: (q: Queryable) => Promise<T>): Promise<T> {
+          const client = await pool.connect();
+          try {
+            await client.query("BEGIN");
+            const out = await fn({
+              query: async (t, p) => ({
+                rows: (await client.query(t, p)).rows as Record<string, unknown>[],
+              }),
+            });
+            await client.query("COMMIT");
+            return out;
+          } catch (e) {
+            await client.query("ROLLBACK").catch(() => undefined);
+            throw e;
+          } finally {
+            client.release();
+          }
+        },
+      }),
+      payments: parts.repo,
+      storage: () => storage,
+      taxBps: () => 0,
+      seller: () => ({}),
+    });
+    const ids: string[] = [];
+    for (let i = 0; i < 6; i++) {
+      const { order, gwPay } = await paid();
+      await parts.settlement.settle((await parts.repo.findById(order.paymentId))!, gwPay);
+      ids.push(order.paymentId);
+    }
+    // Six different payments, and the first one asked for by five workers as well.
+    const results = await Promise.all([
+      ...ids.map((id) => invoices.issueAndRender(id)),
+      ...Array.from({ length: 5 }, () => invoices.issueAndRender(ids[0] as string)),
+    ]);
+    expect(results.filter((r) => r === "issued")).toHaveLength(6);
+    const rows = await pool.query(
+      "SELECT invoice_no, financial_year FROM invoices WHERE payment_id = ANY($1::uuid[]) ORDER BY invoice_no",
+      [ids],
+    );
+    expect(rows.rows).toHaveLength(6);
+    const numbers = rows.rows.map((r) => Number(String(r.invoice_no).split("/")[2]));
+    expect(new Set(numbers).size).toBe(6);
+    // Consecutive within the year (other runs may have used earlier numbers).
+    expect(Math.max(...numbers) - Math.min(...numbers)).toBe(5);
+    const files = await pool.query(
+      "SELECT count(*)::int AS n FROM invoices WHERE payment_id = ANY($1::uuid[]) AND pdf_file_id IS NOT NULL",
+      [ids],
+    );
+    expect(files.rows[0]?.n).toBe(6);
+    expect(stored.size).toBe(6);
+    // The app role cannot rewrite an invoice.
+    await expect(pool.query("UPDATE invoices SET total_paise = 1")).rejects.toThrow(
+      /permission denied|cannot be changed/,
+    );
+    await expect(pool.query("DELETE FROM invoices")).rejects.toThrow(/permission denied/);
+  });
 });

@@ -17,6 +17,8 @@ export type ReconcileReport = {
   gatewayChecked: number;
   gatewayMismatch: number;
   gatewayUnreachable: boolean;
+  /** Booked and paid, but no invoice after ten minutes: asked the worker again. */
+  invoicesRequeued: number;
 };
 
 const LIMIT = 200;
@@ -28,6 +30,11 @@ type Deps = {
   repo: LedgerRepo;
   ledger: LedgerService;
   gateway: () => PaymentProvider;
+  /** Finds paid bookings with no invoice and asks the worker to draw them (P5-08). */
+  invoices?: {
+    missing: (limit: number) => Promise<string[]>;
+    enqueue: (paymentId: string) => Promise<unknown>;
+  };
 };
 
 export class ReconcileService {
@@ -81,7 +88,20 @@ export class ReconcileService {
       }
     }
 
+    // 4. A booking that was paid for and never got its invoice is queued again.
+    let invoicesRequeued = 0;
+    for (const paymentId of (await this.deps.invoices?.missing(LIMIT)) ?? []) {
+      try {
+        await this.deps.invoices?.enqueue(paymentId);
+        invoicesRequeued += 1;
+      } catch (error) {
+        logger.warn({ event: "invoice_requeue_failed", err: error });
+        break;
+      }
+    }
+
     const report: ReconcileReport = {
+      invoicesRequeued,
       ledgerRepaired,
       missingLedger: stillMissing,
       unbalanced: unbalanced.length,

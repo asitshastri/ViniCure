@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -60,6 +60,8 @@ export interface ObjectStore {
   readHead(bucket: string, key: string, bytes: number): Promise<Uint8Array>;
   /** The whole object as a stream of chunks, for the virus scan. */
   read(bucket: string, key: string): Promise<AsyncIterable<Uint8Array>>;
+  /** Writes a whole object (server-generated files only). */
+  put(args: { bucket: string; key: string; body: Uint8Array; contentType: string }): Promise<void>;
   delete(bucket: string, key: string): Promise<void>;
 }
 
@@ -138,6 +140,25 @@ export class S3ObjectStore implements ObjectStore {
     // In Node the body is a readable stream, which is async iterable.
     if (!out.Body) throw new Error("object has no body");
     return out.Body as unknown as AsyncIterable<Uint8Array>;
+  }
+
+  async put(a: {
+    bucket: string;
+    key: string;
+    body: Uint8Array;
+    contentType: string;
+  }): Promise<void> {
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: a.bucket,
+        Key: a.key,
+        Body: a.body,
+        ContentType: a.contentType,
+        ContentLength: a.body.byteLength,
+        // The bucket encrypts at rest; asking for it here as well keeps a misconfigured bucket honest.
+        ServerSideEncryption: "AES256",
+      }),
+    );
   }
 
   async delete(bucket: string, key: string): Promise<void> {
@@ -264,6 +285,43 @@ export class StorageService {
       disposition: `attachment; filename="${name}"`,
     });
     return { url, expiresAt: new Date(this.now() + ttl * 1000) };
+  }
+
+  /**
+   * Stores a file the server made itself (an invoice or prescription PDF). Only purposes that
+   * clients cannot upload to are allowed, the bytes must really be the type the policy names, and
+   * the size is checked against the limit. Returns the random storage key and the file's hash.
+   */
+  async storeGenerated(input: {
+    purpose: FilePurpose;
+    bytes: Uint8Array;
+  }): Promise<{ storageKey: string; type: DetectedType; sizeBytes: number; sha256: string }> {
+    const policy = PURPOSE_POLICY[input.purpose];
+    if (!policy || policy.clientUpload) {
+      throw new AppError("file_rejected", {
+        detail: "This kind of file is not made by the server.",
+      });
+    }
+    const type = detectType(input.bytes.subarray(0, 16));
+    if (!type || !policy.types.includes(type)) {
+      throw new AppError("file_rejected", { detail: "The file content is not an allowed type." });
+    }
+    if (input.bytes.byteLength === 0 || input.bytes.byteLength > policy.maxBytes) {
+      throw new AppError("file_rejected", { detail: "This file is too large or empty." });
+    }
+    const storageKey = this.newKey(input.purpose, type);
+    await this.store.put({
+      bucket: this.config.buckets[policy.bucket],
+      key: storageKey,
+      body: input.bytes,
+      contentType: type,
+    });
+    return {
+      storageKey,
+      type,
+      sizeBytes: input.bytes.byteLength,
+      sha256: createHash("sha256").update(input.bytes).digest("hex"),
+    };
   }
 
   /** The bytes of one stored object, for the scanner. The purpose comes from the key itself. */

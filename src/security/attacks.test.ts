@@ -208,6 +208,10 @@ describe("static guards: no SQL built from text, no raw HTML, no code evaluation
     "params.length - 1",
     // Payments repo: a constant column list.
     "PAYMENT_COLUMNS",
+    // Invoice repo: constant column lists and a constant list of appointment states.
+    "INVOICE_COLUMNS",
+    "RETURNING_COLUMNS",
+    "BILLABLE",
   ]);
 
   it("repo files use template expressions in SQL only from the reviewed list", () => {

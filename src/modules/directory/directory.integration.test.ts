@@ -32,6 +32,7 @@ describe.skipIf(!url)("directory on real Postgres as the app role", () => {
       (async function* () {
         yield PDF;
       })(),
+    put: async (a) => void objects.set(`${a.bucket}/${a.key}`, a.body.byteLength),
     delete: async (b, k) => void objects.delete(`${b}/${k}`),
   };
 

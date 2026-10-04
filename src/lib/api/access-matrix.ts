@@ -366,6 +366,17 @@ export const ACCESS_MATRIX: Record<RouteKey, MatrixEntry> = {
     probeAllowed: true,
     why: "Admin refund of a received payment, in full or in part. Fresh sign-in, Idempotency-Key, capped by what is left; patients, doctors and support get 404. The ledger follows when the gateway confirms.",
   },
+  "GET /api/v1/payments/:id/invoice": {
+    auth: "session",
+    roles: ["patient"],
+    roleDenied: "not_found",
+    rateLimit: "payments",
+    audited: true,
+    freshLogin: false,
+    fullSession: true,
+    probeAllowed: false,
+    why: "Only the account that paid (404 for anyone else, including the doctor and admins). A short-lived download link, or 'preparing' until the worker has drawn the PDF.",
+  },
   "POST /api/v1/payments/verify": {
     auth: "session",
     roles: ["patient"],

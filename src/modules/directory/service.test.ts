@@ -55,6 +55,12 @@ class MemoryStore implements ObjectStore {
   async delete(bucket: string, key: string) {
     this.objects.delete(`${bucket}/${key}`);
   }
+  async put(a: { bucket: string; key: string; body: Uint8Array }) {
+    this.objects.set(`${a.bucket}/${a.key}`, {
+      head: a.body.subarray(0, 16),
+      size: a.body.byteLength,
+    });
+  }
 }
 
 let q: Queryable;
