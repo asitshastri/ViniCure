@@ -1,7 +1,7 @@
 import type { ZodError } from "zod";
 import { logger as defaultLogger } from "../logging/logger";
 import type { Logger } from "pino";
-import { AppError, type FieldIssue } from "./app-error";
+import { AppError, isAppError, type FieldIssue } from "./app-error";
 import { ERROR_CODES } from "./codes";
 
 export type Problem = {
@@ -31,7 +31,7 @@ export function zodToIssues(error: ZodError): FieldIssue[] {
 
 /** Turns anything thrown into an AppError. Unknown errors become internal_error with no detail. */
 export function toAppError(error: unknown): AppError {
-  if (error instanceof AppError) return error;
+  if (isAppError(error)) return error;
   if (isZodError(error)) {
     return new AppError("validation_failed", { issues: zodToIssues(error), cause: error });
   }

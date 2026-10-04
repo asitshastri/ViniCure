@@ -5,13 +5,32 @@ import { DirectoryRepo } from "../modules/directory/repo";
 import { DirectoryService } from "../modules/directory/service";
 import { getStorage } from "../lib/storage";
 import { AppointmentRepo } from "../modules/scheduling/appointments-repo";
+import { createPaymentServices } from "../modules/payments/wiring";
+import { txRunner } from "../lib/db/pool";
+import { getPaymentProvider } from "../lib/adapters/registry";
 import { StepUpRepo } from "../modules/identity/stepup/repo";
 
 // Job handlers, one per queue (backend-architecture.md section 8). Each later task adds its
 // own: otp.send and notify.send (P8), file.scan (P4), payment.webhook.process (P5), the PDF
 // renderers (P7), export.build and erasure.run (P9). A queue with no handler here is not
 // consumed, so its jobs wait safely. Handlers must be idempotent.
+function payments() {
+  return createPaymentServices({
+    db: queryable(getDatabase()),
+    tx: txRunner(),
+    gateway: getPaymentProvider,
+    // The worker re-queues nothing from inside a job; a lost job is found again by the sweep.
+    enqueue: async () => undefined,
+  });
+}
+
 export const handlers: Handlers = {
+  // Handles one stored gateway event. A gateway outage throws, so the queue retries it later;
+  // an event already handled is skipped.
+  "payment.webhook.process": async ({ eventId }, { logger }) => {
+    const result = await payments().webhook.process(eventId);
+    logger.info({ event: "payment_event_processed", result });
+  },
   // Frees unpaid holds that ran out (every minute). A second run changes nothing more, and two
   // workers never take the same row.
   "appointment.release_holds": async (_payload, { logger }) => {

@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Stepper } from "@/components/ui/stepper";
 import { getFamilyMembers, holdSlot } from "@/lib/data/booking";
 import { holdAppointment, releaseAppointment } from "@/lib/data/booking-api";
+import { confirmPayment, startPayment } from "@/lib/data/payments-api";
+import { openCheckout } from "@/lib/payments/checkout";
 import { formatSlotDay, formatSlotTime } from "@/lib/data/doctors";
 import type { ConsultMode, DoctorProfile, PaymentResult } from "@/lib/types";
 import { CheckoutDialog } from "./checkout-dialog";
@@ -14,6 +16,8 @@ import {
   FailedScreen,
   PaymentsSoonScreen,
   PendingScreen,
+  ProblemScreen,
+  RefundedScreen,
   SuccessScreen,
   UnavailableScreen,
 } from "./outcome-screens";
@@ -47,7 +51,9 @@ type Outcome =
   | { kind: "pending" }
   | { kind: "taken" }
   | { kind: "expired" }
-  | { kind: "held"; appointmentId: string };
+  | { kind: "held"; appointmentId: string }
+  | { kind: "refunded" }
+  | { kind: "problem" };
 
 const STEPS = ["Time", "Details", "Pay"];
 const stepTitles = ["Choose a time", "Who is it for?", "Review and pay"];
@@ -65,6 +71,8 @@ export function BookingFlow({ doctor, initialSlotId, selfName, followUp = false,
   const [holdId, setHoldId] = useState<string | null>(null);
   const [releasing, setReleasing] = useState(false);
   const [holdError, setHoldError] = useState<string>();
+  const [payBusy, setPayBusy] = useState(false);
+  const [payError, setPayError] = useState<string>();
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const [slotId, setSlotId] = useState(initialSlotId);
   const [mode, setMode] = useState<ConsultMode>(followUp ? "followup" : "video");
@@ -150,6 +158,58 @@ export function BookingFlow({ doctor, initialSlotId, selfName, followUp = false,
     else setHoldError(result.message);
   }
 
+  /**
+   * Real payment: ask the server for an order (it decides the amount), open Razorpay's widget, and
+   * hand what it returns to the server, which asks the gateway what really happened.
+   */
+  async function payReal() {
+    if (!holdId) return;
+    setPayBusy(true);
+    setPayError(undefined);
+    const started = await startPayment(holdId, crypto.randomUUID());
+    if (started.status !== "ok") {
+      setPayBusy(false);
+      if (started.status === "held_ended") setOutcome({ kind: "expired" });
+      else if (started.status === "signin") setPayError("Please sign in again to continue.");
+      else setPayError(started.message);
+      return;
+    }
+    const result = await openCheckout({
+      keyId: started.order.keyId,
+      orderId: started.order.orderId,
+      amountPaise: started.order.amountPaise,
+      description: `Consultation with ${doctor.name}`,
+    });
+    if (result.kind === "unavailable") {
+      setPayBusy(false);
+      setPayError(
+        "The payment window could not open. Check your connection and try again. Nothing was charged.",
+      );
+      return;
+    }
+    if (result.kind === "dismissed" || result.kind === "failed") {
+      setPayBusy(false);
+      setPayError(
+        result.kind === "failed"
+          ? "The payment did not go through. Nothing was charged. You can try again while your time is held."
+          : "You closed the payment window. Your time is still held. You can pay when you are ready.",
+      );
+      return;
+    }
+    const confirmed = await confirmPayment({
+      paymentId: started.order.paymentId,
+      gatewayPaymentId: result.gatewayPaymentId,
+      signature: result.signature,
+    });
+    setPayBusy(false);
+    if (confirmed.status === "paid") {
+      setOutcome({ kind: "paid", reference: `VC-${holdId.slice(-8).toUpperCase()}` });
+    } else if (confirmed.status === "refunded") setOutcome({ kind: "refunded" });
+    else if (confirmed.status === "pending" || confirmed.status === "unavailable")
+      setOutcome({ kind: "pending" });
+    else setOutcome({ kind: "problem" });
+  }
+
   async function release() {
     if (!holdId) return;
     setReleasing(true);
@@ -195,6 +255,8 @@ export function BookingFlow({ doctor, initialSlotId, selfName, followUp = false,
       />
     );
   }
+  if (outcome.kind === "refunded") return <RefundedScreen doctorId={doctor.id} />;
+  if (outcome.kind === "problem") return <ProblemScreen />;
   if (outcome.kind === "pending") return <PendingScreen />;
   if (outcome.kind === "failed") {
     return (
@@ -284,9 +346,11 @@ export function BookingFlow({ doctor, initialSlotId, selfName, followUp = false,
             forWhom={forWhom}
             reason={reason}
             onEdit={(s) => setStep(s)}
+            payBusy={payBusy}
+            payError={payError}
             onPay={() => {
               // Online payment is not open for real bookings yet: say so and keep the hold.
-              if (real && holdId) setOutcome({ kind: "held", appointmentId: holdId });
+              if (real && holdId) void payReal();
               else setPayOpen(true);
             }}
           />

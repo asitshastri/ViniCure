@@ -6,7 +6,13 @@ import { logger } from "../../lib/logging/logger";
 import { uuidv7 } from "../../lib/ids";
 import { assertAllowed, can, type Principal } from "../identity/policy";
 import type { PayableAppointment, PaymentRepo, PaymentRow } from "./repo";
-import { MAX_ORDERS_PER_APPOINTMENT, type OrderView } from "./schemas";
+import {
+  MAX_ORDERS_PER_APPOINTMENT,
+  type OrderView,
+  type VerifyBody,
+  type VerifyView,
+} from "./schemas";
+import type { SettlementService } from "./settlement";
 
 // Starting a payment (P5-03). The server decides the amount (the fee copied onto the appointment
 // when the slot was held), creates a fresh gateway order for each attempt, and records it. The
@@ -17,6 +23,8 @@ type Deps = {
   gateway: () => PaymentProvider;
   /** The public key id for the checkout widget. */
   publicKeyId: () => string;
+  /** Settles a payment the browser says was made. */
+  settlement?: Pick<SettlementService, "settle">;
 };
 
 /** One key per (person, appointment, client key): the same request always maps to the same row. */
@@ -125,5 +133,53 @@ export class PaymentService {
       });
     }
     return this.view(row);
+  }
+
+  /**
+   * The browser says a payment was made and hands over the widget's signature. The signature is
+   * checked with the key secret, and then the gateway itself is asked what happened: the browser
+   * is never believed about money. The result is the same settlement the webhook runs, so the two
+   * can arrive in either order.
+   */
+  async verify(principal: Principal, input: VerifyBody): Promise<VerifyView> {
+    const payment = await this.deps.repo.findById(input.paymentId);
+    const appt = payment ? await this.deps.repo.appointmentForPayment(payment.appointmentId) : null;
+    // Someone else's payment is the same 404 as one that does not exist.
+    if (!payment || !appt) throw errors.notFound();
+    assertAllowed(can.payment.pay(principal, { ownerUserId: appt.accountUserId }));
+
+    const genuine = this.deps.gateway().verifyCheckoutSignature({
+      orderId: payment.gatewayOrderId,
+      paymentId: input.gatewayPaymentId,
+      signature: input.signature,
+    });
+    if (!genuine) {
+      logger.warn({ event: "checkout_signature_invalid" });
+      throw errors.validation([
+        { path: "signature", message: "We could not confirm this payment." },
+      ]);
+    }
+    if (!this.deps.settlement) throw errors.internal({ cause: new Error("settlement not wired") });
+    try {
+      const result = await this.deps.settlement.settle(payment, input.gatewayPaymentId);
+      const status =
+        result === "captured"
+          ? "paid"
+          : result === "refunded"
+            ? "refunded"
+            : result === "pending"
+              ? "pending"
+              : "problem";
+      return { status, appointmentId: payment.appointmentId };
+    } catch (error) {
+      if (error instanceof AdapterError) {
+        // The webhook will finish the job if the gateway is slow; the screen can ask again.
+        throw errors.unavailable({
+          detail:
+            "We could not confirm your payment yet. Do not pay again. Check your appointments in a few minutes.",
+        });
+      }
+      throw error;
+    }
   }
 }

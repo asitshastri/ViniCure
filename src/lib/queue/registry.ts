@@ -44,7 +44,7 @@ export const QUEUES = {
     },
   },
   "payment.webhook.process": {
-    payload: z.strictObject({ eventId: id }),
+    payload: z.strictObject({ eventId: z.int().positive() }),
     policy: { retryLimit: 10, retryDelay: 15, retryBackoff: true, expireInSeconds: 120 },
   },
   "payment.reconcile": {

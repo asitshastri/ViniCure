@@ -20,3 +20,19 @@ export type OrderView = {
   /** The order is for this appointment until the hold ends. */
   holdExpiresAt: string;
 };
+
+/** What the checkout widget hands back to the browser after a payment. */
+export const verifyBody = z
+  .object({
+    paymentId: z.uuid(),
+    gatewayPaymentId: z.string().regex(/^[A-Za-z0-9_]{4,64}$/),
+    signature: z.string().regex(/^[0-9a-f]{64}$/, "Not a valid signature."),
+  })
+  .strict();
+export type VerifyBody = z.infer<typeof verifyBody>;
+
+/** paid: confirmed. refunded: paid but the time was gone, money is on its way back. pending: not captured yet. */
+export type VerifyView = {
+  status: "paid" | "refunded" | "pending" | "problem";
+  appointmentId: string;
+};

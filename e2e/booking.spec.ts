@@ -89,6 +89,13 @@ test.describe("directory", () => {
 
 test.describe("booking", () => {
   test("a patient adds their details, holds a time, and lets it go", async ({ page }) => {
+    // Razorpay's widget is replaced by one the patient closes at once (payment.spec.ts pays).
+    await page.route("https://checkout.razorpay.com/v1/checkout.js", (route) =>
+      route.fulfill({
+        contentType: "application/javascript",
+        body: "window.Razorpay = class { constructor(o){this.o=o;} on(){} open(){ this.o.modal.ondismiss(); } };",
+      }),
+    );
     await patientSignIn(page);
     await page.goto(`/doctors/${doctorId}`);
     const link = page.locator(`a[href^="/book/${doctorId}?slot="]`).first();
@@ -125,12 +132,17 @@ test.describe("booking", () => {
     expect(String(held.rows[0]?.reason_enc)).not.toContain("Fever");
 
     await page.getByRole("button", { name: /pay/i }).first().click();
-    await expect(page.getByRole("heading", { name: /Your time is held/ })).toBeVisible();
-    await expect(page.getByText(/Online payment is not open yet/)).toBeVisible();
+    await expect(page.getByText(/You closed the payment window/)).toBeVisible();
     await accessible(page);
 
+    // The held time can be let go from the appointments list.
+    await page.goto("/patient/appointments");
+    await page.waitForLoadState("networkidle");
     await page.getByRole("button", { name: /let this time go/i }).click();
-    await expect(page).toHaveURL(/\/doctors$/);
+    await expect(page.getByText(/Nothing was charged/)).toBeVisible();
+    await page.getByRole("radio", { name: /another reason/i }).check();
+    await page.getByRole("button", { name: /^cancel appointment$/i }).click();
+    await expect(page.getByText(/The time is free again/)).toBeVisible();
     await expect
       .poll(
         async () =>

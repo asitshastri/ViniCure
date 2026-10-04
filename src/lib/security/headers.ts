@@ -16,23 +16,43 @@ export function allowsMedia(pathname: string): boolean {
   return CALL_PATHS.some((pattern) => pattern.test(pathname));
 }
 
+/**
+ * The booking page opens Razorpay's checkout widget: its script, its frame and its few calls are
+ * allowed there and nowhere else, so the rest of the site keeps the strict policy.
+ */
+const CHECKOUT_PATHS = [/^\/book\/[^/]+\/?$/];
+const RAZORPAY = {
+  script: "https://checkout.razorpay.com",
+  frame: "https://api.razorpay.com",
+  connect: ["https://api.razorpay.com", "https://lumberjack.razorpay.com"],
+  img: "https://cdn.razorpay.com",
+};
+
+export function allowsCheckout(pathname: string): boolean {
+  return CHECKOUT_PATHS.some((pattern) => pattern.test(pathname));
+}
+
 export function buildCsp({
   nonce,
   production,
   connectOrigins = [],
-}: Pick<HeaderOptions, "nonce" | "production" | "connectOrigins">): string {
+  pathname = "/",
+}: Pick<HeaderOptions, "nonce" | "production" | "connectOrigins"> & { pathname?: string }): string {
+  const checkout = allowsCheckout(pathname);
+  const connect = [...connectOrigins, ...(checkout ? RAZORPAY.connect : [])];
   const directives = [
     "default-src 'self'",
     // strict-dynamic lets the nonce-approved Next.js scripts load their chunks.
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${production ? "" : " 'unsafe-eval'"}`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${checkout ? ` ${RAZORPAY.script}` : ""}${production ? "" : " 'unsafe-eval'"}`,
     `style-src 'self' 'nonce-${nonce}'`,
     // Style attributes (chart widths, progress bars) cannot carry a nonce.
     "style-src-attr 'unsafe-inline'",
-    "img-src 'self' blob: data:",
+    `img-src 'self' blob: data:${checkout ? ` ${RAZORPAY.img}` : ""}`,
     "font-src 'self'",
     "media-src 'self' blob:",
     // Development needs a websocket for hot reload. The video SDK origin is added with P6.
-    `connect-src 'self'${connectOrigins.map((origin) => ` ${origin}`).join("")}${production ? "" : " ws://localhost:* ws://127.0.0.1:*"}`,
+    `connect-src 'self'${connect.map((origin) => ` ${origin}`).join("")}${production ? "" : " ws://localhost:* ws://127.0.0.1:*"}`,
+    ...(checkout ? [`frame-src 'self' ${RAZORPAY.frame}`] : []),
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -48,7 +68,7 @@ export function buildPermissionsPolicy(pathname: string): string {
     `camera=${media}`,
     `microphone=${media}`,
     "geolocation=()",
-    "payment=(self)",
+    allowsCheckout(pathname) ? `payment=(self "${RAZORPAY.frame}")` : "payment=(self)",
     "usb=()",
     "serial=()",
     "bluetooth=()",
@@ -63,7 +83,10 @@ export function securityHeaders(options: HeaderOptions): Record<string, string> 
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
-    "Cross-Origin-Opener-Policy": "same-origin",
+    // The widget may open a bank or UPI page in a popup and needs to hear back from it.
+    "Cross-Origin-Opener-Policy": allowsCheckout(options.pathname)
+      ? "same-origin-allow-popups"
+      : "same-origin",
     "Cross-Origin-Resource-Policy": "same-origin",
   };
   // HSTS is only sent in production, where the site is served over HTTPS.

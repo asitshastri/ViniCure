@@ -68,6 +68,7 @@ export function getPaymentProvider(): PaymentProvider {
         keyId: config.RAZORPAY_KEY_ID,
         keySecret: config.RAZORPAY_KEY_SECRET,
         webhookSecret: config.RAZORPAY_WEBHOOK_SECRET,
+        ...(config.RAZORPAY_API_BASE ? { baseUrl: config.RAZORPAY_API_BASE } : {}),
       }),
       { provider: "razorpay" },
       {

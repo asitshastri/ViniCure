@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 import { clientIp } from "../../lib/api/with-api";
 import type { RateLimitDecision, RateLimitInput } from "../../lib/api/types";
 import { cacheKey, type CacheStore } from "../../lib/cache/cache";
-import { AppError, errors } from "../../lib/errors/app-error";
+import { AppError, errors, isAppError } from "../../lib/errors/app-error";
 
 // Brute-force protection for staff passwords (P2-15). Rules:
 //   - one address: 30 password attempts per 15 minutes (tier "sign_in"), whatever the result
@@ -141,7 +141,7 @@ export async function guardSignIn(
       }
     };
   } catch (error) {
-    if (error instanceof AppError) throw error;
+    if (isAppError(error)) throw error;
     deps.alert("signin_guard_unavailable", { phase: "check" });
     if (deps.production) throw errors.unavailable({ cause: error });
     return null;

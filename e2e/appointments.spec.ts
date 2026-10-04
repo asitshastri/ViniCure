@@ -101,7 +101,7 @@ test("list, let a hold go, move a booking, and review a visit", async ({ page })
   await accessible(page);
   const before = (await db().query("SELECT start_at FROM appointments WHERE id=$1", [booked]))
     .rows[0]?.start_at as Date;
-  await page.getByRole("radio").nth(1).check({ force: true });
+  await page.getByRole("radio").last().check({ force: true });
   // The first time listed may be today; choose the last time of the shown day to be sure it differs.
   await page.getByRole("button", { name: /move appointment/i }).click();
   await expect(page.getByText(/Appointment moved/)).toBeVisible();

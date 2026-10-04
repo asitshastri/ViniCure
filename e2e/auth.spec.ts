@@ -458,7 +458,8 @@ test.describe("phone recycling defence", () => {
     await stranger.goto("/patient/settings");
     await expect(stranger.getByRole("heading", { name: /confirm it is you/i })).toBeVisible();
 
-    // A wrong code is refused.
+    // A wrong code is refused. (The form needs its scripts loaded before it can send.)
+    await stranger.waitForLoadState("networkidle");
     await stranger.getByLabel(/recovery code/i).fill("AAAAA-BBBBB");
     await stranger.getByRole("button", { name: /confirm with recovery code/i }).click();
     await expect(stranger.getByText(/not valid or was already used/i)).toBeVisible();

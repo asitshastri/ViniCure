@@ -3,7 +3,7 @@ import { AdapterError } from "../../lib/adapters/types";
 import { clientIp } from "../../lib/api/with-api";
 import type { RateLimitDecision, RateLimitInput } from "../../lib/api/types";
 import { cacheKey, type CacheStore } from "../../lib/cache/cache";
-import { AppError, errors } from "../../lib/errors/app-error";
+import { AppError, errors, isAppError } from "../../lib/errors/app-error";
 import { isAllowedPhone } from "./phone";
 
 // OTP abuse controls (P2-04). SMS cost abuse is a business-flow risk (OWASP API6): a bot that
@@ -117,7 +117,7 @@ export async function guardOtpRequest(request: Request, deps: OtpGuardDeps): Pro
     // 5. Daily SMS budget.
     await spendSmsBudget(deps);
   } catch (error) {
-    if (error instanceof AppError) throw error;
+    if (isAppError(error)) throw error;
     // Cache or captcha outage.
     deps.alert("otp_guard_unavailable", { tier });
     if (deps.production) throw errors.unavailable({ cause: error });

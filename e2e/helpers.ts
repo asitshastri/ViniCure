@@ -205,6 +205,8 @@ export async function resetRateLimits(): Promise<void> {
 /** Signs a new patient in by phone code and returns the number. */
 export async function patientSignIn(page: Page) {
   const phone = newPhone();
+  // Every test shares one address, so a long run would trip the code-request limit.
+  await resetRateLimits();
   await page.goto("/login");
   await page.getByLabel(/mobile number/i).fill(phone);
   await page.getByRole("button", { name: /send/i }).click();

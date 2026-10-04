@@ -243,3 +243,53 @@ export function PaymentsSoonScreen({
     </Screen>
   );
 }
+
+/** The money arrived after the time had gone to someone else (or the booking was closed). */
+export function RefundedScreen({ doctorId }: { doctorId: string }) {
+  return (
+    <Screen
+      title="That time was taken, so we are refunding you"
+      icon={<WarningCircle weight="fill" />}
+      tone="warning"
+    >
+      <p className="text-ink-muted text-lg">
+        Your payment reached us after someone else had booked this time. We have started a full
+        refund. You do not need to do anything. How soon it shows in your account depends on your
+        bank.
+      </p>
+      <div className="flex flex-wrap justify-center gap-3 sm:justify-start">
+        <ButtonLink href={`/doctors/${doctorId}`} size="lg">
+          Choose another time
+        </ButtonLink>
+        <ButtonLink href="/support" variant="secondary" size="lg">
+          Contact support
+        </ButtonLink>
+      </div>
+    </Screen>
+  );
+}
+
+/** Something does not add up. We keep the money safe and ask the person to reach us. */
+export function ProblemScreen() {
+  return (
+    <Screen
+      title="We could not confirm your payment"
+      icon={<WarningCircle weight="fill" />}
+      tone="danger"
+    >
+      <p className="text-ink-muted text-lg">
+        <strong className="text-ink">Do not pay again.</strong> If money left your account, it is
+        safe and we will sort it out. Tell us when you contacted us and we will check it straight
+        away.
+      </p>
+      <div className="flex flex-wrap justify-center gap-3 sm:justify-start">
+        <ButtonLink href="/support" size="lg">
+          Contact support
+        </ButtonLink>
+        <ButtonLink href="/patient/appointments" variant="secondary" size="lg">
+          My appointments
+        </ButtonLink>
+      </div>
+    </Screen>
+  );
+}

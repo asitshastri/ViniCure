@@ -31,6 +31,7 @@ export const RATE_LIMIT_TIERS = [
   "sign_in",
   "password_reset",
   "payments",
+  "webhook",
   "ai",
   "admin",
 ] as const;

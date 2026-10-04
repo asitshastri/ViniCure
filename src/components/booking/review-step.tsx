@@ -15,9 +15,22 @@ type Props = {
   reason: string;
   onEdit: (step: 0 | 1) => void;
   onPay: () => void;
+  /** Real payments: the button waits while the widget is open, and says what went wrong. */
+  payBusy?: boolean;
+  payError?: string | undefined;
 };
 
-export function ReviewStep({ doctor, slot, mode, forWhom, reason, onEdit, onPay }: Props) {
+export function ReviewStep({
+  doctor,
+  slot,
+  mode,
+  forWhom,
+  reason,
+  onEdit,
+  onPay,
+  payBusy = false,
+  payError,
+}: Props) {
   const fee = feeFor(doctor, mode);
   const rows: Array<{ label: string; value: string; edit: 0 | 1 }> = [
     { label: "Doctor", value: `${doctor.name}, Reg. ${doctor.registrationNumber}`, edit: 0 },
@@ -78,13 +91,18 @@ export function ReviewStep({ doctor, slot, mode, forWhom, reason, onEdit, onPay 
       </section>
 
       <div className="flex flex-wrap gap-3">
-        <Button variant="secondary" size="lg" onClick={() => onEdit(1)}>
+        <Button variant="secondary" size="lg" onClick={() => onEdit(1)} disabled={payBusy}>
           Back
         </Button>
-        <Button size="lg" onClick={onPay}>
+        <Button size="lg" onClick={onPay} loading={payBusy}>
           Pay {formatRupees(fee)}
         </Button>
       </div>
+      {payError ? (
+        <p role="alert" className="text-danger font-medium">
+          {payError}
+        </p>
+      ) : null}
     </div>
   );
 }

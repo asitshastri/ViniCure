@@ -85,6 +85,56 @@ describe("headers", () => {
   });
 });
 
+describe("the payment widget", () => {
+  const opts = (pathname: string) => ({ nonce: "abc", production: true, pathname });
+  const razorpay = /razorpay/;
+
+  it("is allowed on the booking page only: script, frame, calls, images, payment permission, popups", () => {
+    const csp = securityHeaders(opts("/book/0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"));
+    expect(csp["Content-Security-Policy"]).toContain(
+      "script-src 'self' 'nonce-abc' 'strict-dynamic' https://checkout.razorpay.com",
+    );
+    expect(csp["Content-Security-Policy"]).toContain("frame-src 'self' https://api.razorpay.com");
+    expect(csp["Content-Security-Policy"]).toContain(
+      "connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com",
+    );
+    expect(csp["Content-Security-Policy"]).toContain(
+      "img-src 'self' blob: data: https://cdn.razorpay.com",
+    );
+    expect(csp["Permissions-Policy"]).toContain('payment=(self "https://api.razorpay.com")');
+    expect(csp["Cross-Origin-Opener-Policy"]).toBe("same-origin-allow-popups");
+  });
+
+  it("is not allowed anywhere else, including pages that merely start with /book", () => {
+    for (const path of [
+      "/",
+      "/doctors",
+      "/doctors/abc",
+      "/patient/appointments",
+      "/book",
+      "/booking/x",
+      "/book/x/y",
+      "/login",
+      "/doctor/calendar",
+    ]) {
+      const h = securityHeaders(opts(path));
+      expect(h["Content-Security-Policy"], path).not.toMatch(razorpay);
+      expect(h["Permissions-Policy"], path).not.toMatch(razorpay);
+      expect(h["Cross-Origin-Opener-Policy"], path).toBe("same-origin");
+      expect(h["Content-Security-Policy"], path).not.toContain("frame-src");
+    }
+  });
+
+  it("everything else in the policy stays strict on the booking page", () => {
+    const csp = securityHeaders(opts("/book/x"))["Content-Security-Policy"] ?? "";
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain("object-src 'none'");
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).not.toMatch(/script-src[^;]*unsafe-(inline|eval)/);
+    expect(csp).not.toContain("*");
+  });
+});
+
 describe("origin check", () => {
   const base = { pathname: "/api/v1/x", host: "vinicure.example", allowedOrigins: allowed };
 

@@ -74,6 +74,8 @@ const schema = z.object({
   RAZORPAY_KEY_ID: optionalString,
   RAZORPAY_KEY_SECRET: optionalString,
   RAZORPAY_WEBHOOK_SECRET: optionalString,
+  /** Points the adapter at a stand-in for Razorpay's API (tests and local work). Never in production. */
+  RAZORPAY_API_BASE: z.url().optional(),
   MSG91_AUTH_KEY: optionalString,
   MSG91_SENDER_ID: optionalString,
   WHATSAPP_TOKEN: optionalString,
@@ -142,6 +144,8 @@ function productionProblems(config: z.output<typeof schema>): string[] {
   if (config.LOCAL_DEV_KEY) problems.push("LOCAL_DEV_KEY must not be set in production");
   if (config.S3_ENDPOINT)
     problems.push("S3_ENDPOINT (local storage) must not be set in production");
+  if (config.RAZORPAY_API_BASE)
+    problems.push("RAZORPAY_API_BASE (a stand-in gateway) must not be set in production");
   if (config.LOG_LEVEL === "trace" || config.LOG_LEVEL === "debug") {
     problems.push("LOG_LEVEL must be info or higher in production");
   }

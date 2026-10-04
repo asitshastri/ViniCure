@@ -1,4 +1,4 @@
-import { AppError, errors } from "../../lib/errors/app-error";
+import { errors, isAppError } from "../../lib/errors/app-error";
 import { uuidv7 } from "../../lib/ids";
 import type { FileScanner } from "../../lib/adapters/types";
 import type { QueueClient } from "../../lib/queue/queue";
@@ -291,7 +291,7 @@ export class DirectoryService {
         });
       } catch (error) {
         // verifyUpload already deleted a bad object; retire the record so it cannot be reused.
-        if (error instanceof AppError && error.code === "file_rejected") {
+        if (isAppError(error) && error.code === "file_rejected") {
           await this.repo.removeFile(doc.fileId);
         }
         throw error;

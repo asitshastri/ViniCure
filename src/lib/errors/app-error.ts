@@ -13,7 +13,12 @@ type AppErrorOptions = {
   cause?: unknown;
 };
 
+// A dev server can load this file twice (route and page bundles), so `instanceof` alone is not
+// reliable. The brand is shared through the global symbol registry.
+const BRAND = Symbol.for("vinicure.AppError");
+
 export class AppError extends Error {
+  readonly [BRAND] = true;
   readonly code: ErrorCode;
   readonly status: number;
   readonly title: string;
@@ -32,6 +37,16 @@ export class AppError extends Error {
     this.issues = options.issues;
     this.headers = options.headers;
   }
+}
+
+/** True for an AppError even when it was made by another copy of this module. */
+export function isAppError(value: unknown): value is AppError {
+  return (
+    value instanceof AppError ||
+    (typeof value === "object" &&
+      value !== null &&
+      (value as Record<symbol, unknown>)[BRAND] === true)
+  );
 }
 
 export const errors = {

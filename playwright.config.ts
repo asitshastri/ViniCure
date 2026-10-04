@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
+import { STUB } from "./e2e/razorpay-stub";
 
 // End-to-end tests (P2-12): a real browser against `next dev` on port 3100, talking to the
 // Postgres and Valkey from docker/compose.yml (or docker/cloud-services.sh in a cloud session).
@@ -19,6 +20,11 @@ export const E2E_ENV = {
   LOG_LEVEL: "warn",
   // Fake Google credentials: the button appears and the server builds Google's address; the
   // browser is stopped before it leaves for google.com. No real sign-in is attempted here.
+  // Payments run through the real adapter against a stand-in for Razorpay (e2e/razorpay-stub.ts).
+  RAZORPAY_KEY_ID: STUB.keyId,
+  RAZORPAY_KEY_SECRET: STUB.keySecret,
+  RAZORPAY_WEBHOOK_SECRET: STUB.webhookSecret,
+  RAZORPAY_API_BASE: `${STUB.baseUrl}/v1`,
   GOOGLE_CLIENT_ID: "e2e-client-id.apps.googleusercontent.com",
   GOOGLE_CLIENT_SECRET: "e2e-client-secret",
 };
