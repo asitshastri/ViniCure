@@ -237,6 +237,7 @@ erDiagram
 ```
 
 Notes:
+- `files.uploaded_at` is set when the server has checked the upload; only uploaded files are scanned. `files.sha256` may be empty until hashed. `doctor_kyc_documents.review_note` and `doctors.review_note` hold the reviewer's reason for the doctor (migration 0012).
 - Patients carry name, age (from `dob`) and address because the telemedicine guidelines require identity checks.
 - `is_minor` drives the rule that a verified adult must accompany the consultation.
 - `registration_no` and `registration_council` are printed on every prescription and receipt.

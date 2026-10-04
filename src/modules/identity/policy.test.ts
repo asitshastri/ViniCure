@@ -63,6 +63,8 @@ const EXPECT: Record<Resource, Record<string, (keyof typeof who)[]>> = {
     readEarnings: ["assignedDoctor"],
     refund: ["admin", "superAdmin"],
   },
+  // The owner column is empty here because the test's owner is a patient; a doctor owner is tested in the directory service tests.
+  doctorProfile: { read: ["admin", "superAdmin"], write: [], review: ["admin", "superAdmin"] },
   kycDocument: { upload: [], read: ["admin", "superAdmin"], review: ["admin", "superAdmin"] },
   auditLog: { read: ["admin", "superAdmin", "support"] },
   phiAccessLog: { read: ["admin", "superAdmin", "support"] },

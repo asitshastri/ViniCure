@@ -33,7 +33,7 @@ import { listRoutes } from "../lib/api/registry";
 
 const ORIGIN = "https://vinicure.example";
 const PHONE = "+919876543210";
-const SECRET = "attack-suite-secret-with-at-least-thirty-two-chars";
+const SECRET = "attack-suite-secret-with-at-least-thirty-two-chars"; // secret-scan:allow
 
 /** Text an attacker sends hoping something interprets it. */
 export const PAYLOADS = [
@@ -200,6 +200,12 @@ describe("static guards: no SQL built from text, no raw HTML, no code evaluation
     "UPDATE_COLUMNS[key]",
     "params.length",
     "dobParam",
+    // Directory repo: constant column lists, and a WHERE built only from fixed fragments with
+    // numbered placeholders (the allow-listed filters are never put into the text).
+    "DOCTOR_COLUMNS",
+    "DOCUMENT_COLUMNS",
+    "whereSql",
+    "params.length - 1",
   ]);
 
   it("repo files use template expressions in SQL only from the reviewed list", () => {

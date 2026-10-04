@@ -124,6 +124,12 @@ export const MATRIX = {
     admin: ["read", "refund"],
     support: ["read"],
   },
+  doctorProfile: {
+    // The doctor's own application; admins review it (approve, reject, suspend, reinstate).
+    owner: ["read", "write"],
+    ownerRoles: ["doctor"],
+    admin: ["read", "review"],
+  },
   kycDocument: {
     owner: ["upload"],
     ownerRoles: ["doctor"],

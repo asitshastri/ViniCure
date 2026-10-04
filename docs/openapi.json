@@ -214,6 +214,343 @@
         "x-full-session": false
       }
     },
+    "/api/v1/admin/doctors": {
+      "get": {
+        "summary": "List doctor applications",
+        "tags": [
+          "directory",
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "active",
+                "suspended"
+              ]
+            }
+          },
+          {
+            "name": "kycStatus",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "approved",
+                "rejected"
+              ]
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Sign in required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "admin",
+        "x-auth": "staff",
+        "x-roles": [
+          "admin",
+          "super_admin"
+        ],
+        "x-audited": false,
+        "x-fresh-login": false,
+        "x-full-session": false,
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/doctors/{id}": {
+      "get": {
+        "summary": "Read one doctor application with its documents",
+        "tags": [
+          "directory",
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Sign in required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "admin",
+        "x-auth": "staff",
+        "x-roles": [
+          "admin",
+          "super_admin"
+        ],
+        "x-audited": false,
+        "x-fresh-login": false,
+        "x-full-session": false,
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/doctors/{id}/decision": {
+      "post": {
+        "summary": "Approve, reject, suspend or reinstate a doctor",
+        "tags": [
+          "directory",
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Sign in required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "admin",
+        "x-auth": "staff",
+        "x-roles": [
+          "admin",
+          "super_admin"
+        ],
+        "x-audited": true,
+        "x-fresh-login": true,
+        "x-full-session": false,
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "approve",
+                      "reject",
+                      "suspend",
+                      "reinstate"
+                    ]
+                  },
+                  "note": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "decision"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/invitations": {
       "post": {
         "summary": "Invite a staff member by email",
@@ -315,6 +652,214 @@
                 "required": [
                   "email",
                   "role"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/kyc-documents/{id}/download": {
+      "get": {
+        "summary": "Get a short-lived link to a KYC document",
+        "tags": [
+          "directory",
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Sign in required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "admin",
+        "x-auth": "staff",
+        "x-roles": [
+          "admin",
+          "super_admin"
+        ],
+        "x-audited": true,
+        "x-fresh-login": true,
+        "x-full-session": false,
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/kyc-documents/{id}/review": {
+      "post": {
+        "summary": "Accept or refuse one KYC document",
+        "tags": [
+          "directory",
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Sign in required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "admin",
+        "x-auth": "staff",
+        "x-roles": [
+          "admin",
+          "super_admin"
+        ],
+        "x-audited": true,
+        "x-fresh-login": true,
+        "x-full-session": false,
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "approve",
+                      "reject"
+                    ]
+                  },
+                  "note": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "decision"
                 ],
                 "additionalProperties": false
               }
@@ -486,6 +1031,414 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/doctor/application": {
+      "get": {
+        "summary": "Read my doctor application and its documents",
+        "tags": [
+          "directory"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Sign in required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "auth_read",
+        "x-auth": "staff",
+        "x-roles": [
+          "doctor"
+        ],
+        "x-audited": false,
+        "x-fresh-login": false,
+        "x-full-session": false,
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      },
+      "put": {
+        "summary": "Create or change my doctor application",
+        "tags": [
+          "directory"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Sign in required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "write",
+        "x-auth": "staff",
+        "x-roles": [
+          "doctor"
+        ],
+        "x-audited": true,
+        "x-fresh-login": false,
+        "x-full-session": false,
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "displayName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 100,
+                    "pattern": "^[\\p{L}\\p{M}][\\p{L}\\p{M} .'-]*$"
+                  },
+                  "registrationNo": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 40,
+                    "pattern": "^[A-Za-z0-9/\\- ]+$"
+                  },
+                  "registrationCouncil": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "qualifications": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 300
+                  },
+                  "languages": {
+                    "minItems": 1,
+                    "maxItems": 12,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 30
+                    }
+                  },
+                  "specialtyId": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32767
+                  },
+                  "consultationFeePaise": {
+                    "type": "integer",
+                    "minimum": 10000,
+                    "maximum": 500000
+                  }
+                },
+                "required": [
+                  "displayName",
+                  "registrationNo",
+                  "registrationCouncil",
+                  "qualifications",
+                  "languages",
+                  "specialtyId",
+                  "consultationFeePaise"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/doctor/kyc-documents": {
+      "post": {
+        "summary": "Get a presigned upload slot for a KYC document",
+        "tags": [
+          "directory"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Sign in required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "write",
+        "x-auth": "staff",
+        "x-roles": [
+          "doctor"
+        ],
+        "x-audited": true,
+        "x-fresh-login": false,
+        "x-full-session": false,
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "docType": {
+                    "type": "string",
+                    "enum": [
+                      "registration_certificate",
+                      "degree_certificate",
+                      "photo_id",
+                      "photo"
+                    ]
+                  },
+                  "contentType": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 100
+                  },
+                  "sizeBytes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 104857600
+                  }
+                },
+                "required": [
+                  "docType",
+                  "contentType",
+                  "sizeBytes"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/doctor/kyc-documents/{id}/complete": {
+      "post": {
+        "summary": "Finish a KYC upload and queue the virus scan",
+        "tags": [
+          "directory"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Sign in required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "write",
+        "x-auth": "staff",
+        "x-roles": [
+          "doctor"
+        ],
+        "x-audited": true,
+        "x-fresh-login": false,
+        "x-full-session": false,
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/invitations/{token}/accept": {

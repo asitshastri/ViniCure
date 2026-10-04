@@ -58,6 +58,8 @@ export interface ObjectStore {
   }): Promise<string>;
   head(bucket: string, key: string): Promise<ObjectInfo | null>;
   readHead(bucket: string, key: string, bytes: number): Promise<Uint8Array>;
+  /** The whole object as a stream of chunks, for the virus scan. */
+  read(bucket: string, key: string): Promise<AsyncIterable<Uint8Array>>;
   delete(bucket: string, key: string): Promise<void>;
 }
 
@@ -129,6 +131,13 @@ export class S3ObjectStore implements ObjectStore {
       new GetObjectCommand({ Bucket: bucket, Key: key, Range: `bytes=0-${bytes - 1}` }),
     );
     return (await out.Body?.transformToByteArray()) ?? new Uint8Array();
+  }
+
+  async read(bucket: string, key: string): Promise<AsyncIterable<Uint8Array>> {
+    const out = await this.client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+    // In Node the body is a readable stream, which is async iterable.
+    if (!out.Body) throw new Error("object has no body");
+    return out.Body as unknown as AsyncIterable<Uint8Array>;
   }
 
   async delete(bucket: string, key: string): Promise<void> {
@@ -255,6 +264,15 @@ export class StorageService {
       disposition: `attachment; filename="${name}"`,
     });
     return { url, expiresAt: new Date(this.now() + ttl * 1000) };
+  }
+
+  /** The bytes of one stored object, for the scanner. The purpose comes from the key itself. */
+  async openForScan(storageKey: string): Promise<AsyncIterable<Uint8Array>> {
+    const purpose = storageKey.split("/")[0] as FilePurpose;
+    if (!KEY_SHAPE.test(storageKey) || !(purpose in PURPOSE_POLICY)) {
+      throw new AppError("not_found");
+    }
+    return this.store.read(this.config.buckets[PURPOSE_POLICY[purpose].bucket], storageKey);
   }
 
   async remove(purpose: FilePurpose, storageKey: string): Promise<void> {

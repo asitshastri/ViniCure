@@ -172,7 +172,10 @@ describe("files and KYC documents", () => {
       t.app.query("UPDATE files SET scan_status='clean' WHERE id=$1", [f]),
       /files_scanned_check/,
     );
-    await t.app.query("UPDATE files SET scan_status='clean', scanned_at=now() WHERE id=$1", [f]);
+    await t.app.query(
+      "UPDATE files SET scan_status='clean', scanned_at=now(), uploaded_at=now() WHERE id=$1",
+      [f],
+    );
   });
 
   it("a document needs a reviewer once it leaves pending, and a file backs one document", async () => {

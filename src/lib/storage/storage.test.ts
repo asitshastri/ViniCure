@@ -55,6 +55,12 @@ class MemoryObjectStore implements ObjectStore {
   async readHead(bucket: string, key: string) {
     return this.objects.get(`${bucket}/${key}`)?.head ?? new Uint8Array();
   }
+  async read(bucket: string, key: string) {
+    const head = this.objects.get(`${bucket}/${key}`)?.head ?? new Uint8Array();
+    return (async function* () {
+      yield head;
+    })();
+  }
   async delete(bucket: string, key: string) {
     this.deleted.push(`${bucket}/${key}`);
     this.objects.delete(`${bucket}/${key}`);
