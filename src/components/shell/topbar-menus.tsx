@@ -1,6 +1,8 @@
 "use client";
 
+import { signOutCurrentSession } from "@/lib/data/auth";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Bell, SignOut } from "@phosphor-icons/react/ssr";
 import { Avatar } from "@/components/ui/avatar";
 import type { NavItem } from "@/lib/nav";
@@ -68,6 +70,17 @@ export function NotificationBell({ items }: { items: NotificationItem[] }) {
 }
 
 export function UserMenu({ user, account }: { user: SessionUser; account: NavItem[] }) {
+  const router = useRouter();
+  // Ends the session on the server (the response clears the cookie), then opens sign-in.
+  async function signOutAndLeave() {
+    try {
+      await signOutCurrentSession();
+    } finally {
+      router.replace("/login");
+      router.refresh();
+    }
+  }
+
   return (
     <>
       <button
@@ -100,13 +113,14 @@ export function UserMenu({ user, account }: { user: SessionUser; account: NavIte
             </li>
           ))}
           <li className="border-line mt-1 border-t pt-1">
-            <Link
-              href="/login"
-              className="text-danger hover:bg-danger-soft flex min-h-11 items-center gap-3 rounded-lg px-3 text-base"
+            <button
+              type="button"
+              onClick={() => void signOutAndLeave()}
+              className="text-danger hover:bg-danger-soft flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-base"
             >
               <SignOut aria-hidden className="size-5" />
               Sign out
-            </Link>
+            </button>
           </li>
         </ul>
       </div>

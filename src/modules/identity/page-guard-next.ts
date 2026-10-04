@@ -10,11 +10,15 @@ import { guardOutcome } from "./page-guard";
  * 404 to a signed-in person of the wrong role. Throws (a Next.js control-flow error) to stop
  * rendering, so nothing below it runs.
  */
-export async function requireRole(allowed: readonly Role[]): Promise<void> {
+export async function requireRole(
+  allowed: readonly Role[],
+): Promise<{ displayName: string | null }> {
   const config = getConfig();
   const mock = config.UI_MOCK_SESSION && config.NODE_ENV !== "production";
   const actor = mock ? null : await actorFromHeaders(await headers());
   const outcome = guardOutcome(actor ? actor.roles : null, allowed, mock);
   if (outcome === "login") redirect("/login");
   if (outcome === "not_found") notFound();
+  // The name on the account, so the shell greets the real person (null in the mock preview).
+  return { displayName: actor?.displayName ?? null };
 }

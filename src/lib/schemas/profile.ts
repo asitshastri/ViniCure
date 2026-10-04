@@ -93,3 +93,28 @@ export const vitalsForm = z
 export const deleteConfirm = z.object({
   phrase: z.literal("DELETE", { error: "Type DELETE in capital letters to confirm." }),
 });
+
+// A family member added by a patient (P2-12). The server needs a date of birth and a sex for
+// identity checks (the telemedicine guidelines), not an age.
+export const FAMILY_RELATIONS = ["Spouse", "Parent", "Child", "Sibling", "Other"] as const;
+export const FAMILY_SEX = ["female", "male", "other", "undisclosed"] as const;
+
+export const familyMemberForm = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, "Enter their full name.")
+    .max(100, "Name can be at most 100 characters.")
+    .regex(
+      /^[\p{L}\p{M}][\p{L}\p{M} .'-]*$/u,
+      "Use letters, spaces, dots, apostrophes and hyphens only.",
+    ),
+  dob: z
+    .string()
+    .refine(
+      (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && v <= today() && v >= "1900-01-01",
+      "Enter their date of birth. It cannot be in the future.",
+    ),
+  gender: z.enum(FAMILY_SEX, { error: "Choose one." }),
+  relation: z.enum(FAMILY_RELATIONS, { error: "Choose how they are related to you." }),
+});

@@ -116,6 +116,7 @@ export async function actorFromHeaders(headers: Headers): Promise<Actor | null> 
     userId: found.user.id,
     roles: state.roles,
     sessionId: found.session.id,
+    displayName: found.user.name,
     lastSignInAt: new Date(found.session.createdAt),
   };
 }

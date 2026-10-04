@@ -4,7 +4,7 @@ import { EmergencyForm, PersonalForm } from "@/components/profile/personal-forms
 import { FamilyManager } from "@/components/profile/family-manager";
 import { SectionCard } from "@/components/profile/section-card";
 import { PageHeader } from "@/components/shell/page-header";
-import { getFamily, getProfile } from "@/lib/data/profile";
+import { getProfile } from "@/lib/data/profile";
 
 export const metadata: Metadata = { title: "Profile and family" };
 
@@ -36,7 +36,7 @@ export default function ProfilePage() {
           title="Family members"
           description="Add parents or children to book care for them. Children under 18 are managed by you."
         >
-          <FamilyManager initial={getFamily()} />
+          <FamilyManager />
         </SectionCard>
         <p className="text-ink-muted text-sm">
           We do not ask for your address, Aadhaar or PAN. Manage consent and sign-ins in{" "}

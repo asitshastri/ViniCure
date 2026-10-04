@@ -11,6 +11,8 @@ export type Actor = {
   userId: string;
   roles: readonly Role[];
   sessionId: string;
+  /** The name on the account, for greeting the person. Never used for decisions. */
+  displayName?: string;
   /** When the person last signed in. Sensitive actions require this to be recent. */
   lastSignInAt?: Date;
 };

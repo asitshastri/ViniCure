@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { OtpInput } from "@/components/ui/otp-input";
 import {
+  MOCK_AUTH,
   signInStaff,
   verifyStaffBackupCode,
   verifyStaffTotp,
@@ -175,11 +176,13 @@ export function StaffSignIn() {
             Back
           </Button>
         </div>
-        <PrototypeHint>
-          <p>
-            Any 6 digits work, except {MOCK_CODES.wrong} (wrong) and {MOCK_CODES.locked} (locked).
-          </p>
-        </PrototypeHint>
+        {MOCK_AUTH ? (
+          <PrototypeHint>
+            <p>
+              Any 6 digits work, except {MOCK_CODES.wrong} (wrong) and {MOCK_CODES.locked} (locked).
+            </p>
+          </PrototypeHint>
+        ) : null}
       </form>
     );
   }
@@ -193,7 +196,7 @@ export function StaffSignIn() {
         </p>
         <Field
           label="Backup code"
-          hint="Looks like ab12-cd34"
+          hint="Looks like aB3dE-fG7hJ"
           error={failure ?? undefined}
           required
         >
@@ -223,9 +226,13 @@ export function StaffSignIn() {
         >
           Use my authenticator app instead
         </Button>
-        <PrototypeHint>
-          <p>Any 8-character code like ab12-cd34 works, except {MOCK_BACKUP.invalid} (invalid).</p>
-        </PrototypeHint>
+        {MOCK_AUTH ? (
+          <PrototypeHint>
+            <p>
+              Any 8-character code like ab12-cd34 works, except {MOCK_BACKUP.invalid} (invalid).
+            </p>
+          </PrototypeHint>
+        ) : null}
       </form>
     );
   }
@@ -268,16 +275,18 @@ export function StaffSignIn() {
       <Button type="submit" size="lg" loading={busy}>
         Continue
       </Button>
-      <PrototypeHint>
-        <p>
-          Email containing “admin” opens the admin console, “support” the support console, anything
-          else the doctor workspace.
-        </p>
-        <p>
-          Password {MOCK_STAFF.wrongPassword} shows the wrong-password message. An email starting
-          with “{MOCK_STAFF.lockedEmailPrefix}” shows the lockout.
-        </p>
-      </PrototypeHint>
+      {MOCK_AUTH ? (
+        <PrototypeHint>
+          <p>
+            Email containing “admin” opens the admin console, “support” the support console,
+            anything else the doctor workspace.
+          </p>
+          <p>
+            Password {MOCK_STAFF.wrongPassword} shows the wrong-password message. An email starting
+            with “{MOCK_STAFF.lockedEmailPrefix}” shows the lockout.
+          </p>
+        </PrototypeHint>
+      ) : null}
     </form>
   );
 }

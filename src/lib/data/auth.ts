@@ -1,19 +1,29 @@
+import * as api from "./auth-api";
 import { MOCK_BACKUP, MOCK_CODES, MOCK_PHONE_RATE_LIMITED_SUFFIX, MOCK_STAFF } from "@/mocks/auth";
 import type { Role } from "@/lib/types";
 
 // Components call these functions only. In P2 they call the auth API.
 // Replies never say whether an account exists (no account enumeration).
 
+// Mock mode keeps every state reachable without a server (UI preview). Real mode calls the API.
+// NEXT_PUBLIC_UI_MOCK_AUTH is a public build-time switch; it only changes which screens' data
+// source is used and cannot unlock anything, because the server checks every request itself.
+export const MOCK_AUTH = process.env.NEXT_PUBLIC_UI_MOCK_AUTH === "true";
+
 const delay = (ms = 450) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export type OtpRequestResult =
-  { status: "sent"; resendInSeconds: number } | { status: "rate_limited"; retryInMinutes: number };
+  | { status: "sent"; resendInSeconds: number }
+  | { status: "rate_limited"; retryInMinutes: number }
+  | { status: "captcha_failed" }
+  | { status: "unavailable" };
 
 export type OtpVerifyResult =
   | { status: "ok" }
   | { status: "wrong" }
   | { status: "expired" }
-  | { status: "locked"; retryInMinutes: number };
+  | { status: "locked"; retryInMinutes: number }
+  | { status: "unavailable" };
 
 export type StaffSignInResult =
   | { status: "totp_required"; role: Exclude<Role, "patient"> }
@@ -25,14 +35,19 @@ export type StaffCodeResult =
   | { status: "wrong" }
   | { status: "locked"; retryInMinutes: number };
 
-export async function requestPatientOtp(phone: string): Promise<OtpRequestResult> {
+export async function requestPatientOtp(
+  phone: string,
+  captchaToken?: string,
+): Promise<OtpRequestResult> {
+  if (!MOCK_AUTH) return api.requestOtp(phone, captchaToken);
   await delay();
   if (phone.endsWith(MOCK_PHONE_RATE_LIMITED_SUFFIX))
     return { status: "rate_limited", retryInMinutes: 10 };
   return { status: "sent", resendInSeconds: 30 };
 }
 
-export async function verifyPatientOtp(code: string): Promise<OtpVerifyResult> {
+export async function verifyPatientOtp(phone: string, code: string): Promise<OtpVerifyResult> {
+  if (!MOCK_AUTH) return api.verifyOtp(phone, code);
   await delay();
   if (code === MOCK_CODES.locked) return { status: "locked", retryInMinutes: 15 };
   if (code === MOCK_CODES.expired) return { status: "expired" };
@@ -60,6 +75,7 @@ export function homePathFor(role: Role): string {
 let pendingRole: Exclude<Role, "patient"> = "doctor";
 
 export async function signInStaff(email: string, password: string): Promise<StaffSignInResult> {
+  if (!MOCK_AUTH) return api.signIn(email, password);
   await delay();
   if (email.startsWith(MOCK_STAFF.lockedEmailPrefix))
     return { status: "locked", retryInMinutes: 15 };
@@ -69,6 +85,7 @@ export async function signInStaff(email: string, password: string): Promise<Staf
 }
 
 export async function verifyStaffTotp(code: string): Promise<StaffCodeResult> {
+  if (!MOCK_AUTH) return api.verifyTotp(code);
   await delay();
   if (code === MOCK_CODES.locked) return { status: "locked", retryInMinutes: 15 };
   if (code === MOCK_CODES.wrong) return { status: "wrong" };
@@ -76,6 +93,7 @@ export async function verifyStaffTotp(code: string): Promise<StaffCodeResult> {
 }
 
 export async function verifyStaffBackupCode(code: string): Promise<StaffCodeResult> {
+  if (!MOCK_AUTH) return api.verifyBackup(code);
   await delay();
   if (code === MOCK_BACKUP.invalid) return { status: "wrong" };
   return { status: "ok", redirectTo: homeFor[pendingRole] };
@@ -97,4 +115,13 @@ export async function submitNewPassword(
 export async function submitDoctorApplication(): Promise<{ status: "received" }> {
   await delay();
   return { status: "received" };
+}
+
+export async function signOutCurrentSession(): Promise<void> {
+  if (!MOCK_AUTH) await api.signOut();
+}
+
+/** Remembers the name typed at registration, once the patient has signed in. */
+export async function saveRegistrationName(name: string): Promise<void> {
+  if (!MOCK_AUTH) await api.setDisplayName(name);
 }

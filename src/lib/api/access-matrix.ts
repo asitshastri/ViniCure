@@ -201,4 +201,14 @@ export const ACCESS_MATRIX: Record<RouteKey, MatrixEntry> = {
     probeAllowed: false,
     why: "A patient lists their own requests (the user id is in the query).",
   },
+  "GET /api/v1/me": {
+    auth: "session",
+    roles: [],
+    roleDenied: "forbidden",
+    rateLimit: "auth_read",
+    audited: false,
+    freshLogin: false,
+    probeAllowed: false,
+    why: "Describes only the caller (id and roles). Used by the sign-in screens.",
+  },
 };

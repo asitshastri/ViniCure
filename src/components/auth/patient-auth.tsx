@@ -9,8 +9,10 @@ import { Checkbox } from "@/components/ui/choice";
 import { Field, Input } from "@/components/ui/field";
 import { OtpInput } from "@/components/ui/otp-input";
 import {
+  MOCK_AUTH,
   homePathFor,
   requestPatientOtp,
+  saveRegistrationName,
   verifyPatientOtp,
   type OtpRequestResult,
 } from "@/lib/data/auth";
@@ -39,6 +41,7 @@ export function PatientAuth({ mode }: { mode: "login" | "register" }) {
     OtpRequestResult,
     { status: "rate_limited" }
   > | null>(null);
+  const [sendProblem, setSendProblem] = useState<"captcha" | "unavailable" | null>(null);
 
   const [code, setCode] = useState("");
   const [codeError, setCodeError] = useState("");
@@ -70,9 +73,16 @@ export function PatientAuth({ mode }: { mode: "login" | "register" }) {
     setBusy(false);
     if (result.status === "rate_limited") {
       setRateLimit(result);
+      setSendProblem(null);
+      return;
+    }
+    if (result.status === "captcha_failed" || result.status === "unavailable") {
+      setRateLimit(null);
+      setSendProblem(result.status === "captcha_failed" ? "captcha" : "unavailable");
       return;
     }
     setRateLimit(null);
+    setSendProblem(null);
     setPhone(parsed.data.phone);
     setCode("");
     setCodeError("");
@@ -90,14 +100,19 @@ export function PatientAuth({ mode }: { mode: "login" | "register" }) {
     }
     setBusy(true);
     setCodeError("");
-    const result = await verifyPatientOtp(parsed.data);
+    const result = await verifyPatientOtp(cleanPhone, parsed.data);
     setBusy(false);
     if (result.status === "ok") {
+      if (mode === "register" && name.trim()) await saveRegistrationName(name.trim());
       setStep("done");
       router.push(homePathFor("patient"));
       return;
     }
     setCode("");
+    if (result.status === "unavailable") {
+      setCodeError("We could not sign you in. Request a new code and try again.");
+      return;
+    }
     setOtpKey((k) => k + 1);
     if (result.status === "locked") {
       setLockedMinutes(result.retryInMinutes);
@@ -193,13 +208,15 @@ export function PatientAuth({ mode }: { mode: "login" | "register" }) {
           </Button>
         </div>
 
-        <PrototypeHint>
-          <p>Any 6 digits sign you in, except:</p>
-          <p>
-            {MOCK_CODES.wrong}: wrong code, {MOCK_CODES.expired}: expired, {MOCK_CODES.locked}:
-            locked.
-          </p>
-        </PrototypeHint>
+        {MOCK_AUTH ? (
+          <PrototypeHint>
+            <p>Any 6 digits sign you in, except:</p>
+            <p>
+              {MOCK_CODES.wrong}: wrong code, {MOCK_CODES.expired}: expired, {MOCK_CODES.locked}:
+              locked.
+            </p>
+          </PrototypeHint>
+        ) : null}
       </div>
     );
   }
@@ -301,15 +318,25 @@ export function PatientAuth({ mode }: { mode: "login" | "register" }) {
         </Notice>
       ) : null}
 
+      {sendProblem ? (
+        <Notice tone="warning" title="We could not send the code">
+          {sendProblem === "captcha"
+            ? "Complete the check and try again."
+            : "Codes are not available right now. Try again in a few minutes."}
+        </Notice>
+      ) : null}
+
       <Button type="submit" size="lg" loading={busy}>
         {mode === "register" ? t("auth.patient.createAndSend") : t("auth.patient.sendCode")}
       </Button>
 
-      <PrototypeHint>
-        <p>
-          A number ending in {MOCK_PHONE_RATE_LIMITED_SUFFIX} shows the “too many codes” message.
-        </p>
-      </PrototypeHint>
+      {MOCK_AUTH ? (
+        <PrototypeHint>
+          <p>
+            A number ending in {MOCK_PHONE_RATE_LIMITED_SUFFIX} shows the “too many codes” message.
+          </p>
+        </PrototypeHint>
+      ) : null}
     </form>
   );
 }

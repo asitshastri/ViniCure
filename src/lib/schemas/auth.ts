@@ -29,8 +29,10 @@ export const emailSchema = z
 export const backupCodeSchema = z
   .string()
   .trim()
-  .toLowerCase()
-  .regex(/^[a-z0-9]{4}-[a-z0-9]{4}$/, "Enter the backup code as 8 characters, like ab12-cd34.");
+  .regex(
+    /^[A-Za-z0-9]{5}-[A-Za-z0-9]{5}$/,
+    "Enter the backup code as 10 characters, like aB3dE-fG7hJ.",
+  );
 
 export const strongPasswordSchema = z
   .string()
