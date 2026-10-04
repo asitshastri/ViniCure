@@ -70,7 +70,7 @@ Checks: lint <pass/fail>, types <pass/fail>, tests <n passed, n failed>
 
 ## Current focus
 
-Phase 1 (platform foundations) is finished and merged to `main` (tag `phase-p1-done`): 20 of 21 tasks done and verified against real Postgres, Valkey, an S3 server and the built containers. P1-02 keeps one open criterion: a CI workflow that applies the migrations (that is P0-09). Next: Phase 2 (identity and access). Phase F stays accepted (D-015).
+Phase 2 (identity and access) is finished: 18 of 18 tasks done (tag `phase-p2-done`), verified on real Postgres and Valkey (the cloud now has them, see `docker/cloud-services.sh`) and in a real browser (23 Playwright tests, `pnpm e2e`). Still to do on the PC before relying on it: run the whole suite there with Docker (`pnpm test` with the three `*_TEST_URL` variables, then `pnpm e2e`), the live Google sign-in check (needs your `.env.local`), and answer the queued Questions below, above all the three security decisions in ADR-004 (Accepted risks) and the new-device recovery policy (P2-18). Preview note: the panel pages now need a real session; set `UI_MOCK_SESSION=true` in `.env.local` to keep browsing the mock screens. Next: Phase 3 (cloud staging) needs your AWS account and domain, so Claude should take the unblocked work first: P4 (directory and scheduling) and what remains of the UI wiring. Phase F stays accepted (D-015).
 
 ## Needs you
 
