@@ -16,7 +16,9 @@ export const ALLOWED_AUTH_PATHS: ReadonlySet<string> = new Set([
   "/phone-number/send-otp", // patient: also passes the OTP guard
   "/phone-number/verify", // patient: also passes the OTP guard
   "/update-user", // the patient's display name only, see UPDATE_USER_FIELDS
-  "/change-password", // staff, signed in; P2-15 makes it end the other sessions
+  "/change-password", // staff, signed in; ends every other session
+  "/request-password-reset", // staff: emailed link, same answer for every address (P2-16)
+  "/reset-password", // staff: the link's token plus the new password (P2-16)
 ]);
 
 /** Endpoints that exist in Better Auth and are deliberately closed, with the reason. */
@@ -36,9 +38,8 @@ export const CLOSED_AUTH_PATHS: Readonly<Record<string, string>> = {
   "/verify-email": "emails are verified by the invitation",
   "/delete-user": "account deletion is a data request (P2-11)",
   "/delete-user/callback": "account deletion is a data request (P2-11)",
-  "/request-password-reset": "staff reset arrives with P2-16, with its own limits",
-  "/reset-password": "P2-16",
-  "/reset-password/:token": "P2-16",
+  "/reset-password/:token":
+    "our emailed link goes straight to our own page, not through Better Auth redirect",
   "/phone-number/request-password-reset": "patients have no password",
   "/phone-number/reset-password": "patients have no password",
   "/sign-in/phone-number": "patients have no password",

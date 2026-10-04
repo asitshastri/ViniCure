@@ -151,3 +151,62 @@ export async function acceptInvitation(input: {
   }
   return { status: "unavailable" };
 }
+
+// ---- Staff password reset and change (P2-15, P2-16) ----
+
+export type ResetRequestResult =
+  | { status: "sent" }
+  | { status: "rate_limited"; retryInMinutes: number }
+  | { status: "unavailable" };
+
+/** Always "sent" for any address: the server answers the same whether or not it has an account. */
+export async function requestReset(email: string): Promise<ResetRequestResult> {
+  const { status, retryAfter } = await post("/api/auth/request-password-reset", { email });
+  if (status === 200) return { status: "sent" };
+  if (status === 429) return { status: "rate_limited", retryInMinutes: minutes(retryAfter) };
+  return { status: "unavailable" };
+}
+
+export type NewPasswordResult =
+  | { status: "ok" }
+  | { status: "link_expired" }
+  | { status: "weak"; message: string }
+  | { status: "wrong_current" }
+  | { status: "rate_limited"; retryInMinutes: number }
+  | { status: "unavailable" };
+
+function passwordOutcome(res: {
+  status: number;
+  json: Json;
+  retryAfter: number;
+}): NewPasswordResult {
+  if (res.status === 200) return { status: "ok" };
+  if (res.status === 429)
+    return { status: "rate_limited", retryInMinutes: minutes(res.retryAfter) };
+  const code = codeOf(res.json);
+  if (code === "PASSWORD_TOO_WEAK")
+    return { status: "weak", message: String(res.json.message ?? "Choose a stronger password.") };
+  if (code === "INVALID_TOKEN") return { status: "link_expired" };
+  if (code === "INVALID_PASSWORD") return { status: "wrong_current" };
+  return { status: "unavailable" };
+}
+
+export async function resetPassword(
+  token: string,
+  newPassword: string,
+): Promise<NewPasswordResult> {
+  return passwordOutcome(await post("/api/auth/reset-password", { token, newPassword }));
+}
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<NewPasswordResult> {
+  return passwordOutcome(
+    await post("/api/auth/change-password", {
+      currentPassword,
+      newPassword,
+      revokeOtherSessions: true,
+    }),
+  );
+}

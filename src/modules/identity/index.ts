@@ -7,7 +7,7 @@ import { getEmailProvider, getSmsProvider } from "../../lib/adapters/registry";
 import { getCache } from "../../lib/cache";
 import { logger } from "../../lib/logging/logger";
 import { RateLimiter } from "../../lib/rate-limit/limiter";
-import { createAuth, type Auth } from "./auth";
+import { PASSWORD_RESET_SECONDS, createAuth, type Auth } from "./auth";
 import { guardOtpRequest, type OtpGuardDeps } from "./otp-guard";
 import { guardSignIn, type AfterResponse, type SignInGuardDeps } from "./sign-in-guard";
 import { invitationCrypto } from "./invitation-crypto";
@@ -45,6 +45,17 @@ export function getAuth(): Auth {
     rolesOf: (userId) => repo.rolesOf(userId),
     emailAndPassword: staffEmailAndPassword,
     trustedProxyHops: config.TRUSTED_PROXY_HOPS,
+    sendPasswordReset: async ({ to, token }) => {
+      await getEmailProvider().send({
+        to,
+        templateKey: "staff_password_reset",
+        variables: {
+          link: `${config.APP_URL.replace(/\/$/, "")}/reset-password?token=${encodeURIComponent(token)}`,
+          minutes: String(PASSWORD_RESET_SECONDS / 60),
+        },
+      });
+    },
+    onSideEffectFailure: (what) => logger.error({ event: "auth_side_effect_failed", what }),
     plugins: [
       ...createStaffPlugins(config.AUTH_SECRET ?? DEV_SECRET),
       createPhonePlugin({

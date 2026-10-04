@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import pg from "pg";
 import { expect, type Page } from "@playwright/test";
 import { E2E_ENV } from "../playwright.config";
@@ -123,7 +124,8 @@ export async function createStaff(
   return { email, secret, backupCodes: enrol.backupCodes, userId: made.userId };
 }
 
-export const codeNow = (secret: string) => totpCode(secret, Date.now());
+/** The current authenticator code, or the one `steps` periods later (a code can be used only once). */
+export const codeNow = (secret: string, steps = 0) => totpCode(secret, Date.now() + steps * 30_000);
 
 export async function sessionCount(userId: string): Promise<number> {
   const { rows } = await db().query(
@@ -149,4 +151,16 @@ export async function cleanup() {
     [like],
   );
   await db().query("DELETE FROM users WHERE email LIKE $1", [like]);
+}
+
+/** A password reset link token for this person, as the emailed link would carry (valid 30 minutes). */
+export async function createResetToken(userId: string): Promise<string> {
+  const ctx = await auth().$context;
+  const token = `e2e${randomBytes(12).toString("hex")}`;
+  await ctx.internalAdapter.createVerificationValue({
+    identifier: `reset-password:${token}`,
+    value: userId,
+    expiresAt: new Date(Date.now() + 30 * 60_000),
+  });
+  return token;
 }

@@ -39,6 +39,9 @@ export const TIER_RULES: Record<RateLimitTier, Rule[]> = {
   // Password sign-in attempts from one address, counted whatever the result. The per-account
   // failure lock-out lives in modules/identity/sign-in-guard.ts.
   sign_in: [{ subject: "ip", limit: 30, windowMs: 15 * MINUTE }],
+  // Staff password reset requests: 3 per 15 minutes per address (P2-16). The per-email cap
+  // (3 per hour) is in modules/identity/sign-in-guard.ts.
+  password_reset: [{ subject: "ip", limit: 3, windowMs: 15 * MINUTE }],
   payments: [{ subject: "user", limit: 10, windowMs: MINUTE }],
   ai: [{ subject: "user", limit: 5, windowMs: HOUR }],
   admin: [{ subject: "user", limit: 120, windowMs: MINUTE }],

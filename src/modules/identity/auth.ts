@@ -1,9 +1,11 @@
 import { betterAuth, getCurrentAdapter, type BetterAuthOptions } from "better-auth";
 import type { Role } from "../../lib/api/types";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { uuidv7 } from "../../lib/ids";
 import { identityModels } from "./schema";
 import { PATIENT_SESSION_SECONDS, FRESH_LOGIN_SECONDS, sessionExpiry } from "./session-policy";
+import { PASSWORD_PROBLEM_TEXT, passwordProblem } from "./password";
+import { isStaff } from "./session-policy";
 import { sessionRefusal, type AccountState } from "./staff";
 import { UPDATE_USER_FIELDS, hashIdentifier, isAllowedAuthPath, stripTokens } from "./surface";
 
@@ -31,6 +33,10 @@ export type IdentityDeps = {
   trustedProxyHops?: number;
   /** Better Auth paths opened by a method added later (P2-16, P2-17), on top of surface.ts. */
   extraAllowedPaths?: ReadonlySet<string>;
+  /** Sends the staff password reset email. Without it the reset endpoints do nothing. */
+  sendPasswordReset?: (input: { to: string; token: string }) => Promise<void>;
+  /** Reports a failed side effect (an email that could not be sent) without personal data. */
+  onSideEffectFailure?: (what: string) => void;
   /** Extra Better Auth plugins and sign-in methods, added by later tasks (P2-03, P2-05, P2-17). */
   plugins?: BetterAuthOptions["plugins"];
   emailAndPassword?: BetterAuthOptions["emailAndPassword"];
@@ -41,6 +47,51 @@ export const SESSION_COOKIE = {
   production: "__Host-vc_session",
   development: "vc_session",
 } as const;
+
+export const PASSWORD_RESET_SECONDS = 30 * 60;
+
+/**
+ * Applies the password policy to a new password (reset or change) and, for a reset, refuses a
+ * token that does not belong to a staff account. The token is only looked at here, not used up.
+ */
+async function enforcePasswordPolicy(
+  ctx: {
+    path?: string;
+    body?: unknown;
+    context: {
+      internalAdapter: {
+        findVerificationValue: (id: string) => Promise<{ value: string } | null>;
+        findUserById: (id: string) => Promise<{ id: string; email: string } | null>;
+      };
+    };
+  },
+  deps: { rolesOf: (userId: string) => Promise<readonly Role[]> },
+  sessionEmail?: string,
+): Promise<void> {
+  const body = (ctx.body ?? {}) as { newPassword?: unknown; token?: unknown };
+  if (typeof body.newPassword !== "string") return; // Better Auth rejects the shape itself
+  let email = sessionEmail;
+  if (ctx.path === "/reset-password") {
+    const token = typeof body.token === "string" ? body.token : "";
+    const found = token
+      ? await ctx.context.internalAdapter.findVerificationValue(`reset-password:${token}`)
+      : null;
+    const user = found ? await ctx.context.internalAdapter.findUserById(found.value) : null;
+    // Unknown, used or expired token: let Better Auth give its own (generic) answer.
+    if (!user) return;
+    if (!isStaff(await deps.rolesOf(user.id))) {
+      throw new APIError("BAD_REQUEST", { message: "Invalid token", code: "INVALID_TOKEN" });
+    }
+    email = user.email;
+  }
+  const problem = passwordProblem(body.newPassword, email ?? "");
+  if (problem) {
+    throw new APIError("BAD_REQUEST", {
+      message: PASSWORD_PROBLEM_TEXT[problem],
+      code: "PASSWORD_TOO_WEAK",
+    });
+  }
+}
 
 export function buildAuthOptions(deps: IdentityDeps): BetterAuthOptions {
   const cookieName = (suffix: string) => (deps.production ? `__Host-vc_${suffix}` : `vc_${suffix}`);
@@ -54,7 +105,30 @@ export function buildAuthOptions(deps: IdentityDeps): BetterAuthOptions {
     trustedOrigins: [...deps.trustedOrigins],
     ...identityModels,
 
-    emailAndPassword: deps.emailAndPassword ?? { enabled: false },
+    emailAndPassword: {
+      ...(deps.emailAndPassword ?? { enabled: false }),
+      ...(deps.sendPasswordReset
+        ? {
+            // The link is valid for 30 minutes and works once (Better Auth consumes the token).
+            resetPasswordTokenExpiresIn: PASSWORD_RESET_SECONDS,
+            sendResetPassword: async ({
+              user,
+              token,
+            }: {
+              user: { id: string; email: string };
+              token: string;
+            }) => {
+              // Only staff get a link. A patient has no password and must not be given one.
+              if (!isStaff(await deps.rolesOf(user.id))) return;
+              // Not awaited: sending takes longer than not sending, and the answer must not
+              // reveal whether an address has an account. Failures are reported, not shown.
+              void deps
+                .sendPasswordReset?.({ to: user.email, token })
+                .catch(() => deps.onSideEffectFailure?.("password_reset_email"));
+            },
+          }
+        : {}),
+    },
     socialProviders: deps.socialProviders ?? {},
     plugins: deps.plugins ?? [],
 
@@ -122,6 +196,11 @@ export function buildAuthOptions(deps: IdentityDeps): BetterAuthOptions {
         const crossSite = ctx.request?.headers.get("sec-fetch-site") === "cross-site";
         if (origin ? !ctx.context.trustedOrigins.includes(origin) : crossSite) {
           throw new APIError("FORBIDDEN", { message: "Invalid origin" });
+        }
+        // New passwords must meet the staff policy, however they are set.
+        if (ctx.path === "/reset-password" || ctx.path === "/change-password") {
+          const session = ctx.path === "/change-password" ? await getSessionFromCtx(ctx) : null;
+          await enforcePasswordPolicy(ctx, deps, session?.user.email);
         }
         // A person may change their display name and nothing else about the record.
         if (ctx.path === "/update-user") {

@@ -2,14 +2,19 @@ import type { Metadata } from "next";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { ResetPasswordForm } from "@/components/auth/password-forms";
 
-export const metadata: Metadata = { title: "Choose a new password | ViniCure" };
+// The token in the address is the credential: never indexed, never sent on as a Referer.
+export const metadata: Metadata = {
+  title: "Choose a new password | ViniCure",
+  robots: { index: false, follow: false },
+  referrer: "no-referrer",
+};
 
 export default async function ResetPasswordPage({
   searchParams,
 }: {
-  searchParams: Promise<{ state?: string }>;
+  searchParams: Promise<{ state?: string; token?: string }>;
 }) {
-  const { state } = await searchParams;
+  const { state, token } = await searchParams;
   return (
     <AuthShell
       variant="staff"
@@ -21,7 +26,7 @@ export default async function ResetPasswordPage({
         "Your two-step sign-in stays on.",
       ]}
     >
-      <ResetPasswordForm expired={state === "expired"} />
+      <ResetPasswordForm expired={state === "expired"} {...(token ? { token } : {})} />
     </AuthShell>
   );
 }

@@ -99,16 +99,27 @@ export async function verifyStaffBackupCode(code: string): Promise<StaffCodeResu
   return { status: "ok", redirectTo: homeFor[pendingRole] };
 }
 
-export async function requestPasswordReset(): Promise<{ status: "sent" }> {
+export type { NewPasswordResult, ResetRequestResult } from "./auth-api";
+
+export async function requestPasswordReset(email: string): Promise<api.ResetRequestResult> {
+  if (!MOCK_AUTH) return api.requestReset(email);
   await delay();
   return { status: "sent" };
 }
 
-export async function submitNewPassword(
-  current?: string,
-): Promise<{ status: "ok" } | { status: "wrong_current" } | { status: "link_expired" }> {
+/** Sets a new password from a reset link (token) or, with `current`, from the signed-in page. */
+export async function submitNewPassword(input: {
+  password: string;
+  token?: string;
+  current?: string;
+}): Promise<api.NewPasswordResult> {
+  if (!MOCK_AUTH) {
+    return input.token !== undefined
+      ? api.resetPassword(input.token, input.password)
+      : api.changePassword(input.current ?? "", input.password);
+  }
   await delay();
-  if (current === MOCK_STAFF.wrongPassword) return { status: "wrong_current" };
+  if (input.current === MOCK_STAFF.wrongPassword) return { status: "wrong_current" };
   return { status: "ok" };
 }
 

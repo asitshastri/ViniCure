@@ -17,6 +17,12 @@ import { AppError, errors } from "../../lib/errors/app-error";
 
 export const SIGN_IN_PATH = "/sign-in/email";
 export const CHANGE_PASSWORD_PATH = "/change-password";
+export const RESET_REQUEST_PATH = "/request-password-reset";
+export const RESET_PATH = "/reset-password";
+/** One address may ask for 3 reset emails per hour (the address limit is 3 per 15 minutes). */
+export const MAX_RESET_EMAILS_PER_HOUR = 3;
+/** A reset request always takes at least this long, whether or not the email has an account. */
+export const MIN_RESET_RESPONSE_MS = 400;
 export const MAX_FAILURES = 5;
 export const FAILURE_WINDOW_MS = 15 * 60_000;
 export const BASE_LOCK_MS = 15 * 60_000;
@@ -76,15 +82,35 @@ export async function guardSignIn(
   const pathname = new URL(request.url).pathname;
   const isSignIn = pathname.endsWith(`/api/auth${SIGN_IN_PATH}`);
   const isChange = pathname.endsWith(`/api/auth${CHANGE_PASSWORD_PATH}`);
-  if (!isSignIn && !isChange) return null;
+  const isResetRequest = pathname.endsWith(`/api/auth${RESET_REQUEST_PATH}`);
+  const isReset = pathname.endsWith(`/api/auth${RESET_PATH}`);
+  if (!isSignIn && !isChange && !isResetRequest && !isReset) return null;
+  const started = Date.now();
 
   try {
     const decision = await deps.limiter.check({
-      tier: "sign_in",
+      tier: isResetRequest ? "password_reset" : "sign_in",
       route: pathname,
       ip: clientIp(request, deps.trustedProxyHops),
     });
     if (!decision.allowed) throw errors.rateLimited(decision.retryAfterSeconds);
+
+    if (isReset) return null; // the token is the credential; the address limit above is enough
+
+    if (isResetRequest) {
+      const email = await readEmail(request);
+      if (email) {
+        const [mailKey] = subjectKey(deps, "reset-email", email);
+        const { count } = await deps.cache.incrWindow(mailKey as string, 60 * 60_000);
+        // Counted for every address, real or not, so the answer reveals nothing.
+        if (count > MAX_RESET_EMAILS_PER_HOUR) throw errors.rateLimited(60 * 60);
+      }
+      // Same time for every address: wait out the rest of the minimum.
+      return async () => {
+        const wait = MIN_RESET_RESPONSE_MS - (Date.now() - started);
+        if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+      };
+    }
 
     // Sign-in counts by the email typed; a password change counts by the session cookie.
     const subject = isSignIn

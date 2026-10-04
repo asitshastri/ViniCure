@@ -24,6 +24,7 @@ export const RATE_LIMIT_TIERS = [
   "otp_send",
   "otp_verify",
   "sign_in",
+  "password_reset",
   "payments",
   "ai",
   "admin",
@@ -35,6 +36,7 @@ export const FAIL_CLOSED_TIERS: ReadonlySet<RateLimitTier> = new Set([
   "otp_send",
   "otp_verify",
   "sign_in",
+  "password_reset",
   "payments",
   "admin",
 ]);

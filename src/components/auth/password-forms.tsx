@@ -5,7 +5,7 @@ import { useId, useState, type FormEvent } from "react";
 import { CheckCircle, Circle } from "@phosphor-icons/react/ssr";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
-import { requestPasswordReset, submitNewPassword } from "@/lib/data/auth";
+import { MOCK_AUTH, requestPasswordReset, submitNewPassword } from "@/lib/data/auth";
 import {
   changePasswordForm,
   fieldErrors,
@@ -69,8 +69,17 @@ export function ForgotPasswordForm() {
     }
     setError(undefined);
     setBusy(true);
-    await requestPasswordReset();
+    const result = await requestPasswordReset(parsed.data.email);
     setBusy(false);
+    if (result.status === "rate_limited") {
+      setError(`Too many requests. Try again in ${result.retryInMinutes} minutes.`);
+      return;
+    }
+    if (result.status === "unavailable") {
+      setError("We could not send the request. Try again in a moment.");
+      return;
+    }
+    // The same message appears whether or not the email belongs to an account.
     setSent(true);
   }
 
@@ -116,7 +125,7 @@ export function ForgotPasswordForm() {
   );
 }
 
-export function ResetPasswordForm({ expired }: { expired: boolean }) {
+export function ResetPasswordForm({ expired, token }: { expired: boolean; token?: string }) {
   const uid = useId();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -124,20 +133,24 @@ export function ResetPasswordForm({ expired }: { expired: boolean }) {
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [linkGone, setLinkGone] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
   const ids = { password: `${uid}-password`, confirm: `${uid}-confirm` };
 
-  if (expired) {
+  if (expired || linkGone || (!MOCK_AUTH && !token)) {
     return (
       <div className="grid gap-5">
         <Notice tone="warning" title="This link has expired or was already used">
           Reset links work once and for 30 minutes. Ask for a new one.
         </Notice>
         <ButtonLink href="/forgot-password">Send a new link</ButtonLink>
-        <PrototypeHint>
-          <p>
-            Open this page without <code>?state=expired</code> to see the form.
-          </p>
-        </PrototypeHint>
+        {MOCK_AUTH ? (
+          <PrototypeHint>
+            <p>
+              Open this page without <code>?state=expired</code> to see the form.
+            </p>
+          </PrototypeHint>
+        ) : null}
       </div>
     );
   }
@@ -161,10 +174,19 @@ export function ResetPasswordForm({ expired }: { expired: boolean }) {
       return;
     }
     setErrors({});
+    setProblem(null);
     setBusy(true);
-    await submitNewPassword();
+    const result = await submitNewPassword({
+      password: parsed.data.password,
+      ...(token ? { token } : {}),
+    });
     setBusy(false);
-    setDone(true);
+    if (result.status === "ok") setDone(true);
+    else if (result.status === "link_expired") setLinkGone(true);
+    else if (result.status === "weak") setErrors({ password: result.message });
+    else if (result.status === "rate_limited")
+      setProblem(`Too many tries. Wait ${result.retryInMinutes} minutes and try again.`);
+    else setProblem("We could not save the password. Try again in a moment.");
   }
 
   return (
@@ -187,6 +209,11 @@ export function ResetPasswordForm({ expired }: { expired: boolean }) {
         autoComplete="new-password"
         error={errors.confirm}
       />
+      {problem ? (
+        <Notice tone="warning" title="Could not save">
+          {problem}
+        </Notice>
+      ) : null}
       <Button type="submit" size="lg" loading={busy}>
         Save new password
       </Button>
@@ -215,10 +242,24 @@ export function ChangePasswordForm() {
     }
     setErrors({});
     setBusy(true);
-    const result = await submitNewPassword(current);
+    const result = await submitNewPassword({ current, password: parsed.data.password });
     setBusy(false);
     if (result.status === "wrong_current") {
       setErrors({ current: "The current password is not correct." });
+      return;
+    }
+    if (result.status === "weak") {
+      setErrors({ password: result.message });
+      return;
+    }
+    if (result.status === "rate_limited") {
+      setErrors({
+        current: `Too many tries. Wait ${result.retryInMinutes} minutes and try again.`,
+      });
+      return;
+    }
+    if (result.status !== "ok") {
+      setErrors({ current: "We could not change the password. Try again in a moment." });
       return;
     }
     setDone(true);
@@ -262,9 +303,11 @@ export function ChangePasswordForm() {
       <Button type="submit" size="lg" loading={busy}>
         Change password
       </Button>
-      <PrototypeHint>
-        <p>Current password {MOCK_STAFF.wrongPassword} shows the wrong-password error.</p>
-      </PrototypeHint>
+      {MOCK_AUTH ? (
+        <PrototypeHint>
+          <p>Current password {MOCK_STAFF.wrongPassword} shows the wrong-password error.</p>
+        </PrototypeHint>
+      ) : null}
     </form>
   );
 }

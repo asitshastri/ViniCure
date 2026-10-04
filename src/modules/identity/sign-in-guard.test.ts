@@ -6,6 +6,7 @@ import {
   BASE_LOCK_MS,
   FAILURE_WINDOW_MS,
   MAX_FAILURES,
+  MIN_RESET_RESPONSE_MS,
   guardSignIn,
   type SignInGuardDeps,
 } from "./sign-in-guard";
@@ -211,5 +212,67 @@ describe("failure behaviour and scope", () => {
       body: JSON.stringify({ email: "a@b.co", pad: "x".repeat(6000) }),
     });
     await expect(guardSignIn(big, deps)).rejects.toMatchObject({ code: "payload_too_large" });
+  });
+});
+
+describe("password reset requests (P2-16)", () => {
+  const resetRequest = (email: string, ip = "203.0.113.1") =>
+    attempt(email, ip, "/api/auth/request-password-reset");
+
+  async function ask(email: string, ip?: string): Promise<string> {
+    try {
+      const after = await guardSignIn(resetRequest(email, ip), deps);
+      await after?.(new Response(null, { status: 200 }));
+      return "ok";
+    } catch (e) {
+      return e instanceof AppError ? e.code : "error";
+    }
+  }
+
+  it("allows 3 requests per 15 minutes per address, then 429 whatever the email", async () => {
+    for (let i = 0; i < 3; i++) expect(await ask(`dr${i}@example.com`, "203.0.113.20")).toBe("ok");
+    expect(await ask("dr9@example.com", "203.0.113.20")).toBe("rate_limited");
+    expect(await ask("dr9@example.com", "203.0.113.21")).toBe("ok"); // another address is not affected
+  });
+
+  it("the address allowance returns after 15 minutes", async () => {
+    for (let i = 0; i < 3; i++) await ask(`dr${i}@example.com`, "203.0.113.30");
+    expect(await ask("x@example.com", "203.0.113.30")).toBe("rate_limited");
+    now += FAILURE_WINDOW_MS + 1000;
+    expect(await ask("x@example.com", "203.0.113.30")).toBe("ok");
+  });
+
+  it("one email gets at most 3 reset emails an hour, however many addresses ask", async () => {
+    for (let i = 0; i < 3; i++)
+      expect(await ask("dr@example.com", `203.0.113.${40 + i}`)).toBe("ok");
+    expect(await ask("dr@example.com", "203.0.113.50")).toBe("rate_limited");
+    expect(await ask("Dr@Example.com ", "203.0.113.51")).toBe("rate_limited"); // spelling does not matter
+    expect(await ask("other@example.com", "203.0.113.52")).toBe("ok");
+  });
+
+  it("an address with no account is counted exactly like a real one", async () => {
+    for (let i = 0; i < 3; i++)
+      expect(await ask("ghost@example.com", `203.0.113.${60 + i}`)).toBe("ok");
+    expect(await ask("ghost@example.com", "203.0.113.70")).toBe("rate_limited");
+  });
+
+  it("every request takes at least the minimum time, so timing reveals nothing", async () => {
+    const started = Date.now();
+    await ask("quick@example.com", "203.0.113.80");
+    expect(Date.now() - started).toBeGreaterThanOrEqual(MIN_RESET_RESPONSE_MS - 20);
+  });
+
+  it("the reset step itself is limited by address only, and fails closed without the cache", async () => {
+    const reset = () => attempt("", "203.0.113.90", "/api/auth/reset-password");
+    for (let i = 0; i < 30; i++) await guardSignIn(reset(), deps);
+    await expect(guardSignIn(reset(), deps)).rejects.toMatchObject({ code: "rate_limited" });
+    deps.cache.incrWindow = async () => {
+      throw new Error("down");
+    };
+    await expect(
+      guardSignIn(attempt("a@b.co", "203.0.113.91", "/api/auth/request-password-reset"), deps),
+    ).rejects.toMatchObject({
+      code: "unavailable",
+    });
   });
 });

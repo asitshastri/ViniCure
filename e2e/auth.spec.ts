@@ -5,6 +5,7 @@ import {
   closeDb,
   codeNow,
   createInvitation,
+  createResetToken,
   createStaff,
   db,
   newPhone,
@@ -296,5 +297,86 @@ test.describe("profile and family", () => {
       .selectOption("Other");
     await page.getByRole("button", { name: /^add$/i }).click();
     await expect(page.getByText(/cannot be in the future/i).first()).toBeVisible();
+  });
+});
+
+test.describe("staff password reset", () => {
+  const NEW = "Another-Sturdy-Phrase-7#";
+
+  test("asking for a link gives the same message for a real and an unknown address", async ({
+    page,
+  }) => {
+    const staff = await createStaff("doctor-reset-a");
+    for (const email of [staff.email, `e2e-${run}-nobody@example.com`]) {
+      await page.goto("/forgot-password");
+      await page.getByLabel(/work email/i).fill(email);
+      await page.getByRole("button", { name: /send reset link/i }).click();
+      await expect(page.getByText(/if an account uses that email/i)).toBeVisible();
+    }
+  });
+
+  test("the link sets a new password, ends other sessions, and the old password stops working", async ({
+    page,
+    browser,
+  }) => {
+    const staff = await createStaff("doctor-reset-b");
+    // The doctor is signed in on another device.
+    const other = await browser.newContext();
+    const otherPage = await other.newPage();
+    await otherPage.goto("/login/staff");
+    await otherPage.getByLabel(/email/i).fill(staff.email);
+    await otherPage.getByLabel(/^password/i).fill(PASSWORD);
+    await otherPage.getByRole("button", { name: /sign in|continue/i }).click();
+    await typeCode(otherPage, codeNow(staff.secret));
+    await expect(otherPage).toHaveURL(/\/doctor\/dashboard/);
+    expect(await sessionCount(staff.userId)).toBe(1);
+
+    const token = await createResetToken(staff.userId);
+    await page.goto(`/reset-password?token=${token}`);
+    await page.getByLabel(/^new password/i).fill("short");
+    await page.getByLabel(/repeat the new password/i).fill("short");
+    await page.getByRole("button", { name: /save new password/i }).click();
+    await expect(page.getByText(/at least 12 characters/i).first()).toBeVisible();
+
+    await page.getByLabel(/^new password/i).fill(NEW);
+    await page.getByLabel(/repeat the new password/i).fill(NEW);
+    await page.getByRole("button", { name: /save new password/i }).click();
+    await expect(page.getByText(/password changed/i)).toBeVisible();
+    expect(await sessionCount(staff.userId)).toBe(0); // every session ended
+    await otherPage.goto("/doctor/dashboard");
+    await expect(otherPage).toHaveURL(/\/login/);
+    await other.close();
+
+    // The old password is dead; the new one needs the authenticator code as before.
+    await page.goto("/login/staff");
+    await page.getByLabel(/email/i).fill(staff.email);
+    await page.getByLabel(/^password/i).fill(PASSWORD);
+    await page.getByRole("button", { name: /sign in|continue/i }).click();
+    await expect(page.getByText(/email or password is not correct/i)).toBeVisible();
+    await page.getByLabel(/^password/i).fill(NEW);
+    await page.getByRole("button", { name: /sign in|continue/i }).click();
+    await typeCode(page, codeNow(staff.secret, 1));
+    await expect(page).toHaveURL(/\/doctor\/dashboard/);
+  });
+
+  test("a used, expired or made-up link shows the expired message", async ({ page }) => {
+    const staff = await createStaff("doctor-reset-c");
+    const token = await createResetToken(staff.userId);
+    await page.goto(`/reset-password?token=${token}`);
+    await page.getByLabel(/^new password/i).fill(NEW);
+    await page.getByLabel(/repeat the new password/i).fill(NEW);
+    await page.getByRole("button", { name: /save new password/i }).click();
+    await expect(page.getByText(/password changed/i)).toBeVisible();
+    // The same link again.
+    await page.goto(`/reset-password?token=${token}`);
+    await page.getByLabel(/^new password/i).fill("Yet-Another-Phrase-8$");
+    await page.getByLabel(/repeat the new password/i).fill("Yet-Another-Phrase-8$");
+    await page.getByRole("button", { name: /save new password/i }).click();
+    await expect(page.getByText(/expired or was already used/i)).toBeVisible();
+    await page.goto("/reset-password?token=made-up-token-0000000000");
+    await page.getByLabel(/^new password/i).fill(NEW);
+    await page.getByLabel(/repeat the new password/i).fill(NEW);
+    await page.getByRole("button", { name: /save new password/i }).click();
+    await expect(page.getByText(/expired or was already used/i)).toBeVisible();
   });
 });
