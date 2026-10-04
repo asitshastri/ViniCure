@@ -10,6 +10,7 @@
 // To allow a known-safe line (a test value), end it with: // secret-scan:allow
 
 import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 
 export const FORBIDDEN_FILES = [
   /(^|\/)\.env($|\.)(?!example$)/, // .env, .env.local, .env.production ... but not .env.example
@@ -99,7 +100,7 @@ function staged() {
   });
 }
 
-const isMain = process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop() ?? "");
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
   const problems = staged().flatMap(({ name, text }) => scanFile(name, text));
   if (problems.length > 0) {

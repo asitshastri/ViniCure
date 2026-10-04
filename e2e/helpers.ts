@@ -158,11 +158,16 @@ export async function cleanup() {
   await db().query(`DELETE FROM doctor_availability_rules WHERE doctor_id IN ${mine}`, [like]);
   await db().query(`DELETE FROM doctor_time_off WHERE doctor_id IN ${mine}`, [like]);
   await db().query(`DELETE FROM doctor_specialties WHERE doctor_id IN ${mine}`, [like]);
+  // Same rule as patients: a doctor with an appointment stays, and so does their account.
   await db().query(
-    "DELETE FROM doctors WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)",
+    `DELETE FROM doctors WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)
+       AND id NOT IN (SELECT doctor_id FROM appointments)`,
     [like],
   );
-  await db().query("DELETE FROM users WHERE email LIKE $1", [like]);
+  await db().query(
+    "DELETE FROM users WHERE email LIKE $1 AND id NOT IN (SELECT user_id FROM doctors)",
+    [like],
+  );
 }
 
 /** A password reset link token for this person, as the emailed link would carry (valid 30 minutes). */
