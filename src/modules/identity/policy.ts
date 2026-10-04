@@ -124,6 +124,11 @@ export const MATRIX = {
     admin: ["read", "refund"],
     support: ["read"],
   },
+  referral: {
+    // A patient's own referral code, and entering someone else's.
+    owner: ["read", "redeem"],
+    ownerRoles: ["patient"],
+  },
   payout: {
     // Paying doctors what the ledger owes them (manual settlement from a CSV).
     admin: ["read", "create", "settle"],

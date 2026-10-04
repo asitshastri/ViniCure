@@ -65,6 +65,7 @@ const EXPECT: Record<Resource, Record<string, (keyof typeof who)[]>> = {
     readEarnings: ["assignedDoctor"],
     refund: ["admin", "superAdmin"],
   },
+  referral: { read: ["owner"], redeem: ["owner"] },
   payout: {
     read: ["admin", "superAdmin"],
     create: ["admin", "superAdmin"],

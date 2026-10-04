@@ -31,6 +31,7 @@ export const RATE_LIMIT_TIERS = [
   "sign_in",
   "password_reset",
   "payments",
+  "referral",
   "webhook",
   "ai",
   "admin",
@@ -44,6 +45,7 @@ export const FAIL_CLOSED_TIERS: ReadonlySet<RateLimitTier> = new Set([
   "sign_in",
   "password_reset",
   "payments",
+  "referral",
   "admin",
 ]);
 

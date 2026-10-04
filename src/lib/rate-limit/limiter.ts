@@ -43,6 +43,8 @@ export const TIER_RULES: Record<RateLimitTier, Rule[]> = {
   // (3 per hour) is in modules/identity/sign-in-guard.ts.
   password_reset: [{ subject: "ip", limit: 3, windowMs: 15 * MINUTE }],
   payments: [{ subject: "user", limit: 10, windowMs: MINUTE }],
+  // Entering referral codes: few tries per person per hour, so a code cannot be guessed (P5-10).
+  referral: [{ subject: "user", limit: 10, windowMs: HOUR }],
   // Signed gateway callbacks arrive from a few addresses in bursts; the signature is the real
   // gate. If the cache is down the callback is still accepted (the gateway would only retry).
   webhook: [{ subject: "ip", limit: 600, windowMs: MINUTE }],

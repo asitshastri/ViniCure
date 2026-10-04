@@ -106,6 +106,10 @@ const schema = z.object({
   FEATURE_AI_TRIAGE: flag,
   FEATURE_RECORDING: flag,
   FEATURE_REFERRALS: flag,
+  /** Reward for each referral, in paise, stored when the referral is made. 0 until the business decides it. */
+  REFERRAL_REWARD_PAISE: z.coerce.number().int().min(0).max(1_000_000).default(0),
+  /** How many people one person may refer. */
+  REFERRAL_MAX_PER_REFERRER: z.coerce.number().int().min(1).max(1000).default(10),
 
   // Monitoring
   SENTRY_DSN: z.url().optional(),
