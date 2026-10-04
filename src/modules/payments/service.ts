@@ -1,0 +1,129 @@
+import { createHash } from "node:crypto";
+import type { PaymentProvider } from "../../lib/adapters/types";
+import { AdapterError } from "../../lib/adapters/types";
+import { errors } from "../../lib/errors/app-error";
+import { logger } from "../../lib/logging/logger";
+import { uuidv7 } from "../../lib/ids";
+import { assertAllowed, can, type Principal } from "../identity/policy";
+import type { PayableAppointment, PaymentRepo, PaymentRow } from "./repo";
+import { MAX_ORDERS_PER_APPOINTMENT, type OrderView } from "./schemas";
+
+// Starting a payment (P5-03). The server decides the amount (the fee copied onto the appointment
+// when the slot was held), creates a fresh gateway order for each attempt, and records it. The
+// browser only ever receives an order to open in the checkout widget.
+
+type Deps = {
+  repo: PaymentRepo;
+  gateway: () => PaymentProvider;
+  /** The public key id for the checkout widget. */
+  publicKeyId: () => string;
+};
+
+/** One key per (person, appointment, client key): the same request always maps to the same row. */
+export function paymentKey(userId: string, appointmentId: string, clientKey: string): string {
+  return createHash("sha256")
+    .update(`order\n${userId}\n${appointmentId}\n${clientKey}`)
+    .digest("hex");
+}
+
+export class PaymentService {
+  constructor(private readonly deps: Deps) {}
+
+  private view(p: PaymentRow): OrderView {
+    return {
+      paymentId: p.id,
+      orderId: p.gatewayOrderId,
+      amountPaise: p.amountPaise,
+      currency: "INR",
+      keyId: this.deps.publicKeyId(),
+      holdExpiresAt: (p.holdExpiresAt ?? new Date(0)).toISOString(),
+    };
+  }
+
+  private checkPayable(principal: Principal, appt: PayableAppointment | null): PayableAppointment {
+    // Someone else's appointment is the same 404 as one that does not exist.
+    if (!appt) throw errors.notFound();
+    assertAllowed(can.payment.pay(principal, { ownerUserId: appt.accountUserId }));
+    if (
+      appt.status !== "held" ||
+      !appt.holdExpiresAt ||
+      appt.holdExpiresAt.getTime() <= Date.now()
+    ) {
+      throw errors.conflict({
+        detail: "This time is no longer held for you. Choose a time again.",
+      });
+    }
+    if (appt.feePaise <= 0) {
+      throw errors.conflict({ detail: "There is nothing to pay for this booking." });
+    }
+    return appt;
+  }
+
+  /**
+   * Makes (or replays) the order for a held appointment. `clientKey` is the caller's
+   * Idempotency-Key: the same key returns the same order, a new key is a new attempt.
+   */
+  async createOrder(
+    principal: Principal,
+    input: { appointmentId: string },
+    clientKey: string,
+  ): Promise<OrderView> {
+    const key = paymentKey(principal.userId, input.appointmentId, clientKey);
+
+    // A repeat of an earlier request: same answer, no second order at the gateway.
+    const earlier = await this.deps.repo.findByKey(key);
+    if (earlier) return this.view(earlier);
+
+    const appt = this.checkPayable(
+      principal,
+      await this.deps.repo.appointmentForPayment(input.appointmentId),
+    );
+
+    let orderId: string;
+    try {
+      ({ orderId } = await this.deps.gateway().createOrder({
+        amountPaise: appt.feePaise,
+        currency: "INR",
+        // The appointment id is a random UUID, not personal data; the receipt shows it to us in the dashboard.
+        receipt: appt.id.replaceAll("-", "").slice(0, 32),
+        notes: { appointment: appt.id },
+      }));
+    } catch (error) {
+      if (error instanceof AdapterError) {
+        logger.warn({ event: "payment_order_failed", kind: error.kind });
+        throw errors.unavailable({
+          detail:
+            "Payments are not available right now. Your time stays held until the timer ends. Try again in a moment.",
+        });
+      }
+      throw error;
+    }
+
+    let row: PaymentRow | null;
+    try {
+      row = await this.deps.repo.createPayment({
+        id: uuidv7(),
+        appointmentId: appt.id,
+        payerUserId: principal.userId,
+        amountPaise: appt.feePaise,
+        gatewayOrderId: orderId,
+        idempotencyKey: key,
+      });
+    } catch (error) {
+      // The same request arrived twice at once and the other one won: answer with its order.
+      const e = error as { code?: string; constraint?: string };
+      if (e.code === "23505" && e.constraint === "payments_idempotency_idx") {
+        const winner = await this.deps.repo.findByKey(key);
+        if (winner) return this.view(winner);
+      }
+      throw error;
+    }
+    if (!row) {
+      // The hold ended, or the appointment already has its orders, between the check and the write.
+      throw errors.conflict({
+        detail: `This time is no longer held, or ${MAX_ORDERS_PER_APPOINTMENT} payment attempts have been made. Choose a time again.`,
+      });
+    }
+    return this.view(row);
+  }
+}

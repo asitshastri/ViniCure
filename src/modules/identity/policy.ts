@@ -119,7 +119,7 @@ export const MATRIX = {
     phi: true,
   },
   payment: {
-    owner: ["read"],
+    owner: ["read", "pay"],
     assignedDoctor: ["readEarnings"],
     admin: ["read", "refund"],
     support: ["read"],

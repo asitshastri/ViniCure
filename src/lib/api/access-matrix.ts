@@ -344,6 +344,17 @@ export const ACCESS_MATRIX: Record<RouteKey, MatrixEntry> = {
     probeAllowed: false,
     why: "A doctor removes their own time off only; another doctor's entry is 404.",
   },
+  "POST /api/v1/payments/orders": {
+    auth: "session",
+    roles: ["patient"],
+    roleDenied: "not_found",
+    rateLimit: "payments",
+    audited: true,
+    freshLogin: false,
+    fullSession: true,
+    probeAllowed: true,
+    why: "Only the account that holds the appointment (404 for anyone else). The amount is the held fee, never from the client. Idempotent; sensitive tier fails closed.",
+  },
   "GET /api/v1/doctor/application": {
     auth: "staff",
     roles: ["doctor"],

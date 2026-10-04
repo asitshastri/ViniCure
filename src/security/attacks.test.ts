@@ -206,6 +206,8 @@ describe("static guards: no SQL built from text, no raw HTML, no code evaluation
     "DOCUMENT_COLUMNS",
     "whereSql",
     "params.length - 1",
+    // Payments repo: a constant column list.
+    "PAYMENT_COLUMNS",
   ]);
 
   it("repo files use template expressions in SQL only from the reviewed list", () => {

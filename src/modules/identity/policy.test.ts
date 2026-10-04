@@ -61,6 +61,7 @@ const EXPECT: Record<Resource, Record<string, (keyof typeof who)[]>> = {
   document: { read: ["owner", "assignedDoctor"], write: ["owner"] },
   payment: {
     read: ["owner", "admin", "superAdmin", "support"],
+    pay: ["owner"],
     readEarnings: ["assignedDoctor"],
     refund: ["admin", "superAdmin"],
   },
