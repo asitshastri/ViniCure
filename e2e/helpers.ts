@@ -40,7 +40,7 @@ function auth() {
     production: false,
     rolesOf: (id) => repo.rolesOf(id),
     emailAndPassword: staffEmailAndPassword,
-    plugins: createStaffPlugins(),
+    plugins: createStaffPlugins(E2E_ENV.AUTH_SECRET),
   });
 }
 

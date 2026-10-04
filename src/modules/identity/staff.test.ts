@@ -44,7 +44,7 @@ function setup() {
     rolesOf: async (id) => rolesByUser.get(id) ?? [],
     emailAndPassword: staffEmailAndPassword,
     plugins: [
-      ...createStaffPlugins(),
+      ...createStaffPlugins(SECRET),
       createPhonePlugin({
         sms,
         allowedCountryCodes: ["+91"],

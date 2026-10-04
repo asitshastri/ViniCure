@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { twoFactor } from "better-auth/plugins/two-factor";
@@ -45,7 +46,17 @@ const BLOCKED_PATHS = new Set([
 
 const TRUST_DEVICE_PATHS = new Set(["/two-factor/verify-totp", "/two-factor/verify-backup-code"]);
 
-export function createStaffPlugins(): BetterAuthPlugin[] {
+// A code that was accepted once is refused for the next two minutes (RFC 6238 section 5.2: a
+// verifier must not accept the same one-time password twice). Better Auth does not do this, so
+// replays are blocked here with a marker row in auth_verifications, shared by every web task.
+const TOTP_REPLAY_SECONDS = 120;
+const TWO_FACTOR_COOKIE = "two_factor";
+
+function replayKey(secret: string, userId: string, code: string): string {
+  return createHmac("sha256", `totp-replay:${secret}`).update(`${userId}:${code}`).digest("hex");
+}
+
+export function createStaffPlugins(replaySecret: string): BetterAuthPlugin[] {
   const plugin = twoFactor({
     issuer: TOTP_ISSUER,
     schema: twoFactorSchema,
@@ -69,6 +80,22 @@ export function createStaffPlugins(): BetterAuthPlugin[] {
           }),
         },
         {
+          // Refuse a code that was already used for this person.
+          matcher: (ctx) => ctx.path === "/two-factor/verify-totp",
+          handler: createAuthMiddleware(async (ctx) => {
+            const code = (ctx.body as { code?: unknown } | undefined)?.code;
+            if (typeof code !== "string") return;
+            const userId = await challengeUserId(ctx);
+            if (!userId) return; // no challenge: Better Auth answers with its own error
+            const used = await ctx.context.internalAdapter.findVerificationValue(
+              replayKey(replaySecret, userId, code),
+            );
+            if (used && used.expiresAt > new Date()) {
+              throw new APIError("UNAUTHORIZED", { message: "Invalid code" });
+            }
+          }),
+        },
+        {
           matcher: (ctx) => TRUST_DEVICE_PATHS.has(ctx.path ?? ""),
           handler: createAuthMiddleware(async (ctx) => {
             const body = ctx.body as { trustDevice?: unknown } | undefined;
@@ -78,10 +105,44 @@ export function createStaffPlugins(): BetterAuthPlugin[] {
           }),
         },
       ],
+      after: [
+        {
+          // Remember a code that just signed someone in.
+          matcher: (ctx) => ctx.path === "/two-factor/verify-totp",
+          handler: createAuthMiddleware(async (ctx) => {
+            const code = (ctx.body as { code?: unknown } | undefined)?.code;
+            const userId = ctx.context.newSession?.user.id;
+            if (typeof code !== "string" || !userId) return;
+            await ctx.context.internalAdapter.createVerificationValue({
+              identifier: replayKey(replaySecret, userId, code),
+              value: "used",
+              expiresAt: new Date(Date.now() + TOTP_REPLAY_SECONDS * 1000),
+            });
+          }),
+        },
+      ],
     },
   };
 
   return [plugin, guard];
+}
+
+/** The person a pending two-factor challenge belongs to, from the signed challenge cookie. */
+async function challengeUserId(ctx: {
+  context: {
+    secret: string;
+    createAuthCookie: (name: string) => { name: string };
+    internalAdapter: {
+      findVerificationValue: (identifier: string) => Promise<{ value: string } | null>;
+    };
+  };
+  getSignedCookie: (name: string, secret: string) => Promise<string | false | null | undefined>;
+}): Promise<string | null> {
+  const cookie = ctx.context.createAuthCookie(TWO_FACTOR_COOKIE);
+  const identifier = await ctx.getSignedCookie(cookie.name, ctx.context.secret);
+  if (!identifier) return null;
+  const challenge = await ctx.context.internalAdapter.findVerificationValue(identifier);
+  return challenge?.value ?? null;
 }
 
 /** Email and password settings for staff. Sign-up is off: accounts come from invitations. */

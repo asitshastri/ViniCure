@@ -45,7 +45,7 @@ export function getAuth(): Auth {
     emailAndPassword: staffEmailAndPassword,
     trustedProxyHops: config.TRUSTED_PROXY_HOPS,
     plugins: [
-      ...createStaffPlugins(),
+      ...createStaffPlugins(config.AUTH_SECRET ?? DEV_SECRET),
       createPhonePlugin({
         isStaff: async (userId) => isStaff(await repo.rolesOf(userId)),
         // Resolved at send time so a missing real provider fails the send, not the whole auth route.

@@ -116,17 +116,19 @@ export function buildAuthOptions(deps: IdentityDeps): BetterAuthOptions {
         if (!isAllowedAuthPath(ctx.path ?? "", deps.extraAllowedPaths)) {
           throw new APIError("NOT_FOUND", { message: "Not found" });
         }
+        const origin = ctx.request?.headers.get("origin");
+        if (ctx.request?.method === "GET") return;
+        // A browser that says the request is cross-site but sends no Origin is refused too.
+        const crossSite = ctx.request?.headers.get("sec-fetch-site") === "cross-site";
+        if (origin ? !ctx.context.trustedOrigins.includes(origin) : crossSite) {
+          throw new APIError("FORBIDDEN", { message: "Invalid origin" });
+        }
         // A person may change their display name and nothing else about the record.
         if (ctx.path === "/update-user") {
           const keys = Object.keys((ctx.body ?? {}) as Record<string, unknown>);
           if (keys.length === 0 || keys.some((key) => !UPDATE_USER_FIELDS.has(key))) {
             throw new APIError("BAD_REQUEST", { message: "Only the name can be changed." });
           }
-        }
-        const origin = ctx.request?.headers.get("origin");
-        if (!origin || ctx.request?.method === "GET") return;
-        if (!ctx.context.trustedOrigins.includes(origin)) {
-          throw new APIError("FORBIDDEN", { message: "Invalid origin" });
         }
       }),
       // Session tokens stay in the HttpOnly cookie; they are removed from every JSON answer.

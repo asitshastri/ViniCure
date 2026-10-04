@@ -35,7 +35,7 @@ function setup() {
     rolesOf: async () => ["patient"],
     emailAndPassword: staffEmailAndPassword,
     plugins: [
-      ...createStaffPlugins(),
+      ...createStaffPlugins("test-secret-with-at-least-thirty-two-characters!"),
       createPhonePlugin({
         sms,
         allowedCountryCodes: ["+91"],

@@ -58,7 +58,7 @@ describe.skipIf(!url)("Better Auth on real Postgres", () => {
       rolesOf: (id) => repo.rolesOf(id),
       emailAndPassword: staffEmailAndPassword,
       plugins: [
-        ...createStaffPlugins(),
+        ...createStaffPlugins("integration-secret-with-at-least-32-characters"),
         createPhonePlugin({
           sms,
           allowedCountryCodes: ["+91"],

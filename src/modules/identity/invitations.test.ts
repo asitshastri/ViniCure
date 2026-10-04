@@ -59,7 +59,7 @@ async function setup() {
     rolesOf: (id) => repo.rolesOf(id),
     emailAndPassword: staffEmailAndPassword,
     plugins: [
-      ...createStaffPlugins(),
+      ...createStaffPlugins(SECRET),
       createPhonePlugin({
         sms: { sendTemplate: async () => ({ providerId: "x" }) },
         allowedCountryCodes: ["+91"],
