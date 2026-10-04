@@ -20,7 +20,15 @@ import { AppError, errors } from "../../lib/errors/app-error";
 
 export type Relation = "owner" | "assignedDoctor" | "otherDoctor" | "admin" | "support";
 
-export type Principal = { userId: string; roles: readonly Role[] };
+export type Principal = {
+  userId: string;
+  roles: readonly Role[];
+  /**
+   * The session is limited (a risky phone sign-in whose second method is not proven yet,
+   * D-019). A limited principal can reach nothing the matrix guards, whoever owns it.
+   */
+  limited?: boolean;
+};
 
 /** What the caller read from the database about this object and this principal. */
 export type Facts = {
@@ -39,7 +47,12 @@ export type Facts = {
 export type PhiPurpose = "patient_self" | "treatment" | "support_break_glass";
 
 export type DenyReason =
-  "no_relation" | "not_permitted" | "break_glass_required" | "payment_required" | "outside_window";
+  | "no_relation"
+  | "not_permitted"
+  | "break_glass_required"
+  | "step_up_required"
+  | "payment_required"
+  | "outside_window";
 
 export type Decision =
   | {
@@ -167,6 +180,8 @@ export function decide(
   principal: Principal,
   facts: Facts,
 ): Decision {
+  // A limited session reaches nothing stored about the patient: the second method comes first.
+  if (principal.limited === true) return deny("step_up_required", "forbidden");
   const rights: Rights = MATRIX[resource];
   const relations = relationsOf(principal, facts, rights.ownerRoles);
   let reason: DenyReason = relations.length === 0 ? "no_relation" : "not_permitted";
@@ -237,6 +252,7 @@ export const can = Object.fromEntries(
 export function assertAllowed(decision: Decision): Extract<Decision, { allow: true }> {
   if (decision.allow) return decision;
   if (decision.status === "not_found") throw errors.notFound();
+  if (decision.reason === "step_up_required") throw new AppError("step_up_required");
   if (decision.reason === "outside_window") throw new AppError("outside_join_window");
   throw errors.forbidden({ detail: "Payment is needed before you can join." });
 }

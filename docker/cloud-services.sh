@@ -15,7 +15,7 @@ psql -h /tmp -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='vinicure'
   psql -h /tmp -U postgres -c "CREATE DATABASE vinicure"
   psql -h /tmp -U postgres -d postgres -f "$(dirname "$0")/postgres-init/01-roles.sql"
 }
-redis-cli ping >/dev/null 2>&1 || redis-server --port 6379 --daemonize yes >/dev/null
+redis-cli ping >/dev/null 2>&1 || redis-server --port 6379 --save "" --dir /tmp --daemonize yes >/dev/null
 DATABASE_MIGRATION_URL=postgres://migrator:dev-only-change-me@localhost:5432/vinicure npx pnpm@12.8.1 db:migrate
 cat <<'ENV'
 

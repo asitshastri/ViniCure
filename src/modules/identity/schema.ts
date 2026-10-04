@@ -19,6 +19,16 @@ export const identityModels = {
   },
   session: {
     modelName: "auth_sessions",
+    // Our own columns (migration 0010). input:false: a client can never set them.
+    additionalFields: {
+      limited: { type: "boolean", required: false, defaultValue: false, input: false },
+      unlockMethod: {
+        type: "string",
+        required: false,
+        input: false,
+        fieldName: "unlock_method",
+      },
+    },
     fields: {
       userId: "user_id",
       expiresAt: "expires_at",

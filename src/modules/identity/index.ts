@@ -14,6 +14,11 @@ import { guardSignIn, type AfterResponse, type SignInGuardDeps } from "./sign-in
 import { invitationCrypto } from "./invitation-crypto";
 import { InvitationService } from "./invitations";
 import { createPhonePlugin } from "./phone";
+import { AdapterSecurityNotifier } from "./stepup/notifier";
+import { StepUpRepo } from "./stepup/repo";
+import { CodeAttempts } from "./stepup/attempts";
+import { StepUpService } from "./stepup/service";
+import { createStepUpHooks } from "./stepup/hooks";
 import { SessionService } from "./sessions";
 import { isStaff } from "./session-policy";
 import { createStaffPlugins, staffEmailAndPassword } from "./staff";
@@ -41,6 +46,24 @@ export function getAuth(): Auth {
     config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET
       ? { clientId: config.GOOGLE_CLIENT_ID, clientSecret: config.GOOGLE_CLIENT_SECRET }
       : undefined;
+  const stepUpHooks = createStepUpHooks({
+    service: getStepUp(),
+    production,
+    phoneOf: async (userId) => (await stepUpRepo().snapshot(userId))?.phoneNumber ?? null,
+    sessionOf: async (ctx) => {
+      // holder.auth is set by the time a request arrives.
+      const found = await holder.auth?.api.getSession({
+        headers: ctx.request?.headers ?? new Headers(),
+      });
+      if (!found) return null;
+      return {
+        id: found.session.id,
+        userId: found.user.id,
+        createdAt: new Date(found.session.createdAt),
+        limited: (found.session as { limited?: boolean }).limited === true,
+      };
+    },
+  });
   holder.auth = createAuth({
     database: database.pool,
     secret: config.AUTH_SECRET ?? DEV_SECRET,
@@ -53,6 +76,7 @@ export function getAuth(): Auth {
     socialProviders: googleProviders(google),
     extraAllowedPaths: google ? GOOGLE_AUTH_PATHS : new Set<string>(),
     onSocialUserCreated: (userId) => repo.grantPatientRole(userId),
+    stepUp: stepUpHooks,
     sendPasswordReset: async ({ to, token }) => {
       await getEmailProvider().send({
         to,
@@ -71,7 +95,10 @@ export function getAuth(): Auth {
         // Resolved at send time so a missing real provider fails the send, not the whole auth route.
         sms: { sendTemplate: (input) => getSmsProvider().sendTemplate(input) },
         allowedCountryCodes: config.ALLOWED_PHONE_COUNTRY_CODES,
-        onVerified: (userId) => repo.recordPhoneVerified(userId),
+        onVerified: async (userId, ctx) => {
+          await repo.recordPhoneVerified(userId);
+          await stepUpHooks.onPhoneVerified(userId, ctx);
+        },
       }),
     ],
   });
@@ -143,6 +170,60 @@ export function guardAuthRequest(request: Request): Promise<void> {
   return guardOtpRequest(request, getOtpGuardDeps());
 }
 
+function stepUpRepo(): StepUpRepo {
+  return new StepUpRepo(queryable(getDatabase()));
+}
+
+const stepUpHolder = globalSingleton("step-up", () => ({
+  service: undefined as StepUpService | undefined,
+}));
+
+/** The phone-recycling defence (P2-18): risk, devices, recovery codes, "not me". */
+export function getStepUp(): StepUpService {
+  if (stepUpHolder.service) return stepUpHolder.service;
+  const config = getConfig();
+  stepUpHolder.service = new StepUpService({
+    repo: stepUpRepo(),
+    // Providers are resolved when a notice is sent, so a missing real one fails the notice only.
+    notifier: new AdapterSecurityNotifier(
+      { send: (input) => getEmailProvider().send(input) },
+      { sendTemplate: (input) => getSmsProvider().sendTemplate(input) },
+      (what) => logger.error({ event: "security_notice_failed", what }),
+    ),
+    secret: config.AUTH_SECRET ?? DEV_SECRET,
+    appUrl: config.APP_URL,
+  });
+  return stepUpHolder.service;
+}
+
+/** Guess limiter for recovery codes. */
+export function getCodeAttempts(): CodeAttempts {
+  const config = getConfig();
+  return new CodeAttempts(getCache(), config.APP_ENV, config.AUTH_SECRET ?? DEV_SECRET);
+}
+
+export { deviceCookieName } from "./stepup/hooks";
+export { hashDeviceToken } from "./stepup/service";
+
+/**
+ * The number a clinical notice or a document link may be sent to, or null when it must not be
+ * used: no number, a number not verified, or one not proven for 180 days (D-019 rule 5).
+ * Every sender of patient notices (P7, P8) asks here first.
+ */
+export function deliverablePhone(userId: string): Promise<string | null> {
+  return stepUpRepo().deliverablePhone(userId);
+}
+
+export function listTrustedDevices(userId: string) {
+  return stepUpRepo().listDevices(userId);
+}
+export function revokeTrustedDevice(userId: string, id: string) {
+  return stepUpRepo().revokeDevice(userId, id);
+}
+export function unusedRecoveryCodes(userId: string) {
+  return stepUpRepo().unusedRecoveryCodes(userId);
+}
+
 function getRepo(): IdentityRepo {
   return new IdentityRepo(queryable(getDatabase()));
 }
@@ -166,6 +247,7 @@ export async function actorFromHeaders(headers: Headers): Promise<Actor | null> 
     roles: state.roles,
     sessionId: found.session.id,
     displayName: found.user.name,
+    limited: (found.session as { limited?: boolean }).limited === true,
     lastSignInAt: new Date(found.session.createdAt),
   };
 }
@@ -208,4 +290,5 @@ export function resetAuthForTest(): void {
   guardHolder.deps = undefined;
   signInHolder.deps = undefined;
   invitationHolder.service = undefined;
+  stepUpHolder.service = undefined;
 }

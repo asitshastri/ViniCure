@@ -13,6 +13,7 @@ export type RouteEntry = {
   roleDenied: "forbidden" | "not_found";
   rateLimit: RateLimitTier;
   freshLogin: boolean;
+  fullSession: boolean;
   idempotent: boolean;
   audited: boolean;
   hasBody: boolean;

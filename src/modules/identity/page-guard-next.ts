@@ -12,7 +12,7 @@ import { guardOutcome } from "./page-guard";
  */
 export async function requireRole(
   allowed: readonly Role[],
-): Promise<{ displayName: string | null }> {
+): Promise<{ displayName: string | null; limited: boolean }> {
   const config = getConfig();
   const mock = config.UI_MOCK_SESSION && config.NODE_ENV !== "production";
   const actor = mock ? null : await actorFromHeaders(await headers());
@@ -20,5 +20,5 @@ export async function requireRole(
   if (outcome === "login") redirect("/login");
   if (outcome === "not_found") notFound();
   // The name on the account, so the shell greets the real person (null in the mock preview).
-  return { displayName: actor?.displayName ?? null };
+  return { displayName: actor?.displayName ?? null, limited: actor?.limited === true };
 }

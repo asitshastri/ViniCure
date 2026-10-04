@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { RecoveryCodesPanel } from "@/components/profile/recovery-codes";
+import { TrustedDevicesPanel } from "@/components/profile/trusted-devices";
 import { SignInMethodsPanel } from "@/components/profile/sign-in-methods";
 import { SectionCard } from "@/components/profile/section-card";
 import { ConsentPanel, DataPanel, SessionsPanel } from "@/components/profile/settings-panels";
@@ -28,6 +30,20 @@ export default function SettingsPage() {
           description="Your mobile number, and Google if you add it."
         >
           <SignInMethodsPanel />
+        </SectionCard>
+        <SectionCard
+          id="recovery"
+          title="Recovery codes"
+          description="Ten single-use codes for the day you sign in on a new device and need to confirm it is you."
+        >
+          <RecoveryCodesPanel />
+        </SectionCard>
+        <SectionCard
+          id="devices"
+          title="Remembered devices"
+          description="Devices where you confirmed it is you stay trusted for 30 days."
+        >
+          <TrustedDevicesPanel />
         </SectionCard>
         <SectionCard
           id="sessions"

@@ -270,6 +270,12 @@ Auth column: `public`, `session` (any signed-in user), `patient`, `doctor`, `sta
 | GET, POST | `/api/v1/patients` | patient | List and create family profiles |
 | GET, PATCH, DELETE | `/api/v1/patients/:id` | patient, owner | Delete is a soft delete |
 | GET, DELETE | `/api/v1/sessions`, `/api/v1/sessions/:id` | session | Own sessions only |
+| GET | `/api/v1/me`, `/api/v1/me/sign-in-methods` | session | Who am I (id, roles, limited); which sign-in methods the account has |
+| POST | `/api/v1/me/step-up/recovery-code` | patient (limited allowed) | Unlock a limited session with a recovery code. 5 wrong codes lock guessing for 15 minutes |
+| GET, POST | `/api/v1/me/recovery-codes` | patient, full session | Count of unused codes; make a new set of ten (fresh login) |
+| GET, DELETE | `/api/v1/me/devices`, `/api/v1/me/devices/:id` | patient, full session | Remembered devices |
+| POST | `/api/v1/security/not-me` | public (token) | The link from a new-device notice |
+| GET, POST | `/api/v1/data-requests` | patient, full session, fresh login for POST | Ask for an export or for deletion |
 | POST | `/api/v1/admin/invitations` | admin | Invite doctor or staff |
 | POST | `/api/v1/invitations/:token/enrol` | public (token) | Show the authenticator address and backup codes (step 1) |
 | POST | `/api/v1/invitations/:token/accept` | public (token) | Set name and password, confirm the first code, create the account (step 2) |

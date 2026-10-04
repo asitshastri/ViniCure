@@ -1,5 +1,5 @@
 import { loadConfig } from "../src/lib/config/config";
-import { createPool } from "../src/lib/db/pool";
+import { configureDatabase } from "../src/lib/db/pool";
 import { logger } from "../src/lib/logging/logger";
 import { createBoss } from "../src/lib/queue/queue";
 import { handlers } from "../src/worker/handlers";
@@ -14,11 +14,10 @@ if (!config.DATABASE_URL) {
   process.exit(1);
 }
 
-const pool = createPool({
-  connectionString: config.DATABASE_URL,
-  max: config.DATABASE_POOL_MAX,
-  applicationName: "vinicure-worker",
-});
+// One process-wide pool: the health check, the job handlers and shutdown all use it.
+const database = configureDatabase(config, "vinicure-worker");
+if (!database) throw new Error("database is not configured");
+const pool = database.pool;
 const boss = createBoss({ connectionString: config.DATABASE_URL, role: "worker" });
 
 const worker = await startWorker({

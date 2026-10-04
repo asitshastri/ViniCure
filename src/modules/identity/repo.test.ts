@@ -25,19 +25,20 @@ async function addUser(db: Awaited<ReturnType<typeof createTestDb>>, phone: stri
 }
 
 describe("IdentityRepo.recordPhoneVerified", () => {
-  it("records the time and gives a new user the patient role, once", async () => {
+  it("gives a new user the patient role, once, and leaves the sign-in times to the step-up decision", async () => {
     const db = await createTestDb();
     const repo = new IdentityRepo(direct(db));
     const id = await addUser(db, "+919876543210");
     await repo.recordPhoneVerified(id);
     await repo.recordPhoneVerified(id);
     expect(await repo.rolesOf(id)).toEqual(["patient"]);
+    // The risk decision reads the previous times first, so this call must not overwrite them.
     const { rows } = await direct(db).query(
       `SELECT phone_verified_at, last_active_at FROM users WHERE id = $1`,
       [id],
     );
-    expect(rows[0]?.phone_verified_at).toBeInstanceOf(Date);
-    expect(rows[0]?.last_active_at).toBeInstanceOf(Date);
+    expect(rows[0]?.phone_verified_at).toBeNull();
+    expect(rows[0]?.last_active_at).toBeNull();
   });
 
   it("never adds the patient role to a user who already has a role (staff)", async () => {

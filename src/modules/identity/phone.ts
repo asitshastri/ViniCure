@@ -68,13 +68,16 @@ const BLOCKED_PATHS = new Set([
   "/phone-number/reset-password",
 ]);
 
+/** What the sign-in glue needs from the request (see stepup/hooks.ts HookCtx). */
+export type PhoneHookContext = import("./stepup/hooks").HookCtx;
+
 export type PhoneDeps = {
   sms: SmsProvider;
   allowedCountryCodes: readonly string[];
   /** True when the user holds a staff role. Staff never sign in by phone alone (P2-05). */
   isStaff: (userId: string) => Promise<boolean>;
   /** Called after a code is proven: record the time and give a new patient the patient role. */
-  onVerified: (userId: string) => Promise<void>;
+  onVerified: (userId: string, ctx: PhoneHookContext) => Promise<void>;
   /** Reports an SMS failure without the phone number or code. */
   onSmsFailure?: (kind: string) => void;
 };
@@ -102,13 +105,13 @@ export function createPhonePlugin(deps: PhoneDeps): BetterAuthPlugin {
         });
       }
     },
-    callbackOnVerification: async ({ user }) => {
+    callbackOnVerification: async ({ user }, ctx) => {
       // Runs before the session is created. A staff member proves a phone with a code only to
       // change a number, never to sign in: refuse, and no session is made.
       if (await deps.isStaff(user.id)) {
         throw new APIError("FORBIDDEN", { message: "Sign-in is not available for this account." });
       }
-      await deps.onVerified(user.id);
+      await deps.onVerified(user.id, ctx as unknown as PhoneHookContext);
     },
   });
 

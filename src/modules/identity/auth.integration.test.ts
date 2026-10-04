@@ -105,7 +105,7 @@ describe.skipIf(!url)("Better Auth on real Postgres", () => {
     expect(user.status).toBe("active");
     expect(user.email).toMatch(/@no-email\.invalid$/);
     expect(user.phone_number_verified).toBe(true);
-    expect(user.phone_verified_at).toBeInstanceOf(Date);
+    // The times are stamped by the step-up decision (see stepup/stepup.integration.test.ts).
     expect(await new IdentityRepo(queryable()).rolesOf(user.id)).toEqual(["patient"]);
 
     const session = (

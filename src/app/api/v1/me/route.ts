@@ -11,5 +11,5 @@ export const GET = withApi(
     rateLimit: "auth_read",
     doc: { summary: "The signed-in person's id and roles", tags: ["identity"] },
   },
-  ({ actor }) => ({ id: actor.userId, roles: [...actor.roles] }),
+  ({ actor }) => ({ id: actor.userId, roles: [...actor.roles], limited: actor.limited === true }),
 );

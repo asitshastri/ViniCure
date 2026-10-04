@@ -97,6 +97,17 @@ export const QUEUES = {
       cron: "0 1 1 * *",
     },
   },
+  // Daily: a phone number nobody has proven for 180 days stops receiving notices (P2-18, D-019).
+  "identity.phone_reverify": {
+    payload: z.strictObject({}),
+    policy: {
+      retryLimit: 3,
+      retryDelay: 300,
+      retryBackoff: true,
+      expireInSeconds: 600,
+      cron: "20 3 * * *",
+    },
+  },
   "crypto.reencrypt": {
     payload: z.strictObject({
       fromKeyId: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,31}$/),

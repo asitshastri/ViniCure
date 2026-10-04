@@ -89,6 +89,7 @@ function operationFor(route: RouteEntry): Json {
     "x-roles": route.roles,
     "x-audited": route.audited,
     "x-fresh-login": route.freshLogin,
+    "x-full-session": route.fullSession,
   };
   if (route.auth !== "public") operation.security = [{ sessionCookie: [] }];
   if (route.schemas.body) {

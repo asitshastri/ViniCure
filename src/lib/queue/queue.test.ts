@@ -42,7 +42,7 @@ afterAll(async () => {
 
 describe("registry", () => {
   it("gives every queue a strict ID-only payload, a retry policy and a dead-letter name", () => {
-    expect(QUEUE_NAMES.length).toBe(14);
+    expect(QUEUE_NAMES.length).toBe(15);
     for (const name of QUEUE_NAMES) {
       expect(deadLetterName(name)).toBe(`${name}.dlq`);
       expect(QUEUES[name].policy.expireInSeconds).toBeGreaterThan(0);

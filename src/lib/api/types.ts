@@ -13,6 +13,11 @@ export type Actor = {
   sessionId: string;
   /** The name on the account, for greeting the person. Never used for decisions. */
   displayName?: string;
+  /**
+   * True for a session that has not proven a second method after a risky phone sign-in
+   * (D-019). It can sign out and unlock itself, and nothing more.
+   */
+  limited?: boolean;
   /** When the person last signed in. Sensitive actions require this to be recent. */
   lastSignInAt?: Date;
 };
@@ -62,6 +67,11 @@ export type RouteConfig<
   rateLimit: RateLimitTier;
   /** Needs a sign-in within the last 15 minutes (sensitive actions). Older sessions get 403. */
   freshLogin?: boolean;
+  /**
+   * Refuses a limited session (403 step_up_required). Set it on every route that reads or
+   * changes what is stored about the patient.
+   */
+  fullSession?: boolean;
   body?: Body;
   query?: Query;
   params?: Params;

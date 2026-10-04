@@ -249,6 +249,38 @@ describe("relations and edge cases", () => {
   });
 });
 
+describe("limited sessions (D-019)", () => {
+  it("a limited principal is refused every cell of the matrix, owner included", () => {
+    for (const resource of Object.keys(MATRIX) as Resource[]) {
+      for (const action of ALL_ACTIONS(resource)) {
+        for (const name of Object.keys(who) as (keyof typeof who)[]) {
+          const decision = decide(
+            resource,
+            action,
+            { ...who[name], limited: true },
+            factsFor(name, { paid: true, inWindow: true, breakGlassActive: true }),
+          );
+          expect(decision, `${name} ${resource}.${action}`).toMatchObject({
+            allow: false,
+            status: "forbidden",
+            reason: "step_up_required",
+          });
+        }
+      }
+    }
+  });
+
+  it("the same owner is allowed again once the session is unlocked", () => {
+    expect(can.prescription.read({ ...who.owner, limited: false }, facts()).allow).toBe(true);
+  });
+
+  it("assertAllowed turns it into the step_up_required error", () => {
+    const attempt = () =>
+      assertAllowed(can.prescription.read({ ...who.owner, limited: true }, facts()));
+    expect(attempt).toThrowError(expect.objectContaining({ code: "step_up_required" }));
+  });
+});
+
 describe("assertAllowed", () => {
   it("returns an allowed decision, hides objects with 404, explains join refusals", () => {
     expect(assertAllowed(can.prescription.read(who.owner, facts())).allow).toBe(true);

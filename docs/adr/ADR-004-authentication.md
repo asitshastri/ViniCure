@@ -40,6 +40,23 @@ Better Auth 1.7.7 was walked against its source and our tests, not only its docu
 | Brute force on sign-in | 30 attempts per 15 minutes per address; 5 wrong passwords lock an account's password sign-in for 15 minutes, doubling on repeats within 24 hours (cap 24 hours); the same counting for emails without an account; a correct password clears the count; fail closed if the cache is down. The authenticator step has its own lock-out (5 wrong codes, 15 minutes) | `sign-in-guard.ts`, `sign-in-guard.test.ts`, Playwright |
 | Password change | Ends every other session whatever the client asks; wrong current passwords are counted like wrong sign-ins; a reset (P2-16) also ends all sessions (`revokeSessionsOnPasswordReset`) | `staff.test.ts` |
 
+## Phone recycling defence (P2-18, decision D-019)
+
+Built as described in `docs/backend-architecture.md` section 3, with these concrete choices:
+
+| Rule | What the code does |
+|---|---|
+| High risk (any one) | new device (no live trusted-device cookie for this account), 90 days without a sign-in, number last proven 180 days ago or more, number changed in the last 30 days, a "not me" flag not yet cleared. Values are read before the sign-in updates them. A brand-new account is never high risk |
+| Limited session | `auth_sessions.limited`. The policy module refuses every cell of the matrix to a limited principal (owner included), `withApi` refuses routes marked `fullSession` with `step_up_required`, and the patient pages show only a "Confirm it is you" card. A limited session can sign out, list its sessions, and unlock itself; it cannot read or change profiles, appointments, records, documents, payments or data requests |
+| Unlocking | Google (an account linked earlier: a Google sign-in is a full session) or a recovery code. A limited session can NOT add Google or make recovery codes, because a recycled number could add its own. Five wrong recovery codes lock guessing for 15 minutes |
+| Recovery codes | Ten codes of 10 characters (about 50 bits), shown once, stored as an HMAC keyed with `AUTH_SECRET`, single use (one winner under a race), a new set ends the old one; making codes needs a full session and a sign-in in the last 15 minutes. Spending one tells the patient (email if verified, SMS to the number) |
+| Trusted devices | A random token in an HttpOnly cookie (`__Host-vc_device`), only its SHA-256 stored. Set for a brand-new account, after Google, after a recovery code. 30 days, renewed by each calm sign-in on that browser. Listed and revocable in settings. A cookie from another account does not count |
+| New-device notice | A sign-in from an unknown device records a "not me" alert with a one-time link (hash stored, 7 days) and mails the patient if a verified email exists. Opening the link ends every session, forgets every device and raises the flag (the next phone sign-in is limited until a second method is proven) |
+| Number change | Needs a full session and a sign-in in the last 15 minutes, a code sent to the NEW number, and a number that no other account has. Then: the old number is detached (it belongs to nobody, so a new owner gets a new, empty account), every other session ends, every other device is forgotten, `phone_changed_at` is set (so the next sign-ins from other browsers are limited for 30 days) and the old number is texted |
+| Re-verification | A daily worker job marks numbers not proven for 180 days unverified. `deliverablePhone(userId)` is the gate for every clinical notice and document link: no number, unverified, or older than 180 days gives null |
+
+What this does NOT solve, on purpose (decisions for the human, see TODO Questions): a patient who changes phone and has no second method cannot open their records on the new device until support checks who they are, and the "emailed code to a verified email" unlock is not built because patients cannot add and verify an email yet (TODO DISCOVERED).
+
 ## Threat notes
 
 | Threat | Control |

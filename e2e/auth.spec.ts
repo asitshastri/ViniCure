@@ -1,10 +1,12 @@
 import { expect, test } from "@playwright/test";
 import {
   PASSWORD,
+  resetRateLimits,
   cleanup,
   closeDb,
   codeNow,
   createInvitation,
+  createNotMeToken,
   createResetToken,
   createStaff,
   db,
@@ -15,6 +17,10 @@ import {
   sessionCount,
   typeCode,
 } from "./helpers";
+
+test.beforeEach(async () => {
+  await resetRateLimits();
+});
 
 test.afterAll(async () => {
   await cleanup();
@@ -422,5 +428,101 @@ test.describe("Google sign-in button", () => {
     await expect(page.getByText(/mobile number and code/i)).toBeVisible();
     await expect(page.getByText("Verified")).toBeVisible();
     await expect(page.getByRole("button", { name: /add google/i })).toBeVisible();
+  });
+});
+
+test.describe("phone recycling defence", () => {
+  async function signInAs(page: import("@playwright/test").Page, phone: string) {
+    await page.goto("/login");
+    await page.getByLabel(/mobile number/i).fill(phone);
+    await page.getByRole("button", { name: /send/i }).click();
+    await expect(page.getByLabel("Digit 1 of 6")).toBeVisible();
+    await typeCode(page, await otpFor(phone));
+    await page.waitForURL(/\/patient\//); // signed in (a limited session lands here too)
+  }
+
+  test("a new device is limited until a recovery code is used, once", async ({ page, browser }) => {
+    // The owner's own browser: a new account, so full access and a remembered device.
+    const phone = newPhone();
+    await signInAs(page, phone);
+    await expect(page).toHaveURL(/\/patient\/dashboard/);
+    await expect(page.getByRole("heading", { name: /confirm it is you/i })).toHaveCount(0);
+
+    // They make recovery codes in settings.
+    await page.goto("/patient/settings");
+    await page.getByRole("button", { name: /make recovery codes/i }).click();
+    await expect(page.getByTestId("recovery-codes").locator("li")).toHaveCount(10);
+    const codes = await page.getByTestId("recovery-codes").locator("li").allTextContents();
+
+    // Someone with the same number, on another browser: limited.
+    const other = await browser.newContext();
+    const stranger = await other.newPage();
+    await signInAs(stranger, phone);
+    await expect(stranger).toHaveURL(/\/patient\/dashboard/);
+    await expect(stranger.getByRole("heading", { name: /confirm it is you/i })).toBeVisible();
+    // None of the patient's data is offered, and the API refuses too.
+    const api = await other.request.get("/api/v1/patients");
+    expect(api.status()).toBe(403);
+    expect((await api.json()).code).toBe("step_up_required");
+    expect((await other.request.get("/api/v1/data-requests")).status()).toBe(403);
+    await stranger.goto("/patient/settings");
+    await expect(stranger.getByRole("heading", { name: /confirm it is you/i })).toBeVisible();
+
+    // A wrong code is refused.
+    await stranger.getByLabel(/recovery code/i).fill("AAAAA-BBBBB");
+    await stranger.getByRole("button", { name: /confirm with recovery code/i }).click();
+    await expect(stranger.getByText(/not valid or was already used/i)).toBeVisible();
+
+    // A right code opens it, once.
+    await stranger.getByLabel(/recovery code/i).fill(codes[0] as string);
+    await stranger.getByRole("button", { name: /confirm with recovery code/i }).click();
+    await expect(stranger.getByRole("heading", { name: /confirm it is you/i })).toHaveCount(0);
+    expect((await other.request.get("/api/v1/patients")).status()).toBe(200);
+    await other.close();
+
+    // The same code from a third browser fails.
+    const third = await browser.newContext();
+    const thirdPage = await third.newPage();
+    await signInAs(thirdPage, phone);
+    await thirdPage.getByLabel(/recovery code/i).fill(codes[0] as string);
+    await thirdPage.getByRole("button", { name: /confirm with recovery code/i }).click();
+    await expect(thirdPage.getByText(/not valid or was already used/i)).toBeVisible();
+    await third.close();
+  });
+
+  test("remembered devices are listed and can be forgotten", async ({ page }) => {
+    await signInAs(page, newPhone());
+    await page.goto("/patient/settings");
+    await expect(page.getByText(/Remembered until/i)).toBeVisible();
+    await page.getByRole("button", { name: /^forget /i }).click();
+    await expect(page.getByText(/No devices are remembered/i)).toBeVisible();
+  });
+
+  test("'this was not me' signs everything out and asks for proof next time", async ({
+    page,
+    context,
+  }) => {
+    const phone = newPhone();
+    await signInAs(page, phone);
+    const { rows } = await db().query("SELECT id FROM users WHERE phone_number = $1", [
+      `+91${phone}`,
+    ]);
+    const token = await createNotMeToken(rows[0].id);
+    const reporter = await context.browser()!.newContext();
+    const reportPage = await reporter.newPage();
+    await reportPage.goto(`/not-me?token=${token}`);
+    await reportPage.getByRole("button", { name: /this was not me/i }).click();
+    await expect(reportPage.getByText(/signed out everywhere/i)).toBeVisible();
+    expect(await sessionCount(rows[0].id)).toBe(0);
+    await page.goto("/patient/dashboard");
+    await expect(page).toHaveURL(/\/login/);
+    // The same link a second time.
+    await reportPage.goto(`/not-me?token=${token}`);
+    await reportPage.getByRole("button", { name: /this was not me/i }).click();
+    await expect(reportPage.getByText(/link is not valid/i)).toBeVisible();
+    await reporter.close();
+    // Signing in again, even on the old browser, is limited.
+    await signInAs(page, phone);
+    await expect(page.getByRole("heading", { name: /confirm it is you/i })).toBeVisible();
   });
 });

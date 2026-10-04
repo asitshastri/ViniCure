@@ -50,14 +50,12 @@ export class IdentityRepo {
   }
 
   /**
-   * A phone code was just proven: record when, and give a user who has no role yet the patient
-   * role. Staff always hold a role, so this never adds the patient role to them.
+   * A phone code was just proven: give a user who has no role yet the patient role. The times
+   * (last sign-in, number last proven) are stamped by the step-up decision, which first reads
+   * the previous values to judge the risk of this sign-in. Staff always hold a role, so this
+   * never adds the patient role to them.
    */
   async recordPhoneVerified(userId: string): Promise<void> {
-    await this.db.query(
-      `UPDATE users SET phone_verified_at = now(), last_active_at = now() WHERE id = $1`,
-      [userId],
-    );
     await this.grantPatientRole(userId);
   }
 

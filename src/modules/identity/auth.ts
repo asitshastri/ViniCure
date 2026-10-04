@@ -12,6 +12,7 @@ import {
 } from "./session-policy";
 import { PASSWORD_PROBLEM_TEXT, passwordProblem } from "./password";
 import { sessionRefusal, type AccountState } from "./staff";
+import type { HookCtx, StepUpHooks } from "./stepup/hooks";
 import { UPDATE_USER_FIELDS, hashIdentifier, isAllowedAuthPath, stripTokens } from "./surface";
 
 // Better Auth set-up (decision D-003, ADR-004). Only this module imports better-auth: the rest of
@@ -44,6 +45,8 @@ export type IdentityDeps = {
   onSideEffectFailure?: (what: string) => void;
   /** A person was just created through a social sign-in (Google): give them the patient role. */
   onSocialUserCreated?: (userId: string) => Promise<void>;
+  /** Phone-recycling defence (P2-18): limited sessions, trusted devices, number changes. */
+  stepUp?: StepUpHooks;
   /** Extra Better Auth plugins and sign-in methods, added by later tasks (P2-03, P2-05, P2-17). */
   plugins?: BetterAuthOptions["plugins"];
   emailAndPassword?: BetterAuthOptions["emailAndPassword"];
@@ -117,6 +120,13 @@ async function requireFreshPatientSession(
   }
   if (isStaff(await deps.rolesOf(found.user.id))) {
     throw new APIError("FORBIDDEN", { message: "Not available for this account." });
+  }
+  // A limited session cannot add a method: it could be a recycled number adding its own Google.
+  if ((found.session as { limited?: boolean }).limited === true) {
+    throw new APIError("FORBIDDEN", {
+      message: "Confirm it is you first.",
+      code: "STEP_UP_REQUIRED",
+    });
   }
 }
 
@@ -231,6 +241,8 @@ export function buildAuthOptions(deps: IdentityDeps): BetterAuthOptions {
         if (origin ? !ctx.context.trustedOrigins.includes(origin) : crossSite) {
           throw new APIError("FORBIDDEN", { message: "Invalid origin" });
         }
+        // Changing the number needs a full, fresh session; the old number is noted first.
+        await deps.stepUp?.beforeNumberChange(ctx as unknown as HookCtx);
         // Adding Google to an account: signed in, signed in recently, not staff.
         if (ctx.path === "/link-social") await requireFreshPatientSession(ctx, deps);
         // New passwords must meet the staff policy, however they are set.
@@ -251,6 +263,8 @@ export function buildAuthOptions(deps: IdentityDeps): BetterAuthOptions {
         const returned = ctx.context.returned;
         if (!returned || typeof returned !== "object") return;
         if (returned instanceof Response || returned instanceof Error) return;
+        // A number change was just proven: end the other sessions and tell the old number.
+        await deps.stepUp?.afterNumberChange(ctx as unknown as HookCtx);
         const clean = stripTokens(returned);
         if (clean !== returned) return ctx.json(clean);
       }),
@@ -324,9 +338,14 @@ export function buildAuthOptions(deps: IdentityDeps): BetterAuthOptions {
             }
             const roles = state.roles;
             const now = new Date();
+            // A phone-only sign-in that looks risky starts limited (P2-18).
+            const extras = deps.stepUp?.sessionBefore((ctx as unknown as HookCtx) ?? null) ?? {};
             return {
-              data: { ...session, expiresAt: sessionExpiry({ roles, createdAt: now }) },
+              data: { ...session, ...extras, expiresAt: sessionExpiry({ roles, createdAt: now }) },
             };
+          },
+          after: async (session, ctx) => {
+            await deps.stepUp?.sessionAfter(session, (ctx as unknown as HookCtx) ?? null);
           },
         },
       },

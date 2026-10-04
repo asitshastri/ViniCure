@@ -206,6 +206,7 @@ export function withApi<
     roleDenied: config.roleDenied ?? "forbidden",
     rateLimit: config.rateLimit,
     freshLogin: config.freshLogin ?? false,
+    fullSession: config.fullSession ?? false,
     idempotent: config.idempotent ?? false,
     audited: config.audit !== undefined,
     hasBody: config.body !== undefined,
@@ -239,6 +240,8 @@ export function withApi<
         logger = requestLogger({ requestId, route: config.path, method: config.method, userId });
         // 3. Role.
         checkRoles(actor, config);
+        // A limited session (risky phone sign-in, second method not yet proven) gets no data.
+        if (config.fullSession && actor.limited === true) throw new AppError("step_up_required");
         // Sensitive actions need a recent sign-in. No sign-in time on record counts as stale.
         if (config.freshLogin && !(actor.lastSignInAt && isFreshLogin(actor.lastSignInAt))) {
           throw new AppError("fresh_login_required");

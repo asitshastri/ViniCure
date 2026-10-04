@@ -29,6 +29,11 @@ export const ERROR_CODES = {
     title: "Sign in again",
     detail: "For your safety, sign in again to do this.",
   },
+  step_up_required: {
+    status: 403,
+    title: "Confirm it is you",
+    detail: "Confirm it is you with a recovery code or Google to open this.",
+  },
   consent_required: {
     status: 403,
     title: "Consent required",

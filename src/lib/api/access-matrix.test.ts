@@ -103,6 +103,7 @@ describe("the matrix covers exactly the routes that exist", () => {
           rateLimit: route.rateLimit,
           audited: route.audited,
           freshLogin: route.freshLogin,
+          fullSession: route.fullSession,
         },
         key(route),
       ).toEqual({
@@ -112,6 +113,7 @@ describe("the matrix covers exactly the routes that exist", () => {
         rateLimit: want.rateLimit,
         audited: want.audited,
         freshLogin: want.freshLogin,
+        fullSession: want.fullSession,
       });
     }
   });
@@ -207,6 +209,30 @@ describe("the running routes enforce the matrix", () => {
         } else {
           expect(res.status, key(route)).not.toBe(403);
         }
+      }
+    }
+  });
+
+  it("a limited session is refused on routes that read patient data, and only on those", async () => {
+    for (const route of routes) {
+      const entry = ACCESS_MATRIX[key(route) as keyof typeof ACCESS_MATRIX];
+      if (!entry || entry.auth === "public") continue;
+      const role = entry.roles[0] ?? "patient";
+      current = { actor: { ...actorFor(role), limited: true } };
+      const res = await call(route);
+      if (entry.fullSession) {
+        expect(res.status, key(route)).toBe(403);
+        expect((await res.json()).code, key(route)).toBe("step_up_required");
+      } else {
+        expect(
+          (
+            await res
+              .clone()
+              .json()
+              .catch(() => ({}))
+          ).code,
+          key(route),
+        ).not.toBe("step_up_required");
       }
     }
   });

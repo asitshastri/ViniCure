@@ -164,3 +164,28 @@ export async function createResetToken(userId: string): Promise<string> {
   });
   return token;
 }
+
+/** A "this was not me" link token for this person, as a new-device notice would carry. */
+export async function createNotMeToken(userId: string): Promise<string> {
+  const token = `nm${randomBytes(18).toString("hex")}`;
+  const { createHash } = await import("node:crypto");
+  await db().query(
+    "INSERT INTO signin_alerts (id, user_id, token_hash, expires_at) VALUES (gen_random_uuid(), $1, $2, now() + interval '1 hour')",
+    [userId, createHash("sha256").update(token).digest("hex")],
+  );
+  return token;
+}
+
+/**
+ * Clears the rate-limit and SMS-budget counters in Valkey. The server sees every test as one
+ * address, and one address may ask for only 10 sign-in codes an hour (a rule we want to keep),
+ * so each test starts from zero.
+ */
+export async function resetRateLimits(): Promise<void> {
+  const { Redis } = await import("ioredis");
+  const redis = new Redis(E2E_ENV.VALKEY_URL, { lazyConnect: true });
+  await redis.connect();
+  const keys = await redis.keys("vc:local:*");
+  if (keys.length > 0) await redis.del(...keys);
+  await redis.quit();
+}
