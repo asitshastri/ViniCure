@@ -2,10 +2,23 @@ import { getConfig } from "../config/config";
 import { globalSingleton } from "../singleton";
 import { getStorage } from "../storage";
 import { ClamAvScanner } from "./clamav";
-import { FakeEmailProvider, FakeFileScanner, FakePaymentProvider, FakeSmsProvider } from "./fakes";
+import { AgoraProvider } from "./agora";
+import {
+  FakeEmailProvider,
+  FakeFileScanner,
+  FakePaymentProvider,
+  FakeSmsProvider,
+  FakeVideoProvider,
+} from "./fakes";
 import { RazorpayProvider } from "./razorpay";
 import { protect } from "./resilience";
-import type { EmailProvider, FileScanner, PaymentProvider, SmsProvider } from "./types";
+import type {
+  EmailProvider,
+  FileScanner,
+  PaymentProvider,
+  SmsProvider,
+  VideoProvider,
+} from "./types";
 
 // Picks the adapter implementation for this process. Only fakes exist for SMS and email until the real providers
 // are built (MSG91 and SES in P8); the scanner is real ClamAV when CLAMAV_HOST is set. A fake is never used in production: the process refuses to send.
@@ -15,6 +28,7 @@ const holder = globalSingleton("adapters", () => ({
   email: undefined as EmailProvider | undefined,
   scanner: undefined as FileScanner | undefined,
   payments: undefined as PaymentProvider | undefined,
+  video: undefined as VideoProvider | undefined,
 }));
 
 function refuseFakeInProduction(what: string): void {
@@ -96,4 +110,28 @@ export function setFileScannerForTest(scanner: FileScanner | undefined): void {
 }
 export function setPaymentProviderForTest(provider: PaymentProvider | undefined): void {
   holder.payments = provider;
+}
+
+/**
+ * Agora when its app id and certificate are set; a fake only outside production. Tokens are built
+ * on our server, so there is no outside call to protect.
+ */
+export function getVideoProvider(): VideoProvider {
+  if (holder.video) return holder.video;
+  const config = getConfig();
+  if (config.AGORA_APP_ID && config.AGORA_APP_CERTIFICATE) {
+    holder.video = new AgoraProvider({
+      appId: config.AGORA_APP_ID,
+      appCertificate: config.AGORA_APP_CERTIFICATE,
+    });
+    return holder.video;
+  }
+  refuseFakeInProduction("video (set AGORA_APP_ID and AGORA_APP_CERTIFICATE)");
+  holder.video = new FakeVideoProvider();
+  return holder.video;
+}
+
+/** Replaces the video provider (tests). Pass undefined to reset. */
+export function setVideoProviderForTest(provider: VideoProvider | undefined): void {
+  holder.video = provider;
 }

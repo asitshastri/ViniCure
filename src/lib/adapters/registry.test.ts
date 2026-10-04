@@ -45,3 +45,26 @@ describe("getPaymentProvider", () => {
     expect(provider.constructor.name).toBe("RazorpayProvider");
   });
 });
+
+describe("getVideoProvider", () => {
+  it("is a fake in development and test, and refuses to be one in production", async () => {
+    const dev = await registryWith({ NODE_ENV: "development" });
+    expect(dev.getVideoProvider().constructor.name).toBe("FakeVideoProvider");
+    const prod = await registryWith({ NODE_ENV: "production" });
+    expect(() => prod.getVideoProvider()).toThrow(/No real video/);
+    const partial = await registryWith({
+      NODE_ENV: "production",
+      AGORA_APP_ID: "0123456789abcdef0123456789abcdef",
+    });
+    expect(() => partial.getVideoProvider()).toThrow(/No real video/);
+  });
+
+  it("uses Agora when the app id and certificate are set", async () => {
+    const { getVideoProvider } = await registryWith({
+      NODE_ENV: "production",
+      AGORA_APP_ID: "0123456789abcdef0123456789abcdef",
+      AGORA_APP_CERTIFICATE: "fedcba9876543210fedcba9876543210",
+    });
+    expect(getVideoProvider().constructor.name).toBe("AgoraProvider");
+  });
+});
