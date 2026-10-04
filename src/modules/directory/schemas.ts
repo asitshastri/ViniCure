@@ -170,6 +170,9 @@ export type PublicDoctorView = {
   languages: string[];
   specialty: { id: number; name: string } | null;
   consultationFeePaise: number;
+  /** Average of published reviews, 1 to 5, or null before the first one. */
+  ratingAvg: number | null;
+  ratingCount: number;
   /** Has working hours left today (India time) and is not on leave for the whole day. */
   availableToday: boolean;
 };

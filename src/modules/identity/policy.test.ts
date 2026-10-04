@@ -51,6 +51,7 @@ const EXPECT: Record<Resource, Record<string, (keyof typeof who)[]>> = {
     read: ["owner", "assignedDoctor", "admin", "superAdmin", "support"],
     cancel: ["owner", "assignedDoctor", "admin", "superAdmin"],
     reschedule: ["owner"],
+    review: ["owner"],
     updateStatus: ["assignedDoctor"],
   },
   consultation: { join: ["assignedDoctor"] }, // owner needs paid and in window: tested below
@@ -65,6 +66,7 @@ const EXPECT: Record<Resource, Record<string, (keyof typeof who)[]>> = {
   },
   // The owner column is empty here because the test's owner is a patient; a doctor owner is tested in the directory service tests.
   doctorProfile: { read: ["admin", "superAdmin"], write: [], review: ["admin", "superAdmin"] },
+  review: { read: ["admin", "superAdmin"], moderate: ["admin", "superAdmin"] },
   kycDocument: { upload: [], read: ["admin", "superAdmin"], review: ["admin", "superAdmin"] },
   auditLog: { read: ["admin", "superAdmin", "support"] },
   phiAccessLog: { read: ["admin", "superAdmin", "support"] },

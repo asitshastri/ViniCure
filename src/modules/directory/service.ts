@@ -167,7 +167,7 @@ export function decodePublicCursor(cursor: string, sort: string): { key: string;
 }
 
 /** Copies the allow-listed fields only, so the page-cursor key never reaches a visitor. */
-const toPublicView = (row: PublicDoctorView): PublicDoctorView => ({
+export const toPublicView = (row: PublicDoctorView): PublicDoctorView => ({
   id: row.id,
   displayName: row.displayName,
   registrationNo: row.registrationNo,
@@ -176,6 +176,8 @@ const toPublicView = (row: PublicDoctorView): PublicDoctorView => ({
   languages: row.languages,
   specialty: row.specialty,
   consultationFeePaise: row.consultationFeePaise,
+  ratingAvg: row.ratingAvg,
+  ratingCount: row.ratingCount,
   availableToday: row.availableToday,
 });
 

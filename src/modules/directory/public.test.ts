@@ -161,6 +161,8 @@ describe("who is listed", () => {
       "id",
       "languages",
       "qualifications",
+      "ratingAvg",
+      "ratingCount",
       "registrationCouncil",
       "registrationNo",
       "specialty",

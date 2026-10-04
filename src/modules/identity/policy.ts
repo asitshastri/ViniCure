@@ -85,7 +85,7 @@ export const MATRIX = {
     supportBreakGlass: ["read"],
   },
   appointment: {
-    owner: ["read", "cancel", "reschedule"],
+    owner: ["read", "cancel", "reschedule", "review"],
     assignedDoctor: ["read", "updateStatus", "cancel"],
     admin: ["read", "cancel"],
     support: ["read"],
@@ -129,6 +129,10 @@ export const MATRIX = {
     owner: ["read", "write"],
     ownerRoles: ["doctor"],
     admin: ["read", "review"],
+  },
+  review: {
+    // Moderation of patient reviews before they are public.
+    admin: ["read", "moderate"],
   },
   kycDocument: {
     owner: ["upload"],

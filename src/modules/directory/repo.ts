@@ -123,7 +123,7 @@ const AVAILABLE_TODAY_SQL =
 
 const PUBLIC_COLUMNS =
   "d.id, d.display_name, d.registration_no, d.registration_council, d.qualifications, d.languages," +
-  " d.consultation_fee_paise, sp.id AS specialty_id, sp.name AS specialty_name," +
+  " d.consultation_fee_paise, d.rating_avg, d.rating_count, sp.id AS specialty_id, sp.name AS specialty_name," +
   " " +
   AVAILABLE_TODAY_SQL +
   " AS available_today";
@@ -170,6 +170,9 @@ function toPublic(row: Record<string, unknown>): PublicDoctorRow {
         ? null
         : { id: Number(row.specialty_id), name: String(row.specialty_name) },
     consultationFeePaise: Number(row.consultation_fee_paise),
+    ratingAvg:
+      row.rating_avg === null || row.rating_avg === undefined ? null : Number(row.rating_avg),
+    ratingCount: Number(row.rating_count ?? 0),
     availableToday: row.available_today === true,
     sortKey: String(row.sort_key ?? ""),
   };
@@ -450,6 +453,17 @@ export class DirectoryRepo {
       name: String(r.name),
       doctorCount: Number(r.doctor_count),
     }));
+  }
+
+  /** Listed doctors among these ids, in the order given. Used for a patient's saved doctors. */
+  async findPublicMany(ids: string[]): Promise<PublicDoctorRow[]> {
+    if (ids.length === 0) return [];
+    const { rows } = await this.db.query(
+      "SELECT " + PUBLIC_COLUMNS + PUBLIC_FROM + " WHERE d.id = ANY($1::uuid[]) AND " + LISTED,
+      [ids],
+    );
+    const byId = new Map(rows.map((r) => [String(r.id), toPublic(r)]));
+    return ids.flatMap((id) => (byId.has(id) ? [byId.get(id) as PublicDoctorRow] : []));
   }
 
   async findPublic(id: string): Promise<PublicDoctorRow | null> {
