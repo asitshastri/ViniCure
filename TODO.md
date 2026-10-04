@@ -102,8 +102,6 @@ Packages and libraries (npm dependencies) are not questions: install them when n
 
 | Added | Task | Question or need | Why it matters | What Claude did meanwhile |
 |---|---|---|---|---|
-| 2026-10-05 | P6-10 | **Provider pilot.** I cannot run this: it needs people with real phones on Jio, Airtel and others, an Agora project, and an account with one alternative. ADR-008 has the whole protocol (scenarios, what to measure per call, what to ask each vendor, the decision rule, an empty result table). Please decide: (1) which alternative to test (the architecture names 100ms and LiveKit; LiveKit can be self-hosted), (2) who runs it and when, (3) whether to run it before paying for Agora Cloud Recording (see the Agora question above), since a different provider would change that too. | A provider switch is cheaper before launch than after. | Task marked blocked; protocol and table written; the `VideoProvider` interface keeps a switch cheap. |
-| 2026-10-05 | P6-11 | **Media encryption.** I recommend Agora's built-in channel encryption, `AES_256_GCM2`, with a new key per consultation made by our server and given only to the two people in the call; not end-to-end encryption (it is beta and our server would hand out the key anyway). ADR-008 has the options table and the reasons. Please say yes, or which option you want. Also: should counsel review where Agora processes the media (it offers geofencing to India; whether that meets the rules for health data is not verified)? Recording with encryption on shows the media to Agora's recorder while it records; that is inherent and sits behind both people's consent. | A security decision about patient video; the build waits for your yes. | Decision written as proposed. New task P6-12 (below) builds it; real calls should wait for it. |
 | 2026-10-05 | P6-08 | **Recording: legal settings.** Recording is built and off. To switch it on anywhere, three things are yours: (1) `RECORDING_RETENTION_DAYS`, how long a recording is kept (legal; there is no default, and the app refuses to start with `FEATURE_RECORDING` on and no value); (2) the `recording` consent text (what each person agrees to for one consultation), English first, then Hindi and Gujarati; I will not write legal wording (local work uses a marked draft placeholder from the seed only); (3) who may ever watch a recording and for what purpose (not built; see DISCOVERED). | Retention and consent wording are legal. | Everything is built and tested with the fake provider; with the flag off nothing changes. |
 | 2026-10-05 | P6-08 | **Agora cloud recording.** The real Agora adapter has no recording yet. It needs, in your Agora project: Cloud Recording enabled (a paid add-on), a RESTful API customer ID and secret (`AGORA_REST_KEY`, `AGORA_REST_SECRET`), and a write-only access key for the Mumbai recordings bucket that Agora uses to deliver files (an IAM user limited to `s3:PutObject` on that bucket; it comes with staging, P3). Tell me if you prefer to compare providers first (P6-10) before paying for the add-on. | Needs your Agora account, a paid add-on and an AWS key. | The `VideoProvider` interface, the fake and all the server rules are done; `AgoraProvider` offers no recording, so it stays closed even with the flag on. |
 | 2026-10-04 | P6-05 | **Consent texts.** The video visit is closed until a `telemedicine` and a `video` consent text are loaded (`consent_policies`, English first, then Hindi and Gujarati). I will not write legal wording. Please have the texts written or approved (what the patient agrees to for an online consultation under the Telemedicine Practice Guidelines, 2020, and for the video call itself), and tell me their version names and start date. For local work I will load clearly marked draft placeholders through the seed script only; they must never reach production. | Consent wording is legal text. | Video stays closed in production until the texts are loaded; everything else is built. |
@@ -148,7 +146,7 @@ New tasks found while working. Claude Code appends here, the human triages them 
 
 | Date | Found during | Task | Size | Owner | Acceptance criteria | Triage |
 |---|---|---|---|---|---|---|
-| 2026-10-05 | P6-11 | **P6-12: per-consultation media encryption (launch blocker).** Migration: `consultations` gets the key and salt, encrypted with the envelope crypto (`aad consultations.media_key`). Join and renew answers carry `encryption: { mode: "aes-256-gcm2", key, salt }` for the two participants only; the client calls the SDK's encryption setup before joining (the fake client ignores it). Same key on renew and re-join, new key per consultation. Never in a log, an audit line or an error; extend the P6-09 log guard. Then test on the real Agora project: Chrome, Safari on iPhone, low-end Android, audio-only fallback, reconnect, renewal. Recording needs the key passed to cloud recording (`decryptionMode`). | M | C+H | Tests: key differs per consultation, the same for both people, absent from every other answer and every log line, renewal keeps it; a real two-device encrypted call recorded in the ADR. | Before the first real call (P6-10 or P11). |
+| 2026-10-05 | P6-11 | **P6-12: per-consultation media encryption (LATER, D-022; was a launch blocker, the human dropped that).** Migration: `consultations` gets the key and salt, encrypted with the envelope crypto (`aad consultations.media_key`). Join and renew answers carry `encryption: { mode: "aes-256-gcm2", key, salt }` for the two participants only; the client calls the SDK's encryption setup before joining (the fake client ignores it). Same key on renew and re-join, new key per consultation. Never in a log, an audit line or an error; extend the P6-09 log guard. Then test on the real Agora project: Chrome, Safari on iPhone, low-end Android, audio-only fallback, reconnect, renewal. Recording needs the key passed to cloud recording (`decryptionMode`). | M | C+H | Tests: key differs per consultation, the same for both people, absent from every other answer and every log line, renewal keeps it; a real two-device encrypted call recorded in the ADR. | Later (D-022), see the "Later" section. |
 | 2026-10-05 | P6-08 | **Agora cloud recording adapter.** Implement `startRecording` / `stopRecording` in `AgoraProvider` (acquire, start in mix mode writing one mp4 to the bucket and key we pass, stop) with a contract run against a stand-in and then the real project; check what file name Agora really writes and copy to our key if it differs. | M | C+H | The shared contract suite passes against Agora; one real recorded call lands as one mp4 at the key we chose. | After the Agora Questions are answered (P6-10). |
 | 2026-10-05 | P6-08 | **Recording screens.** The call screens still say "Recording is off". Needs: the consent prompt for each person (from `GET .../recording`), a visible "recording" banner for both, a withdraw button, and the doctor's start and stop in the console. Use the ui-ux-pro-max and frontend-design skills. | M | C | Playwright with the fake provider: both agree, the doctor starts, the banner shows for both, the patient withdraws, the banner goes. | Before the flag is ever turned on (P10 at the latest). |
 | 2026-10-05 | P6-08 | **Recording playback.** Not built on purpose. Needs: who may watch (assigned doctor? patient? nobody?) and why (legal), a PHI access log entry per view (`recording` is already a resource type), a short-lived signed URL, and a scan decision: ClamAV's stream limit is far below a recording, so files are registered with scan state `pending` and must not be offered until that is decided. | M | C+H | Test: the right person gets a logged signed link, everyone else 404, a `pending` file is refused. | P7 or P9, after the legal answer. |
@@ -192,6 +190,50 @@ New tasks found while working. Claude Code appends here, the human triages them 
 | 2026-10-04 | P2-18 | New-device notices need real channels: they go through the fake email and SMS adapters now; the template texts (`security_new_device`, `security_recovery_code_used`, `security_number_changed`, `staff_password_reset`, `staff_invitation`) arrive with P8, with DLT registration for SMS. Any notice to the *same* phone that a recycled owner holds protects nobody; only a verified email does. | M | C+H | Templates approved, delivery tested in the provider sandbox. | P8. |
 
 ---
+
+## Later: features and content to add after the first working release
+
+Decided by the human on 2026-10-05 (D-022): build a fast, production-grade site first, and add these as the product grows. Nothing here is forgotten; each row says what it is and where it came from. Claude never ships a guess for the legal or policy rows: the site shows a clearly marked placeholder until the text is supplied.
+
+**More video security (can be added later)**
+
+| What | Where it is written | Notes |
+|---|---|---|
+| Per-consultation media encryption (AES-256-GCM2, key per consultation) | ADR-008, DISCOVERED P6-12 | Calls use the provider's default protection until then. Needs real devices to test. |
+| End-to-end encryption | ADR-008 option C | Revisit when it leaves beta. |
+| India-only media routing (provider geofencing) and counsel's view | ADR-008 | A legal question, not a build question. |
+| Agora Cloud Recording adapter, recording screens, playback | DISCOVERED (P6-08 rows) | Recording is built and off. Cloud Recording is a paid Agora add-on. |
+| Provider comparison pilot on real Indian networks | P6-10, ADR-008 protocol | Needs people, phones and a second account. |
+| Alerts on video and recording log events | DISCOVERED (P6-08 alerts row) | P11. |
+
+**Legal text, policy answers, Q&A and wording (to be supplied by the human or counsel)**
+
+| What | Where it is asked | Placeholder until then |
+|---|---|---|
+| Consent texts: telemedicine, video, recording (English, Hindi, Gujarati) | Questions, P6-05 and P6-08 | Clearly marked draft texts from the demo seed, never in production |
+| Privacy policy, terms of use, recording policy | `src/content/legal.ts` | Marked "to be confirmed" on the pages |
+| Recording retention period, medical record retention (3 or 7 years?) | Needs you, P6-08 and P9-04 | No default; recording stays closed without it |
+| Refund and cancellation terms, platform fee rate, booking window | Questions, P4-06, P5-06, P4-04 | Built with safe constants, easy to change |
+| Invoice tax and seller details (accountant) | Questions, P5-08 | Invoices say "Invoice", no tax line |
+| Medicines that cannot be prescribed online, dose limits, e-signature rules | Needs you, P7-03 | A small sample list in the console |
+| Doctor KYC document list and fee range | Questions, P4-02 | Constants in `directory/schemas.ts` |
+| Review moderation rules | Questions, P4-10 | Reviews wait for an admin |
+| Referral reward and whether it is allowed | Questions, P5-10 | Feature off |
+| Data erasure and export deadlines under the DPDP Act | Questions, P2-11 | Requests recorded with no deadline |
+| Break-glass rules for support | Needs you, P9 | Proposal on the support screen |
+| Hindi and Gujarati wording reviewed by native speakers; Tamil and Bengali? | Needs you, P10-02 | Claude's drafts, marked as drafts |
+| Final logo file | Needs you | Temporary derived logo |
+| Licence for the repository | Questions, P0-01 | README says not chosen |
+
+**Accounts and services (when you are ready to go live)**
+
+| What | Needed for |
+|---|---|
+| Razorpay test keys, then live approval | P5-02 live sandbox runs, real payments |
+| SMS provider and DLT registration; Meta business verification and WhatsApp | P8: real OTP and reminders (locally the code is read from the database) |
+| AWS account and domain; Sentry | P3 cloud staging, P1-18 error tracking |
+| Google OAuth production redirect URIs and app verification (4 weeks) | P3-15, P11-11 |
+| Agora Cloud Recording add-on | Recording |
 
 ## Phase 0: Bootstrap
 
@@ -492,6 +534,8 @@ Things Claude Code cannot do for you. Fill the owner and date.
 | 2026-10-04 | D-019 | Identity model: the account is the identity and the phone is only a sign-in method. Patients can use phone OTP and Google, linked to one account. Phone-only sign-in gets a limited session when it looks risky (new device, 90 days idle, 180 days since phone check, recent number change) until a second method is proven. Prescriptions and reports can be shared by 24-hour links that open one document and ask for the date of birth. Aadhaar and PAN stay uncollected (any government identity later through ABHA after legal review). Staff stay on email, password and TOTP | Human concern: Indian operators reassign numbers after about 90 days, so a new owner could take over an old patient account. Researched 2026-10-04. Docs updated: backend-architecture section 3, er_model (3 new tables), ADR-004. |
 | 2026-10-04 | D-020 | Patients without an email get a placeholder address ending in `@no-email.invalid`; the application treats it as no email. Session tokens are stored as Better Auth writes them (not hashed) | Better Auth requires an email on every user. Hashing session tokens needs a database hook; to be decided in P2-13 (a database leak would expose live sessions, so it is listed as Not verified in ADR-004). |
 | 2026-10-04 | D-021 | Sessions are never renewed: patients stay signed in 14 days from sign-in, staff 8 hours from sign-in | Better Auth renews every session by one global lifetime, which would stretch a staff session to 14 days (found by a failing test). Fixed lifetimes are simpler and safer. Extra idle risk is handled by the phone recycling step-up (D-019). |
+
+| 2026-10-05 | D-022 | **Priorities set by the human.** (1) Video media encryption is not needed for the first release; calls keep the provider's default protection (TLS in transit, nothing stored). The strong protection goes to patient **records**: prescriptions, medical history, vitals and conditions, uploaded scans, X-rays, MRIs and reports. (2) The Agora free tier is used; the human adds the keys. (3) Legal text, policy answers, Q&A content and similar are added later and tracked in "Later" below. (4) The aim is a fast, production-grade Indian telemedicine site, tested with an admin, demo doctors and demo patients. More video security can be added later as the product grows | Human decision. Keeps the work on what protects patients most and on a site that works end to end. The P6-12 encryption task and the video items move to "Later". |
 
 ## Progress log
 

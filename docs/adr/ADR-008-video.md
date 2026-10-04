@@ -1,11 +1,11 @@
 # ADR-008: Video
 
-Status: provider accepted (2026-10-02, human). Media-encryption decision (P6-11) proposed 2026-10-05, waiting for the human. Provider pilot (P6-10) not run yet: it needs people, phones and Indian mobile networks.
+Status: provider accepted (2026-10-02, human). Media encryption (P6-11): evaluated 2026-10-05; the human decided the same day (D-022) that it is **not needed for the first release**, the strong protection goes to patient records, and it can be added later. Provider pilot (P6-10) not run: it needs people, phones and Indian mobile networks.
 
 ## Decision
 
 1. **Provider:** Agora behind the `VideoProvider` adapter (`src/lib/adapters/types.ts`). Unchanged.
-2. **Media encryption (proposed):** turn on Agora's built-in channel encryption, mode `AES_256_GCM2`, with **a new key and salt for every consultation**, made on our server and given only to the two people who pass the join checks. Do not build end-to-end encryption now. Details and the reasons are in "Media encryption" below. Implementation is a new task (DISCOVERED, "P6-12"), to be done when the real Agora client is wired, and it needs a real project to verify.
+2. **Media encryption (evaluated, postponed by the human, D-022):** the first release uses the provider's default protection (TLS in transit, nothing stored by Agora after the call). When added later, the recommended design is to turn on Agora's built-in channel encryption, mode `AES_256_GCM2`, with **a new key and salt for every consultation**, made on our server and given only to the two people who pass the join checks. Do not build end-to-end encryption now. Details and the reasons are in "Media encryption" below. Implementation is a later task ("P6-12", listed under "Later" in `TODO.md`) and needs a real project to verify.
 3. **Pilot:** a protocol is written below. The human runs it (P6-10).
 
 ## Context
@@ -92,9 +92,8 @@ Not run. It needs an Agora project, an account with the alternative, real phones
 ## Consequences and open points
 
 - Written from the decision table in `docs/architecture.md` section 13 (task P0-12), extended in P6-09, P6-10 and P6-11.
-- **Encryption is proposed, not built.** Until task P6-12 lands, calls are protected in transit only (Option A). No real patient call should happen before it, so it is a launch blocker, listed in the DISCOVERED table.
-- **Human:** confirm Option B, and say whether counsel must review where Agora processes the media (geofencing to India).
-- **Human:** run or schedule the pilot, and say which alternative to test.
+- **Encryption is postponed by the human (D-022).** Until task P6-12 is built, calls are protected in transit only (Option A). Patient records, uploads and prescriptions are where the strong protection goes first. The risk is accepted for the first release and recorded here so it is not forgotten.
+- **Later:** whether counsel should review where Agora processes the media (geofencing to India), and the provider pilot with a second account.
 
 ## Sources
 
