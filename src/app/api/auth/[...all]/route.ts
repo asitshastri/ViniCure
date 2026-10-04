@@ -1,5 +1,5 @@
 import { withApi } from "@/lib/api/with-api";
-import { getAuth, guardAuthRequest } from "@/modules/identity";
+import { getAuth, guardAuthRequest, guardPasswordRequest } from "@/modules/identity";
 
 // Better Auth's endpoints (sign-in, sign-out, session, and the methods added in P2-03 to P2-17).
 // They go through withApi so every request gets a request ID, the rate limiter and the standard
@@ -30,6 +30,10 @@ export const POST = withApi(
   async ({ request }) => {
     // OTP abuse controls (limits, captcha, SMS budget) run before Better Auth sees the request.
     await guardAuthRequest(request);
-    return getAuth().handler(request);
+    // Password sign-in and password change: address limit and per-account lock-out.
+    const record = await guardPasswordRequest(request);
+    const response = await getAuth().handler(request);
+    await record?.(response);
+    return response;
   },
 );

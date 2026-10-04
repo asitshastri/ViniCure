@@ -140,6 +140,24 @@ test.describe("staff sign-in", () => {
     expect(await sessionCount(staff.userId)).toBe(0);
   });
 
+  test("five wrong passwords lock the account, even for the right password, and say so", async ({
+    page,
+  }) => {
+    const staff = await createStaff("doctor-lock");
+    await page.goto("/login/staff");
+    for (let i = 0; i < 5; i++) {
+      await page.getByLabel(/email/i).fill(staff.email);
+      await page.getByLabel(/^password/i).fill(`Wrong-Password-${i}!`);
+      await page.getByRole("button", { name: /sign in|continue/i }).click();
+      await expect(page.getByText(/email or password is not correct/i)).toBeVisible();
+    }
+    await page.getByLabel(/email/i).fill(staff.email);
+    await page.getByLabel(/^password/i).fill(PASSWORD);
+    await page.getByRole("button", { name: /sign in|continue/i }).click();
+    await expect(page.getByText(/locked for 15 minutes/i)).toBeVisible();
+    expect(await sessionCount(staff.userId)).toBe(0);
+  });
+
   test("a backup code signs in once", async ({ page }) => {
     const staff = await createStaff("doctor-c", "admin");
     const signInWithBackup = async () => {

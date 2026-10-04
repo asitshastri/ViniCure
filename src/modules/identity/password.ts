@@ -1,13 +1,39 @@
-import { hashPassword, verifyPassword } from "better-auth/crypto";
+import { randomBytes } from "node:crypto";
+import { argon2Verify, argon2id } from "hash-wasm";
 
-// Password hashing in one place. Better Auth signs staff in with `hash` and `verify`, and the
-// invitation flow stores new passwords with `hash`, so both always agree. Today this is Better
-// Auth's default (scrypt, N=16384, r=16, p=1, 64 byte key). P2-15 decides on Argon2id and
-// changes only this file.
+// Password hashing in one place (P2-15). Better Auth signs staff in with `hash` and `verify`, and
+// the invitation flow stores new passwords with `hash`, so both always agree.
+//
+// Algorithm: Argon2id, the first choice of the OWASP Password Storage Cheat Sheet, with its
+// minimum recommended cost: 19 MiB of memory, 2 passes, 1 lane (about 100 ms on a small server).
+// The salt is 16 random bytes, the result 32 bytes, stored as the standard PHC string
+// ("$argon2id$v=19$m=19456,t=2,p=1$salt$hash") so the cost can be raised later and old hashes
+// still verify. Implementation: hash-wasm (WebAssembly, no native build, no dependencies).
+//
+// Better Auth's own default is scrypt. It is not accepted here: a stored hash that is not
+// Argon2id never verifies, so nothing can be downgraded to a weaker algorithm.
+
+export const ARGON2 = { memoryKiB: 19_456, iterations: 2, parallelism: 1, hashLength: 32 } as const;
 
 export const passwordHasher = {
-  hash: (password: string): Promise<string> => hashPassword(password),
-  verify: (input: { hash: string; password: string }): Promise<boolean> => verifyPassword(input),
+  hash: (password: string): Promise<string> =>
+    argon2id({
+      password,
+      salt: randomBytes(16),
+      parallelism: ARGON2.parallelism,
+      iterations: ARGON2.iterations,
+      memorySize: ARGON2.memoryKiB,
+      hashLength: ARGON2.hashLength,
+      outputType: "encoded",
+    }),
+  verify: async (input: { hash: string; password: string }): Promise<boolean> => {
+    if (!input.hash.startsWith("$argon2id$")) return false;
+    try {
+      return await argon2Verify({ password: input.password, hash: input.hash });
+    } catch {
+      return false; // a malformed stored value is a failed sign-in, never an error page
+    }
+  },
 };
 
 export const PASSWORD_MIN_LENGTH = 12;

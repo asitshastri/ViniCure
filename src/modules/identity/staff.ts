@@ -80,6 +80,13 @@ export function createStaffPlugins(replaySecret: string): BetterAuthPlugin[] {
           }),
         },
         {
+          // Changing a password ends every other session, always: the person cannot opt out.
+          matcher: (ctx) => ctx.path === "/change-password",
+          handler: createAuthMiddleware(async (ctx) => {
+            return { context: { body: { ...(ctx.body as object), revokeOtherSessions: true } } };
+          }),
+        },
+        {
           // Refuse a code that was already used for this person.
           matcher: (ctx) => ctx.path === "/two-factor/verify-totp",
           handler: createAuthMiddleware(async (ctx) => {
@@ -154,4 +161,6 @@ export const staffEmailAndPassword: NonNullable<BetterAuthOptions["emailAndPassw
   minPasswordLength: PASSWORD_MIN_LENGTH,
   maxPasswordLength: PASSWORD_MAX_LENGTH,
   password: passwordHasher,
+  // A reset (P2-16) also ends every session of the account.
+  revokeSessionsOnPasswordReset: true,
 };

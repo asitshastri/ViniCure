@@ -9,6 +9,7 @@ import { logger } from "../../lib/logging/logger";
 import { RateLimiter } from "../../lib/rate-limit/limiter";
 import { createAuth, type Auth } from "./auth";
 import { guardOtpRequest, type OtpGuardDeps } from "./otp-guard";
+import { guardSignIn, type AfterResponse, type SignInGuardDeps } from "./sign-in-guard";
 import { invitationCrypto } from "./invitation-crypto";
 import { InvitationService } from "./invitations";
 import { createPhonePlugin } from "./phone";
@@ -86,6 +87,35 @@ function getOtpGuardDeps(): OtpGuardDeps {
   return guardHolder.deps;
 }
 
+const signInHolder = globalSingleton("sign-in-guard", () => ({
+  deps: undefined as SignInGuardDeps | undefined,
+}));
+
+function getSignInGuardDeps(): SignInGuardDeps {
+  if (signInHolder.deps) return signInHolder.deps;
+  const config = getConfig();
+  const cache = getCache();
+  const hashSecret = config.AUTH_SECRET ?? DEV_SECRET;
+  signInHolder.deps = {
+    limiter: new RateLimiter({ cache, env: config.APP_ENV, hashSecret }),
+    cache,
+    env: config.APP_ENV,
+    hashSecret,
+    production: config.NODE_ENV === "production",
+    trustedProxyHops: config.TRUSTED_PROXY_HOPS,
+    alert: (event, data) => logger.warn({ event: `auth_${event}`, security: true, ...data }),
+  };
+  return signInHolder.deps;
+}
+
+/**
+ * Password sign-in protection (address limit and per-account lock-out). Call before Better Auth;
+ * pass the response to the returned function afterwards so the outcome is counted.
+ */
+export function guardPasswordRequest(request: Request): Promise<AfterResponse | null> {
+  return guardSignIn(request, getSignInGuardDeps());
+}
+
 /**
  * Abuse controls for the OTP routes (limits, captcha, daily SMS budget). Call before handing a
  * request to Better Auth. Throws an AppError when the request must stop.
@@ -147,5 +177,6 @@ export function getSessions(): SessionService {
 export function resetAuthForTest(): void {
   holder.auth = undefined;
   guardHolder.deps = undefined;
+  signInHolder.deps = undefined;
   invitationHolder.service = undefined;
 }

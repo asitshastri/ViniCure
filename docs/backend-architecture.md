@@ -251,6 +251,7 @@ Rate-limit tiers (proposals):
 | `write` | 60 per minute per user |
 | `otp_send` | 3 per 10 minutes per phone, 10 per hour per IP, daily global cap |
 | `otp_verify` | 5 attempts per code, 10 per 10 minutes per phone |
+| `sign_in` | 30 password attempts per 15 minutes per address. Per account: 5 wrong passwords lock password sign-in for 15 minutes, doubling on each repeat within 24 hours up to 24 hours (`sign-in-guard.ts`) |
 | `payments` | 10 per minute per user |
 | `ai` | 5 per hour per user, plus a daily budget |
 | `admin` | 120 per minute per user |

@@ -36,8 +36,9 @@ Better Auth 1.7.7 was walked against its source and our tests, not only its docu
 | Update user | Only `name` can change through `/update-user`; phone, email, image, status, role and two-factor are refused | `surface.test.ts` |
 | Identifiers | Phone numbers and challenge ids in `auth_verifications` are stored as an HMAC keyed with `AUTH_SECRET` | `surface.test.ts`, Playwright |
 | Backup codes | 10 codes, single use, stored encrypted with `AUTH_SECRET` in the plugin's format (reversible, because the plugin must read them) | `invitations.test.ts` |
-| Password hashing | Better Auth's scrypt for now, behind `passwordHasher`. P2-15 decides on Argon2id | open, P2-15 |
-| Brute force on sign-in | Only the general write limit and the two-factor lock-out exist. Per-account and per-address sign-in limits and temporary lock-outs are P2-15 | open, P2-15 |
+| Password hashing | **Argon2id** (hash-wasm, OWASP minimum cost 19 MiB, 2 passes, 1 lane, 16 byte random salt, PHC string). Better Auth's default scrypt is not accepted: a stored hash that is not Argon2id never verifies, so there is no downgrade path. Staff password rules: 12 to 128 characters, not common, not repetitive, not containing the email name | `password.ts`, `password.test.ts` |
+| Brute force on sign-in | 30 attempts per 15 minutes per address; 5 wrong passwords lock an account's password sign-in for 15 minutes, doubling on repeats within 24 hours (cap 24 hours); the same counting for emails without an account; a correct password clears the count; fail closed if the cache is down. The authenticator step has its own lock-out (5 wrong codes, 15 minutes) | `sign-in-guard.ts`, `sign-in-guard.test.ts`, Playwright |
+| Password change | Ends every other session whatever the client asks; wrong current passwords are counted like wrong sign-ins; a reset (P2-16) also ends all sessions (`revokeSessionsOnPasswordReset`) | `staff.test.ts` |
 
 ## Threat notes
 
@@ -62,11 +63,10 @@ Better Auth 1.7.7 was walked against its source and our tests, not only its docu
 1. **OTP codes sit in `auth_verifications.value` in clear text** for at most 5 minutes and 3 attempts. Better Auth compares the plain value. Hashing needs a custom `verifyOTP` that re-implements attempts and expiry; the exposure is a 5 minute window of codes that also need the matching phone number (which is hashed). Not worth the extra security-critical code now. Revisit if Better Auth adds hashed OTP storage.
 2. **Session tokens are stored as written** (D-020). Someone who can read the `auth_sessions` table can use live sessions until they expire or are revoked. Better Auth has no option to store them hashed. Controls: the database is private, encrypted at rest, only the app role reads it, staff sessions last 8 hours. Revisit in P11 (hardening): a secondary store or a session table with hashed tokens.
 3. **Backup codes are encrypted, not hashed**, with the application secret. Whoever has the database and `AUTH_SECRET` can read them; with only the database they cannot.
-4. **scrypt** stays the staff password hash until P2-15 (OWASP lists scrypt as acceptable with the right parameters).
+4. **A lock-out can be used to annoy a doctor**: anyone who knows a staff email can lock that account's password sign-in for 15 minutes by typing wrong passwords. This is the usual trade-off; the address limit and fail counts keep it from being cheap, and an admin can be told through the alert. Revisit with an unlock-by-email flow after P2-16.
 
 ## Open items
 
-- P2-15: Argon2id decision, sign-in rate limits and lock-out, other sessions ended on password change.
 - P2-16: staff password reset (opens `/request-password-reset` and `/reset-password` with their own limits).
 - P2-17 and P2-18: Google sign-in, account linking proof, step-up and recovery codes.
 - Production needs the hCaptcha widget on the patient form (TODO DISCOVERED) before codes can be sent.
@@ -74,4 +74,4 @@ Better Auth 1.7.7 was walked against its source and our tests, not only its docu
 ## Not verified
 
 - Whether the MSG91 adapter's delivery delays make the 5 minute code life too short (P8).
-- Exact scrypt parameters Better Auth uses against the current OWASP table (P2-15).
+- Argon2id cost against production hardware: 19 MiB and 2 passes take about 100 ms here; measure on the real task size in P3 and raise it if there is room.

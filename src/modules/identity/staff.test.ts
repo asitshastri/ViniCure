@@ -342,3 +342,70 @@ describe("staff cannot sign in by phone alone", () => {
     expect(res.status).toBe(404);
   });
 });
+
+type Staff = Awaited<ReturnType<ReturnType<typeof setup>["createStaff"]>>;
+
+describe("changing the password ends every other session", () => {
+  async function signInFully(t: ReturnType<typeof setup>, staff: Staff, offsetSteps: number) {
+    const first = await t.post("/sign-in/email", { email: staff.email, password: PASSWORD });
+    const done = await t.post(
+      "/two-factor/verify-totp",
+      { code: totp(staff.secret, Date.now() + offsetSteps * 30_000) },
+      { cookie: t.cookiesOf(first) },
+    );
+    expect(done.status).toBe(200);
+    return t.cookiesOf(done);
+  }
+
+  it("the other session is revoked at once, this one stays, the old password stops working", async () => {
+    const t = setup();
+    const staff = await t.createStaff();
+    const laptop = await signInFully(t, staff, 0);
+    const phone = await signInFully(t, staff, 1);
+    expect(t.db.auth_sessions).toHaveLength(2);
+
+    const NEW = "a brand new sturdy passphrase";
+    const changed = await t.post(
+      "/change-password",
+      { currentPassword: PASSWORD, newPassword: NEW, revokeOtherSessions: false }, // the client asks not to: ignored
+      { cookie: laptop },
+    );
+    expect(changed.status).toBe(200);
+
+    const get = (cookie: string) =>
+      t.auth.handler(new Request(`${ORIGIN}/api/auth/get-session`, { headers: { cookie } }));
+    expect(((await (await get(phone)).json()) as unknown) ?? null).toBeNull(); // the other device is out
+    const stillIn = (await (await get(t.cookiesOf(changed) || laptop)).json()) as {
+      session?: unknown;
+    } | null;
+    expect(stillIn?.session).toBeTruthy(); // the device that changed it stays in
+
+    const old = await t.post("/sign-in/email", { email: staff.email, password: PASSWORD });
+    expect(old.status).toBe(401);
+    const fresh = await t.post("/sign-in/email", { email: staff.email, password: NEW });
+    expect(await fresh.json()).toMatchObject({ twoFactorRedirect: true });
+  });
+
+  it("a wrong current password changes nothing and ends nothing", async () => {
+    const t = setup();
+    const staff = await t.createStaff();
+    const laptop = await signInFully(t, staff, 0);
+    await signInFully(t, staff, 1);
+    const res = await t.post(
+      "/change-password",
+      { currentPassword: "not the password at all", newPassword: "another sturdy passphrase" },
+      { cookie: laptop },
+    );
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(t.db.auth_sessions).toHaveLength(2);
+  });
+
+  it("the stored hash is Argon2id", async () => {
+    const t = setup();
+    await t.createStaff();
+    const account = t.db.auth_accounts?.find(
+      (a) => a.providerId === "credential" || a.provider_id === "credential",
+    );
+    expect(String(account?.password)).toMatch(/^\$argon2id\$/);
+  });
+});
