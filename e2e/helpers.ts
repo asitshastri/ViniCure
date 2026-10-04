@@ -7,6 +7,7 @@ import { invitationCrypto } from "../src/modules/identity/invitation-crypto";
 import { InvitationService, hashToken } from "../src/modules/identity/invitations";
 import { IdentityRepo } from "../src/modules/identity/repo";
 import { createStaffPlugins, staffEmailAndPassword } from "../src/modules/identity/staff";
+import { hashIdentifier } from "../src/modules/identity/surface";
 import { totpCode } from "../src/modules/identity/totp";
 
 // Test-side access to the same database the app uses: read the OTP the app stored, make staff
@@ -52,7 +53,7 @@ export function newPhone(): string {
 export async function otpFor(tenDigits: string): Promise<string> {
   const { rows } = await db().query(
     "SELECT value FROM auth_verifications WHERE identifier = $1 ORDER BY created_at DESC LIMIT 1",
-    [`+91${tenDigits}`],
+    [await hashIdentifier(E2E_ENV.AUTH_SECRET)(`+91${tenDigits}`)],
   );
   expect(rows[0], "the app should have stored a code").toBeTruthy();
   return String(rows[0].value).split(":")[0] as string;

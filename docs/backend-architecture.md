@@ -633,7 +633,7 @@ Names only. Never commit values. A Zod schema validates these at boot and the ap
 
 ## 20. Not verified
 
-- Better Auth behaviors listed here come from its documentation. Confirm each in the matching task, especially staff sign-in blocking, session lifetime options and OTP sender wiring.
+- Better Auth behaviors were confirmed against its source and our tests in P2-02 to P2-13 (see ADR-004, "Review of the configuration"). Remaining: Argon2id and sign-in lock-out (P2-15), password reset (P2-16), Google (P2-17).
 - Rate limits, session lifetimes, join windows, break-glass duration and file limits are proposals.
 - Whether Drizzle migration tooling cleanly coexists with hand-written SQL files. Confirm in P1-02.
 - Legal items: retention periods, erasure versus retention, drug restriction lists, recording retention, invoice tax treatment.

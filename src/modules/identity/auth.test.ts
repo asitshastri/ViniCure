@@ -44,6 +44,8 @@ function setup(options: { production: boolean; roles?: Role[] }) {
       },
     ],
     emailAndPassword: { enabled: true, disableSignUp: false },
+    // These tests make their users by e-mail sign-up, which the real surface keeps closed.
+    extraAllowedPaths: new Set(["/sign-up/email"]),
   });
   const origin = options.production ? "https://vinicure.example" : "http://localhost:3000";
   const request = (path: string, body: unknown, headers: Record<string, string> = {}) =>

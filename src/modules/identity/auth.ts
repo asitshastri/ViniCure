@@ -5,6 +5,7 @@ import { uuidv7 } from "../../lib/ids";
 import { identityModels } from "./schema";
 import { PATIENT_SESSION_SECONDS, FRESH_LOGIN_SECONDS, sessionExpiry } from "./session-policy";
 import { sessionRefusal, type AccountState } from "./staff";
+import { UPDATE_USER_FIELDS, hashIdentifier, isAllowedAuthPath, stripTokens } from "./surface";
 
 // Better Auth set-up (decision D-003, ADR-004). Only this module imports better-auth: the rest of
 // the code calls the functions exported from src/modules/identity.
@@ -28,6 +29,8 @@ export type IdentityDeps = {
   rolesOf: (userId: string) => Promise<readonly Role[]>;
   /** How many proxies sit in front of the app, for reading the client address. */
   trustedProxyHops?: number;
+  /** Better Auth paths opened by a method added later (P2-16, P2-17), on top of surface.ts. */
+  extraAllowedPaths?: ReadonlySet<string>;
   /** Extra Better Auth plugins and sign-in methods, added by later tasks (P2-03, P2-05, P2-17). */
   plugins?: BetterAuthOptions["plugins"];
   emailAndPassword?: BetterAuthOptions["emailAndPassword"];
@@ -97,17 +100,42 @@ export function buildAuthOptions(deps: IdentityDeps): BetterAuthOptions {
     // Our own rate limiter (src/lib/rate-limit) guards /api/auth through withApi.
     rateLimit: { enabled: false },
 
+    // Identifiers in auth_verifications (phone numbers, challenge ids) are stored as a keyed hash.
+    verification: {
+      ...identityModels.verification,
+      storeIdentifier: { hash: hashIdentifier(deps.secret) },
+    },
+
     hooks: {
       // Better Auth checks Origin only on requests that carry cookies. Every state-changing
       // request must come from our own origin, cookie or not: otherwise any website could make
       // a visitor's browser ask us to send SMS codes. A request with no Origin header (not a
       // browser) is left to the rate limits and captcha.
       before: createAuthMiddleware(async (ctx) => {
+        // Default deny: only the paths in surface.ts exist.
+        if (!isAllowedAuthPath(ctx.path ?? "", deps.extraAllowedPaths)) {
+          throw new APIError("NOT_FOUND", { message: "Not found" });
+        }
+        // A person may change their display name and nothing else about the record.
+        if (ctx.path === "/update-user") {
+          const keys = Object.keys((ctx.body ?? {}) as Record<string, unknown>);
+          if (keys.length === 0 || keys.some((key) => !UPDATE_USER_FIELDS.has(key))) {
+            throw new APIError("BAD_REQUEST", { message: "Only the name can be changed." });
+          }
+        }
         const origin = ctx.request?.headers.get("origin");
         if (!origin || ctx.request?.method === "GET") return;
         if (!ctx.context.trustedOrigins.includes(origin)) {
           throw new APIError("FORBIDDEN", { message: "Invalid origin" });
         }
+      }),
+      // Session tokens stay in the HttpOnly cookie; they are removed from every JSON answer.
+      after: createAuthMiddleware(async (ctx) => {
+        const returned = ctx.context.returned;
+        if (!returned || typeof returned !== "object") return;
+        if (returned instanceof Response || returned instanceof Error) return;
+        const clean = stripTokens(returned);
+        if (clean !== returned) return ctx.json(clean);
       }),
     },
 
