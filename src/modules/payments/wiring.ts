@@ -3,7 +3,10 @@ import type { Queryable, TxRunner } from "../../lib/db/queryable";
 import { AppointmentService } from "../scheduling/appointments";
 import { AppointmentRepo } from "../scheduling/appointments-repo";
 import { PatientRepo } from "../patients/repo";
+import { LedgerRepo } from "./ledger-repo";
+import { LedgerService } from "./ledger";
 import { PaymentRepo } from "./repo";
+import { ReconcileService } from "./reconcile";
 import { RefundService } from "./refunds";
 import { SettlementService } from "./settlement";
 import { WebhookService } from "./webhook";
@@ -17,6 +20,8 @@ export type PaymentWiring = {
   tx: TxRunner;
   gateway: () => PaymentProvider;
   enqueue: (eventId: number) => Promise<unknown>;
+  /** The platform's share of each payment, in hundredths of a percent (0 to 10000). */
+  feeBps: () => number;
 };
 
 export function createPaymentServices(w: PaymentWiring) {
@@ -36,12 +41,18 @@ export function createPaymentServices(w: PaymentWiring) {
     },
   });
   const refunds = new RefundService({ repo, gateway: w.gateway });
+  const ledgerRepo = new LedgerRepo(w.db);
+  const ledger = new LedgerService({ repo: ledgerRepo, feeBps: w.feeBps });
+  const reconcile = new ReconcileService({ repo: ledgerRepo, ledger, gateway: w.gateway });
   const settlement = new SettlementService({
     repo,
     gateway: w.gateway,
     confirmAppointment: (id) => appointments.confirmAfterPayment(id, null),
     refunds,
+    onCaptured: async (payment) => {
+      await ledger.recordCapture(payment);
+    },
   });
   const webhook = new WebhookService({ repo, gateway: w.gateway, settlement, enqueue: w.enqueue });
-  return { repo, refunds, settlement, webhook };
+  return { repo, refunds, settlement, webhook, ledger, ledgerRepo, reconcile };
 }

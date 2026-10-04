@@ -76,6 +76,8 @@ const schema = z.object({
   RAZORPAY_WEBHOOK_SECRET: optionalString,
   /** Points the adapter at a stand-in for Razorpay's API (tests and local work). Never in production. */
   RAZORPAY_API_BASE: z.url().optional(),
+  /** The platform's share of each payment in hundredths of a percent (1000 = 10%). 0 until the business sets the rate. */
+  PLATFORM_FEE_BPS: z.coerce.number().int().min(0).max(10_000).default(0),
   MSG91_AUTH_KEY: optionalString,
   MSG91_SENDER_ID: optionalString,
   WHATSAPP_TOKEN: optionalString,

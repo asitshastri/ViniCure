@@ -1,3 +1,4 @@
+import { getConfig } from "../lib/config/config";
 import { queryable, getDatabase } from "../lib/db/pool";
 import type { Handlers } from "../lib/queue/queue";
 import { getFileScanner } from "../lib/adapters/registry";
@@ -21,6 +22,7 @@ function payments() {
     gateway: getPaymentProvider,
     // The worker re-queues nothing from inside a job; a lost job is found again by the sweep.
     enqueue: async () => undefined,
+    feeBps: () => getConfig().PLATFORM_FEE_BPS,
   });
 }
 
@@ -30,6 +32,12 @@ export const handlers: Handlers = {
   "payment.webhook.process": async ({ eventId }, { logger }) => {
     const result = await payments().webhook.process(eventId);
     logger.info({ event: "payment_event_processed", result });
+  },
+  // Daily check of our books against the gateway (P5-06). Repairs missing ledger entries and
+  // raises one alert line for anything else; it never moves money.
+  "payment.reconcile": async (_payload, { logger }) => {
+    const report = await payments().reconcile.run();
+    logger.info({ event: "payment_reconcile_done", ...report });
   },
   // Frees unpaid holds that ran out (every minute). A second run changes nothing more, and two
   // workers never take the same row.

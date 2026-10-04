@@ -25,6 +25,7 @@ describe.skipIf(!url)("payment webhook on real Postgres", () => {
       }),
     };
     parts = createPaymentServices({
+      feeBps: () => 0,
       db,
       tx: {
         async transaction<T>(fn: (q: Queryable) => Promise<T>): Promise<T> {
@@ -152,5 +153,23 @@ describe.skipIf(!url)("payment webhook on real Postgres", () => {
       /permission denied/,
     );
     await expect(pool.query("DELETE FROM payment_events")).rejects.toThrow(/permission denied/);
+  });
+
+  it("six settlements of one payment at once write the two ledger entries once, and the app role cannot change them", async () => {
+    const { order, gwPay } = await paid();
+    const payment = (await parts.repo.findById(order.paymentId))!;
+    await Promise.all(Array.from({ length: 6 }, () => parts.settlement.settle(payment, gwPay)));
+    const rows = await pool.query(
+      "SELECT entry_type, amount_paise FROM earnings_ledger WHERE payment_id=$1 ORDER BY entry_type",
+      [order.paymentId],
+    );
+    expect(rows.rows.map((r) => [r.entry_type, Number(r.amount_paise)])).toEqual([
+      ["doctor_share", 30000],
+      ["platform_fee", 0],
+    ]);
+    await expect(pool.query("UPDATE earnings_ledger SET amount_paise = 1")).rejects.toThrow(
+      /permission denied/,
+    );
+    await expect(pool.query("DELETE FROM earnings_ledger")).rejects.toThrow(/permission denied/);
   });
 });

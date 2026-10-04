@@ -10,6 +10,8 @@ export { PaymentService } from "./service";
 export { SettlementService } from "./settlement";
 export { WebhookService } from "./webhook";
 export { RefundService } from "./refunds";
+export { LedgerService, splitPayment } from "./ledger";
+export { ReconcileService } from "./reconcile";
 
 import { createPaymentServices } from "./wiring";
 
@@ -26,6 +28,7 @@ function parts() {
     tx: txRunner(),
     gateway: getPaymentProvider,
     enqueue: async (eventId) => (await getQueue()).enqueue("payment.webhook.process", { eventId }),
+    feeBps: () => getConfig().PLATFORM_FEE_BPS,
   });
   return holder.parts;
 }

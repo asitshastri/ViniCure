@@ -29,7 +29,7 @@ type Deps = {
   gateway: () => PaymentProvider;
   confirmAppointment: Confirm;
   refunds: RefundService;
-  /** Runs once a captured payment has its appointment confirmed (the earnings ledger, P5-06). */
+  /** Runs as soon as a payment is known to be captured (the earnings ledger, P5-06). Must be safe to repeat. */
   onCaptured?: (payment: PaymentRow) => Promise<void>;
 };
 
@@ -71,6 +71,10 @@ export class SettlementService {
       return "mismatch";
     }
 
+    // The money arrived, so the books say so before anything else can go wrong; a refund that
+    // follows (lost time, second payment) is a reversal of these entries (P5-07).
+    await this.deps.onCaptured?.(current);
+
     const outcome = await this.deps.confirmAppointment(current.appointmentId);
     if (outcome === "slot_lost" || outcome === "not_payable") {
       await refunds.refundInFull(
@@ -82,7 +86,6 @@ export class SettlementService {
       );
       return "refunded";
     }
-    await this.deps.onCaptured?.(current);
     return "captured";
   }
 }

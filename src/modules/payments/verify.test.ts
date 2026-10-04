@@ -97,6 +97,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   gateway = new FakePaymentProvider();
   parts = createPaymentServices({
+    feeBps: () => 0,
     db: q,
     tx,
     gateway: () => gateway,
@@ -252,6 +253,7 @@ describe("verify", () => {
       });
       const ids: number[] = [];
       const hooked = createPaymentServices({
+        feeBps: () => 0,
         db: q,
         tx,
         gateway: () => gateway,

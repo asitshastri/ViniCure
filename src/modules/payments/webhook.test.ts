@@ -124,6 +124,7 @@ beforeEach(async () => {
   gateway = new FakePaymentProvider();
   queued = [];
   parts = createPaymentServices({
+    feeBps: () => 0,
     db: q,
     tx,
     gateway: () => gateway,
@@ -509,6 +510,7 @@ describe("repair and retry", () => {
     const appt = await appointment();
     const o = await order(appt.id);
     const failing = createPaymentServices({
+      feeBps: () => 0,
       db: q,
       tx,
       gateway: () => gateway,
