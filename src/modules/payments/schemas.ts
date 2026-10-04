@@ -36,3 +36,20 @@ export type VerifyView = {
   status: "paid" | "refunded" | "pending" | "problem";
   appointmentId: string;
 };
+
+/** An admin refund. No amount means "everything not yet refunded". The payment is named in the path. */
+export const adminRefundBody = z
+  .object({
+    amountPaise: z.int().positive().max(100_000_000).optional(),
+    reason: z.string().trim().min(3).max(200),
+  })
+  .strict();
+export type AdminRefundBody = z.infer<typeof adminRefundBody>;
+export const paymentIdParams = z.object({ id: z.uuid() }).strict();
+
+/** What an admin sees of a refund they started. */
+export type RefundView = {
+  refundId: string;
+  status: "initiated" | "processed" | "failed";
+  amountPaise: number;
+};

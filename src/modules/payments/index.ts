@@ -37,6 +37,7 @@ export function getPayments(): PaymentService {
   holder.service ??= new PaymentService({
     repo: parts().repo,
     settlement: parts().settlement,
+    refunds: parts().refunds,
     gateway: getPaymentProvider,
     publicKeyId: () => getConfig().RAZORPAY_KEY_ID ?? "fake_key_id",
   });
@@ -44,6 +45,7 @@ export function getPayments(): PaymentService {
 }
 
 export const getWebhook = () => parts().webhook;
+export const getRefunds = () => parts().refunds;
 export const getSettlement = () => parts().settlement;
 
 /** Replaces the service (tests). Pass undefined to reset. */

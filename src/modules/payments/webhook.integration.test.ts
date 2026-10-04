@@ -172,4 +172,50 @@ describe.skipIf(!url)("payment webhook on real Postgres", () => {
     );
     await expect(pool.query("DELETE FROM earnings_ledger")).rejects.toThrow(/permission denied/);
   });
+
+  it("simultaneous refunds never add up to more than was paid, and a confirmation processed twice at once reverses once", async () => {
+    const { order, gwPay } = await paid();
+    await parts.settlement.settle((await parts.repo.findById(order.paymentId))!, gwPay);
+    const payment = (await parts.repo.findById(order.paymentId))!;
+    const refundOf = (amountPaise: number | null, key: string) =>
+      parts.refunds
+        .refund(payment, {
+          purpose: key,
+          reason: "integration test",
+          amountPaise,
+          initiatedBy: null,
+        })
+        .then(
+          (r) => (r ? "started" : "none"),
+          (e: { code?: string }) => e.code ?? "error",
+        );
+    // Ten refunds of 10000 against a payment of 30000: exactly three can start.
+    const results = await Promise.all(
+      Array.from({ length: 10 }, (_, i) => refundOf(10000, `race-${order.paymentId}-${i}`)),
+    );
+    expect(results, JSON.stringify(results)).toContain("started");
+    expect(results.filter((r) => r === "started")).toHaveLength(3);
+    expect(results.filter((r) => r === "conflict" || r === "none")).toHaveLength(7);
+    const rows = await pool.query(
+      "SELECT id, amount_paise FROM refunds WHERE payment_id=$1 AND status='initiated'",
+      [order.paymentId],
+    );
+    expect(rows.rows).toHaveLength(3);
+    // The first one is confirmed by two workers at once: one reversal.
+    const id = String(rows.rows[0]?.id);
+    const done = await Promise.all([parts.repo.completeRefund(id), parts.repo.completeRefund(id)]);
+    expect(done.filter(Boolean)).toHaveLength(1);
+    const reversals = await pool.query(
+      "SELECT count(*)::int AS n FROM earnings_ledger WHERE refund_id=$1",
+      [id],
+    );
+    expect(reversals.rows[0]?.n).toBe(2);
+    expect(
+      (
+        await pool.query("SELECT amount_refunded_paise FROM payments WHERE id=$1", [
+          order.paymentId,
+        ])
+      ).rows[0]?.amount_refunded_paise,
+    ).toBe(10000);
+  });
 });

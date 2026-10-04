@@ -64,11 +64,11 @@ export class LedgerRepo {
     return rows.map((r) => String(r.id));
   }
 
-  /** Money was taken, the time was never booked, and no refund was started. */
+  /** Money was taken, the booking is held, expired or cancelled by the doctor or an admin, and no refund was started. */
   async paidWithoutBooking(limit: number): Promise<string[]> {
     const { rows } = await this.db.query(
       "SELECT p.id FROM payments p JOIN appointments a ON a.id = p.appointment_id" +
-        " WHERE p.status = 'captured' AND a.status IN ('held', 'expired')" +
+        " WHERE p.status = 'captured' AND a.status IN ('held', 'expired', 'cancelled_by_doctor', 'cancelled_by_admin')" +
         " AND p.captured_at < now() - interval '10 minutes'" +
         " AND NOT EXISTS (SELECT 1 FROM refunds r WHERE r.payment_id = p.id AND r.status <> 'failed')" +
         " ORDER BY p.captured_at LIMIT $1",

@@ -88,11 +88,38 @@ export class WebhookService {
       const payment = event.orderId ? await repo.findByOrderId(event.orderId) : null;
       // A failed attempt closes nothing for good: the customer may pay again on the same order.
       if (payment) await repo.markFailed(payment.id, event.errorCode ?? "failed");
+    } else if (event.event === "refund.processed" || event.event === "refund.failed") {
+      await this.handleRefund(event);
     }
-    // Refund and other events are kept for the record; refunds are completed in P5-07.
+    // Other events are kept for the record.
 
     await repo.markEventProcessed(eventId);
     return "handled";
+  }
+
+  /**
+   * The gateway reports the end of a refund. It can arrive before we have saved the gateway's
+   * refund id (we save it right after asking), so an unknown refund is an error: the job is
+   * retried a little later. One that never turns up is a refund made outside the system, which
+   * someone must look at, and the queue's dead-letter alert says so.
+   */
+  private async handleRefund(event: GatewayEvent): Promise<void> {
+    const { repo } = this.deps;
+    const refund = event.refundId ? await repo.findRefundByGatewayId(event.refundId) : null;
+    if (!refund) throw new Error("refund event for a refund we have not recorded yet");
+    if (event.refundAmountPaise !== undefined && event.refundAmountPaise !== refund.amountPaise) {
+      logger.error({ event: "refund_amount_mismatch", refundId: refund.id });
+      return;
+    }
+    if (event.event === "refund.failed") {
+      if (await repo.failRefund(refund.id)) {
+        logger.error({ event: "refund_failed_at_gateway", refundId: refund.id });
+      }
+      return;
+    }
+    if (await repo.completeRefund(refund.id)) {
+      logger.info({ event: "refund_processed", refundId: refund.id });
+    }
   }
 
   /** Re-queues events that were stored but never handled (a lost job). Returns how many. */

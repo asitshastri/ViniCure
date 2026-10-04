@@ -6,6 +6,7 @@ import { assertAllowed, can, type Principal } from "../identity/policy";
 import type { PatientRepo } from "../patients/repo";
 import type { AppointmentDetail, AppointmentRepo, AppointmentRow } from "./appointments-repo";
 import type { SlotService } from "./service";
+import { logger } from "../../lib/logging/logger";
 import { CANCEL_REASONS, MAX_RESCHEDULES, canMove, cancelStatusFor, type Canceller } from "./state";
 import { istDate } from "./slots";
 
@@ -134,6 +135,12 @@ type Deps = {
   patients: Pick<PatientRepo, "findById">;
   slots: Pick<SlotService, "list" | "invalidate">;
   crypto: () => Crypto;
+  /**
+   * Called after a cancellation went through (payments uses it to give money back when the
+   * doctor or an admin cancels). It must not decide the cancellation: a failure here is logged
+   * and the cancellation stands.
+   */
+  onCancelled?: (info: { appointmentId: string; by: Canceller; from: string }) => Promise<void>;
 };
 
 export class AppointmentService {
@@ -290,6 +297,12 @@ export class AppointmentService {
     if (!done)
       throw errors.conflict({ detail: "This appointment just changed. Reload and try again." });
     await this.deps.slots.invalidate(detail.doctorId);
+    try {
+      await this.deps.onCancelled?.({ appointmentId: id, by: who, from: detail.status });
+    } catch (error) {
+      // The daily payment check reports a cancelled booking that still holds money.
+      logger.error({ event: "cancel_follow_up_failed", err: error });
+    }
     return toDetailView(await this.load(id));
   }
 

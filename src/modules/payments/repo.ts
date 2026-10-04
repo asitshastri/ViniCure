@@ -149,6 +149,16 @@ export class PaymentRepo {
     return rows[0] ? toPayment(rows[0]) : null;
   }
 
+  /** The payment that took money for an appointment, if any (at most one). */
+  async findPaidByAppointment(appointmentId: string): Promise<PaymentRow | null> {
+    const { rows } = await this.db.query(
+      `SELECT ${PAYMENT_COLUMNS} FROM payments p JOIN appointments a ON a.id = p.appointment_id
+        WHERE p.appointment_id = $1 AND p.status IN ('captured', 'partially_refunded')`,
+      [appointmentId],
+    );
+    return rows[0] ? toPayment(rows[0]) : null;
+  }
+
   async findByOrderId(orderId: string): Promise<PaymentRow | null> {
     const { rows } = await this.db.query(
       `SELECT ${PAYMENT_COLUMNS} FROM payments p JOIN appointments a ON a.id = p.appointment_id
@@ -261,38 +271,41 @@ export class PaymentRepo {
     return rows[0] ? toRefund(rows[0]) : null;
   }
 
-  /** Refunds that are started or done for a payment, in paise: the part that cannot be refunded again. */
-  async refundedOrPending(paymentId: string): Promise<number> {
-    const { rows } = await this.db.query(
-      "SELECT COALESCE(sum(amount_paise), 0)::bigint AS n FROM refunds WHERE payment_id = $1 AND status IN ('initiated', 'processed')",
-      [paymentId],
-    );
-    return Number(rows[0]?.n ?? 0);
-  }
-
-  /** Starts a refund row. Null when this key already started one (a repeat). */
-  async insertRefund(input: {
+  /**
+   * Starts a refund row, deciding the amount against what is left under a lock on the payment, so
+   * simultaneous refunds can never add up to more than was paid. `amountPaise` null means
+   * everything not yet refunded. Returns why nothing was started, or "created". A repeat of the
+   * same key is "exists".
+   */
+  async startRefund(input: {
     id: string;
     paymentId: string;
-    amountPaise: number;
+    amountPaise: number | null;
     reason: string;
     initiatedBy: string | null;
     idempotencyKey: string;
-  }): Promise<boolean> {
-    const { rows } = await this.db.query(
-      `INSERT INTO refunds (id, payment_id, amount_paise, reason, initiated_by, idempotency_key)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       ON CONFLICT (idempotency_key) DO NOTHING RETURNING id`,
-      [
-        input.id,
+  }): Promise<"created" | "exists" | "nothing_left" | "too_much"> {
+    return this.tx.transaction(async (q) => {
+      const locked = await q.query("SELECT amount_paise FROM payments WHERE id = $1 FOR UPDATE", [
         input.paymentId,
-        input.amountPaise,
-        input.reason,
-        input.initiatedBy,
-        input.idempotencyKey,
-      ],
-    );
-    return rows.length === 1;
+      ]);
+      if (!locked.rows[0]) return "nothing_left";
+      const used = await q.query(
+        "SELECT COALESCE(sum(amount_paise), 0)::bigint AS n FROM refunds WHERE payment_id = $1 AND status IN ('initiated', 'processed')",
+        [input.paymentId],
+      );
+      const remaining = Number(locked.rows[0].amount_paise) - Number(used.rows[0]?.n ?? 0);
+      const amount = input.amountPaise ?? remaining;
+      if (remaining <= 0 || amount <= 0) return "nothing_left";
+      if (amount > remaining) return "too_much";
+      const { rows } = await q.query(
+        `INSERT INTO refunds (id, payment_id, amount_paise, reason, initiated_by, idempotency_key)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (idempotency_key) DO NOTHING RETURNING id`,
+        [input.id, input.paymentId, amount, input.reason, input.initiatedBy, input.idempotencyKey],
+      );
+      return rows.length === 1 ? "created" : "exists";
+    });
   }
 
   async setRefundGatewayId(id: string, gatewayRefundId: string): Promise<void> {
@@ -300,6 +313,84 @@ export class PaymentRepo {
       "UPDATE refunds SET gateway_refund_id = $2 WHERE id = $1 AND gateway_refund_id IS NULL",
       [id, gatewayRefundId],
     );
+  }
+
+  async findRefundByGatewayId(gatewayRefundId: string): Promise<RefundRow | null> {
+    const { rows } = await this.db.query(
+      "SELECT id, payment_id, amount_paise, status, gateway_refund_id FROM refunds WHERE gateway_refund_id = $1",
+      [gatewayRefundId],
+    );
+    return rows[0] ? toRefund(rows[0]) : null;
+  }
+
+  /** The gateway said the refund failed. It stops counting against the payment, so it can be tried again. */
+  async failRefund(id: string): Promise<boolean> {
+    const { rows } = await this.db.query(
+      "UPDATE refunds SET status = 'failed' WHERE id = $1 AND status = 'initiated' RETURNING id",
+      [id],
+    );
+    return rows.length === 1;
+  }
+
+  /**
+   * The gateway says the money went back. In one transaction: the refund becomes processed, the
+   * payment's refunded total and status follow, and the ledger gets reversal entries (the fee and
+   * the doctor's share are each reduced in proportion; a full refund reverses both exactly).
+   * A payment with no capture entries (a duplicate that was never booked) has nothing to reverse.
+   * Returns false when the refund was not waiting (already done or failed).
+   */
+  async completeRefund(id: string): Promise<boolean> {
+    return this.tx.transaction(async (q) => {
+      const { rows } = await q.query(
+        `SELECT rf.payment_id, rf.amount_paise AS refund_paise, p.amount_paise AS paid_paise,
+                p.amount_refunded_paise AS refunded_before, p.status AS payment_status
+           FROM refunds rf JOIN payments p ON p.id = rf.payment_id
+          WHERE rf.id = $1 AND rf.status = 'initiated' FOR UPDATE OF rf, p`,
+        [id],
+      );
+      const r = rows[0];
+      if (!r) return false;
+      const refund = Number(r.refund_paise);
+      const paid = Number(r.paid_paise);
+      const before = Number(r.refunded_before);
+      const paymentId = String(r.payment_id);
+      await q.query("UPDATE refunds SET status = 'processed', processed_at = now() WHERE id = $1", [
+        id,
+      ]);
+      if (!["captured", "partially_refunded"].includes(String(r.payment_status))) return true;
+
+      const total = before + refund;
+      await q.query(
+        `UPDATE payments SET amount_refunded_paise = $2,
+                status = CASE WHEN $2 = amount_paise THEN 'refunded' ELSE 'partially_refunded' END
+          WHERE id = $1`,
+        [paymentId, total],
+      );
+
+      const entries = await q.query(
+        `SELECT doctor_id, amount_paise FROM earnings_ledger
+          WHERE payment_id = $1 AND entry_type = 'platform_fee'`,
+        [paymentId],
+      );
+      const fee = entries.rows[0];
+      if (!fee) return true;
+      const feePaise = Number(fee.amount_paise);
+      const prior = await q.query(
+        `SELECT COALESCE(sum(-amount_paise), 0)::bigint AS n FROM earnings_ledger
+          WHERE payment_id = $1 AND entry_type = 'platform_fee_reversal'`,
+        [paymentId],
+      );
+      // Cumulative rounding: after this refund the fee reversed in total is floor(fee * refunded / paid),
+      // and the rest of this refund comes off the doctor's share.
+      const feeReversal = Math.floor((feePaise * total) / paid) - Number(prior.rows[0]?.n ?? 0);
+      await q.query(
+        `INSERT INTO earnings_ledger (doctor_id, payment_id, refund_id, entry_type, amount_paise)
+         VALUES ($1, $2, $3, 'platform_fee_reversal', $4), ($1, $2, $3, 'doctor_share_reversal', $5)
+         ON CONFLICT DO NOTHING`,
+        [String(fee.doctor_id), paymentId, id, -feeReversal, -(refund - feeReversal)],
+      );
+      return true;
+    });
   }
 
   /** A second paid payment for one appointment: it stays out of the paid set and is refunded. */

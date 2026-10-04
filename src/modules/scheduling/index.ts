@@ -1,3 +1,4 @@
+import { getRefunds } from "../payments";
 import { z } from "zod";
 import { getCache } from "../../lib/cache";
 import { getConfig } from "../../lib/config/config";
@@ -48,6 +49,9 @@ export function getAppointments(): AppointmentService {
     patients: new PatientRepo(queryable(getDatabase())),
     slots: getSlots(),
     crypto: getCrypto,
+    // A doctor's or admin's cancellation of a paid booking gives the money back (P5-07).
+    onCancelled: ({ appointmentId, by, from }) =>
+      getRefunds().refundForCancellation(appointmentId, by, from),
   });
   return holder.appointments;
 }

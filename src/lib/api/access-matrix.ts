@@ -355,6 +355,17 @@ export const ACCESS_MATRIX: Record<RouteKey, MatrixEntry> = {
     probeAllowed: true,
     why: "Only the account that holds the appointment (404 for anyone else). The amount is the held fee, never from the client. Idempotent; sensitive tier fails closed.",
   },
+  "POST /api/v1/admin/payments/:id/refund": {
+    auth: "staff",
+    roles: ["admin", "super_admin"],
+    roleDenied: "not_found",
+    rateLimit: "admin",
+    audited: true,
+    freshLogin: true,
+    fullSession: false,
+    probeAllowed: true,
+    why: "Admin refund of a received payment, in full or in part. Fresh sign-in, Idempotency-Key, capped by what is left; patients, doctors and support get 404. The ledger follows when the gateway confirms.",
+  },
   "POST /api/v1/payments/verify": {
     auth: "session",
     roles: ["patient"],

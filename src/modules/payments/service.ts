@@ -8,10 +8,13 @@ import { assertAllowed, can, type Principal } from "../identity/policy";
 import type { PayableAppointment, PaymentRepo, PaymentRow } from "./repo";
 import {
   MAX_ORDERS_PER_APPOINTMENT,
+  type AdminRefundBody,
   type OrderView,
+  type RefundView,
   type VerifyBody,
   type VerifyView,
 } from "./schemas";
+import type { RefundService } from "./refunds";
 import type { SettlementService } from "./settlement";
 
 // Starting a payment (P5-03). The server decides the amount (the fee copied onto the appointment
@@ -25,6 +28,8 @@ type Deps = {
   publicKeyId: () => string;
   /** Settles a payment the browser says was made. */
   settlement?: Pick<SettlementService, "settle">;
+  /** Starts refunds (admin endpoint, cancellations). */
+  refunds?: Pick<RefundService, "refund">;
 };
 
 /** One key per (person, appointment, client key): the same request always maps to the same row. */
@@ -178,6 +183,53 @@ export class PaymentService {
           detail:
             "We could not confirm your payment yet. Do not pay again. Check your appointments in a few minutes.",
         });
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * An admin refunds a captured payment, in full or in part (P5-07). Needs the admin role and a
+   * recent sign-in (the route checks the second). The amount can never be more than what is left;
+   * the reason is stored; a repeat with the same Idempotency-Key is the same refund. The ledger
+   * and the payment total follow when the gateway confirms.
+   */
+  async refundAsAdmin(
+    principal: Principal,
+    paymentId: string,
+    input: AdminRefundBody,
+    clientKey: string,
+  ): Promise<RefundView> {
+    const payment = await this.deps.repo.findById(paymentId);
+    // Not an admin: the same 404 as a payment that does not exist.
+    if (!payment) throw errors.notFound();
+    assertAllowed(can.payment.refund(principal, { ownerUserId: payment.payerUserId }));
+    if (!["captured", "partially_refunded"].includes(payment.status)) {
+      throw errors.conflict({ detail: "Only a payment that was received can be refunded." });
+    }
+    if (!this.deps.refunds) throw errors.internal({ cause: new Error("refunds not wired") });
+    const purpose = `admin:${createHash("sha256").update(clientKey).digest("hex")}`;
+    try {
+      const refund = await this.deps.refunds.refund(payment, {
+        purpose,
+        reason: input.reason,
+        amountPaise: input.amountPaise ?? null,
+        initiatedBy: principal.userId,
+      });
+      if (!refund) throw errors.conflict({ detail: "Nothing is left to refund on this payment." });
+      return {
+        refundId: refund.id,
+        status: refund.status as RefundView["status"],
+        amountPaise: refund.amountPaise,
+      };
+    } catch (error) {
+      if (error instanceof AdapterError) {
+        logger.warn({ event: "admin_refund_failed", kind: error.kind });
+        throw error.kind === "rejected"
+          ? errors.conflict({ detail: "The payment provider refused this refund." })
+          : errors.unavailable({
+              detail: "The payment provider is not available. Try again in a moment.",
+            });
       }
       throw error;
     }
