@@ -2,8 +2,10 @@ import { getConfig } from "../config/config";
 import { globalSingleton } from "../singleton";
 import { getStorage } from "../storage";
 import { ClamAvScanner } from "./clamav";
-import { FakeEmailProvider, FakeFileScanner, FakeSmsProvider } from "./fakes";
-import type { EmailProvider, FileScanner, SmsProvider } from "./types";
+import { FakeEmailProvider, FakeFileScanner, FakePaymentProvider, FakeSmsProvider } from "./fakes";
+import { RazorpayProvider } from "./razorpay";
+import { protect } from "./resilience";
+import type { EmailProvider, FileScanner, PaymentProvider, SmsProvider } from "./types";
 
 // Picks the adapter implementation for this process. Only fakes exist for SMS and email until the real providers
 // are built (MSG91 and SES in P8); the scanner is real ClamAV when CLAMAV_HOST is set. A fake is never used in production: the process refuses to send.
@@ -12,6 +14,7 @@ const holder = globalSingleton("adapters", () => ({
   sms: undefined as SmsProvider | undefined,
   email: undefined as EmailProvider | undefined,
   scanner: undefined as FileScanner | undefined,
+  payments: undefined as PaymentProvider | undefined,
 }));
 
 function refuseFakeInProduction(what: string): void {
@@ -51,6 +54,35 @@ export function getFileScanner(): FileScanner {
   return holder.scanner;
 }
 
+/**
+ * Razorpay when its keys are set; a fake only outside production. Every call has a timeout and a
+ * circuit breaker. Only reads are retried: creating an order and refunding are never repeated by
+ * the wrapper (a repeat could charge or refund twice), so the caller decides what to do.
+ */
+export function getPaymentProvider(): PaymentProvider {
+  if (holder.payments) return holder.payments;
+  const config = getConfig();
+  if (config.RAZORPAY_KEY_ID && config.RAZORPAY_KEY_SECRET && config.RAZORPAY_WEBHOOK_SECRET) {
+    holder.payments = protect(
+      new RazorpayProvider({
+        keyId: config.RAZORPAY_KEY_ID,
+        keySecret: config.RAZORPAY_KEY_SECRET,
+        webhookSecret: config.RAZORPAY_WEBHOOK_SECRET,
+      }),
+      { provider: "razorpay" },
+      {
+        createOrder: { timeoutMs: 10_000 },
+        fetchPayment: { timeoutMs: 10_000, idempotent: true },
+        refund: { timeoutMs: 15_000 },
+      },
+    );
+    return holder.payments;
+  }
+  refuseFakeInProduction("payment (set the Razorpay keys)");
+  holder.payments = new FakePaymentProvider();
+  return holder.payments;
+}
+
 /** Replaces the providers (tests). Pass undefined to reset. */
 export function setSmsProviderForTest(provider: SmsProvider | undefined): void {
   holder.sms = provider;
@@ -60,4 +92,7 @@ export function setEmailProviderForTest(provider: EmailProvider | undefined): vo
 }
 export function setFileScannerForTest(scanner: FileScanner | undefined): void {
   holder.scanner = scanner;
+}
+export function setPaymentProviderForTest(provider: PaymentProvider | undefined): void {
+  holder.payments = provider;
 }

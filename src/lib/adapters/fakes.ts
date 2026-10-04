@@ -1,4 +1,5 @@
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
+import { safeEqualHex } from "./signature";
 import {
   AdapterError,
   E164,
@@ -38,12 +39,6 @@ function requireText(name: string, value: string): void {
 
 function requirePhone(to: string): void {
   if (!E164.test(to)) throw new AdapterError("invalid_input", "to must be an E.164 phone number");
-}
-
-function safeEqualHex(a: string, b: string): boolean {
-  const left = Buffer.from(a, "utf8");
-  const right = Buffer.from(b, "utf8");
-  return left.length === right.length && timingSafeEqual(left, right);
 }
 
 export class FakeVideoProvider implements VideoProvider {

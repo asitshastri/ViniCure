@@ -225,3 +225,17 @@ describe("protect() on real fakes", () => {
     expect(sms.sent).toHaveLength(0);
   });
 });
+
+describe("protect only wraps the methods it is told about", () => {
+  it("leaves inherited names such as constructor and toString alone", () => {
+    class Thing {
+      async work() {
+        return 1;
+      }
+    }
+    const wrapped = protect(new Thing(), { provider: "t" }, { work: { timeoutMs: 100 } });
+    expect(wrapped.constructor).toBe(Thing);
+    expect(typeof wrapped.toString).toBe("function");
+    expect(wrapped.toString()).toBe("[object Object]");
+  });
+});

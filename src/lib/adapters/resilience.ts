@@ -235,9 +235,10 @@ export function protect<A extends object>(
   return new Proxy(adapter, {
     get(target, property, receiver) {
       const value = Reflect.get(target, property, receiver);
-      const policy = (policies as Record<string, MethodPolicy<unknown> | undefined>)[
-        String(property)
-      ];
+      // Only methods listed by the caller; an inherited name such as "constructor" is never one.
+      const policy = Object.hasOwn(policies, property)
+        ? (policies as Record<string, MethodPolicy<unknown> | undefined>)[String(property)]
+        : undefined;
       if (typeof value !== "function" || !policy) return value;
       return (...args: unknown[]) =>
         resilience.call(
