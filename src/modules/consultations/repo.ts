@@ -14,6 +14,29 @@ export type JoinAppointment = {
   paid: boolean;
 };
 
+/** What the doctor's console shows, as stored. The reason is still encrypted here. */
+export type ConsoleRow = {
+  appointmentId: string;
+  status: string;
+  startAt: Date;
+  endAt: Date;
+  reasonEnc: string | null;
+  attendingAdultName: string | null;
+  attendingAdultRelation: string | null;
+  patientId: string;
+  patientAccountUserId: string;
+  patientName: string;
+  dob: string;
+  gender: string;
+  relation: string;
+  isMinor: boolean;
+  doctorUserId: string | null;
+  doctorName: string;
+  doctorQualifications: string;
+  doctorRegistrationNo: string;
+  doctorCouncil: string;
+};
+
 export type ConsultationRow = {
   id: string;
   appointmentId: string;
@@ -71,6 +94,45 @@ export class ConsultationRepo {
       patientAccountUserId: String(r.account_user_id),
       doctorUserId: r.doctor_user_id === null ? null : String(r.doctor_user_id),
       paid: r.paid === true,
+    };
+  }
+
+  /** The patient and doctor details for the console, for any appointment (the service decides who may see it). */
+  async consoleRow(appointmentId: string): Promise<ConsoleRow | null> {
+    const { rows } = await this.db.query(
+      `SELECT a.id, a.status, a.start_at, a.end_at, a.reason_enc, a.attending_adult_name,
+              a.attending_adult_relation, p.id AS patient_id, p.account_user_id, p.full_name,
+              p.dob::text AS dob, p.gender, p.relation, p.is_minor, d.user_id AS doctor_user_id,
+              d.display_name, d.qualifications, d.registration_no, d.registration_council
+         FROM appointments a
+         JOIN patients p ON p.id = a.patient_id
+         JOIN doctors d ON d.id = a.doctor_id
+        WHERE a.id = $1`,
+      [appointmentId],
+    );
+    const r = rows[0];
+    if (!r) return null;
+    return {
+      appointmentId: String(r.id),
+      status: String(r.status),
+      startAt: new Date(String(r.start_at)),
+      endAt: new Date(String(r.end_at)),
+      reasonEnc: r.reason_enc === null ? null : String(r.reason_enc),
+      attendingAdultName: r.attending_adult_name === null ? null : String(r.attending_adult_name),
+      attendingAdultRelation:
+        r.attending_adult_relation === null ? null : String(r.attending_adult_relation),
+      patientId: String(r.patient_id),
+      patientAccountUserId: String(r.account_user_id),
+      patientName: String(r.full_name),
+      dob: String(r.dob),
+      gender: String(r.gender),
+      relation: String(r.relation),
+      isMinor: r.is_minor === true,
+      doctorUserId: r.doctor_user_id === null ? null : String(r.doctor_user_id),
+      doctorName: String(r.display_name),
+      doctorQualifications: String(r.qualifications),
+      doctorRegistrationNo: String(r.registration_no),
+      doctorCouncil: String(r.registration_council),
     };
   }
 

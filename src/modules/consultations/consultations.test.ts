@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb } from "../../db/testing";
 import { FakeVideoProvider } from "../../lib/adapters/fakes";
+import type { PhiAccessEntry } from "../../lib/audit/audit";
+import { Crypto, LocalKeyProvider } from "../../lib/crypto/crypto";
 import type { Queryable, TxRunner } from "../../lib/db/queryable";
 import { AppError } from "../../lib/errors/app-error";
 import { uuidv7 } from "../../lib/ids";
@@ -20,6 +22,9 @@ let service: ConsultationService;
 let consent: ConsentService;
 let nowMs = 0;
 let nextUid: (() => number) | undefined;
+const crypto = new Crypto(new LocalKeyProvider("a-local-development-secret-of-32+chars"));
+let phi: PhiAccessEntry[] = [];
+let phiDown = false;
 
 let patient: Principal;
 let doctor: Principal;
@@ -157,7 +162,14 @@ beforeEach(async () => {
     window: () => ({ earlyMinutes: 10, lateMinutes: 30 }),
     now: () => nowMs,
     newUid: () => (nextUid ? nextUid() : Math.floor(Math.random() * 4_000_000_000) + 1),
+    crypto: () => crypto,
+    phiLog: async (entry) => {
+      if (phiDown) throw new Error("log down");
+      phi.push(entry);
+    },
   });
+  phi = [];
+  phiDown = false;
   patient = await person();
   doctor = await person(["doctor"]);
   otherDoctor = await person(["doctor"]);
@@ -679,5 +691,123 @@ describe("ending", () => {
       "scheduled",
     );
     expect(await code(service.renew(patient, appt))).toBe("forbidden");
+  });
+});
+
+describe("the doctor's console", () => {
+  async function withReason(text: string | null, over: { minor?: boolean } = {}) {
+    const appt = await booking();
+    const enc = text === null ? null : await crypto.encrypt(text, "appointments.reason_enc");
+    await q.query("UPDATE appointments SET reason_enc=$2 WHERE id=$1", [appt, enc]);
+    if (over.minor) {
+      await q.query(
+        "UPDATE patients SET is_minor=true, dob='2018-02-01', relation='child' WHERE id=$1",
+        [patientId],
+      );
+      await q.query(
+        "UPDATE appointments SET attending_adult_name='Parent Name', attending_adult_relation='mother' WHERE id=$1",
+        [appt],
+      );
+    }
+    return appt;
+  }
+
+  it("the assigned doctor sees the patient and the reason they wrote, and the read is logged first", async () => {
+    const appt = await withReason("Fever and cough for two days");
+    const out = await service.console(doctor, appt);
+    expect(out).toMatchObject({
+      appointmentId: appt,
+      status: "scheduled",
+      reason: "Fever and cough for two days",
+      patient: {
+        name: "Video Patient",
+        sex: "female",
+        relation: "self",
+        isMinor: false,
+        attendingAdult: null,
+      },
+      doctor: {
+        name: "Dr Video",
+        registrationNo: expect.stringMatching(/^VD-/),
+        council: "Council",
+      },
+    });
+    expect(out.patient.ageYears).toBeGreaterThan(30);
+    expect(phi).toEqual([
+      {
+        actorUserId: doctor.userId,
+        patientId,
+        resourceType: "patient_summary",
+        resourceId: appt,
+        purpose: "treatment",
+      },
+    ]);
+  });
+
+  it("every read writes its own log entry", async () => {
+    const appt = await withReason("Headache");
+    await service.console(doctor, appt);
+    await service.console(doctor, appt);
+    expect(phi).toHaveLength(2);
+  });
+
+  it("if the log cannot be written, nothing is returned", async () => {
+    const appt = await withReason("Private reason");
+    phiDown = true;
+    const error = await service.console(doctor, appt).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect(JSON.stringify(error)).not.toContain("Private reason");
+    expect(phi).toHaveLength(0);
+  });
+
+  it("a child shows the adult who will attend", async () => {
+    const appt = await withReason("Rash", { minor: true });
+    // Ages are worked out from the clock; use today's so a child born in 2018 is still a child.
+    nowMs = Date.now();
+    const out = await service.console(doctor, appt);
+    expect(out.patient).toMatchObject({
+      isMinor: true,
+      relation: "child",
+      attendingAdult: { name: "Parent Name", relation: "mother" },
+    });
+    expect(out.patient.ageYears).toBeLessThan(18);
+  });
+
+  it("no reason written is null, not an empty guess", async () => {
+    const appt = await withReason(null);
+    expect((await service.console(doctor, appt)).reason).toBeNull();
+  });
+
+  it("only the assigned doctor; the patient, another doctor, an admin, support and a stranger get 404 and nothing is logged", async () => {
+    const appt = await withReason("Secret");
+    for (const who of [patient, otherDoctor, admin, support, stranger]) {
+      expect(await code(service.console(who, appt)), who.roles.join()).toBe("not_found");
+    }
+    expect(await code(service.console(doctor, uuidv7()))).toBe("not_found");
+    expect(phi).toHaveLength(0);
+  });
+
+  it("a limited session cannot open it", async () => {
+    const appt = await withReason("Secret");
+    expect(await code(service.console({ ...doctor, limited: true }, appt))).toBe(
+      "step_up_required",
+    );
+    expect(phi).toHaveLength(0);
+  });
+
+  it("a closed appointment cannot be opened: cancelled, completed, expired", async () => {
+    for (const status of ["cancelled_by_patient", "completed", "expired"]) {
+      const appt = await booking({ status });
+      expect(await code(service.console(doctor, appt)), status).toBe("conflict");
+    }
+    expect(phi).toHaveLength(0);
+  });
+
+  it("the answer holds only what the screen needs: no contact details, no account ids", async () => {
+    const appt = await withReason("Cough");
+    const text = JSON.stringify(await service.console(doctor, appt));
+    for (const leak of [patient.userId, doctor.userId, "@no-email", "phone", "dob", "1990-01-01"]) {
+      expect(text, leak).not.toContain(leak);
+    }
   });
 });

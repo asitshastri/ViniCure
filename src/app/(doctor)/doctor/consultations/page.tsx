@@ -5,7 +5,10 @@ import { ConsultList } from "@/components/doctor/consult-row";
 import { PageHeader } from "@/components/shell/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/cn";
+import { loadRealDoctorConsults } from "@/lib/data/console-real";
+import { isRealDirectory } from "@/lib/data/directory-real";
 import { getDoctorConsults, getTodayDate } from "@/lib/data/doctor";
+import { istDate } from "@/modules/scheduling/slots";
 
 export const metadata: Metadata = { title: "Consultations" };
 
@@ -22,8 +25,10 @@ export default async function ConsultationsPage({
 }) {
   const raw = (await searchParams).tab;
   const tab = TABS.find((t) => t.id === raw)?.id ?? "today";
-  const today = getTodayDate();
-  const all = getDoctorConsults();
+  // Real bookings from the database when it is configured; the sample data otherwise.
+  const real = isRealDirectory() ? await loadRealDoctorConsults() : null;
+  const today = real ? istDate(new Date()) : getTodayDate();
+  const all = real ?? getDoctorConsults();
   const lists = {
     today: all.filter((c) => c.date === today),
     upcoming: all

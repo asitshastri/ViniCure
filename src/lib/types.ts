@@ -396,6 +396,8 @@ export type ConsultContext = {
     medicines: string[];
     pastVisits: Array<{ date: string; summary: string }>;
     files: Array<{ id: string; title: string; type: string; sharedOn: string }>;
+    /** A child's adult for this visit: "Name (relation)". */
+    attendingAdult?: string;
   };
   doctor: { name: string; qualifications: string; registrationNumber: string; council: string };
 };

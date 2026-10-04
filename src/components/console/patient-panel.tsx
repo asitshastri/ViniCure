@@ -12,9 +12,12 @@ import type { ConsultContext } from "@/lib/types";
 export function PatientPanel({
   ctx,
   part = "all",
+  real = false,
 }: {
   ctx: ConsultContext;
   part?: "info" | "files" | "all";
+  /** A real consultation: what is not recorded yet says so, instead of showing sample data. */
+  real?: boolean;
 }) {
   const { patient, consult } = ctx;
   const [file, setFile] = useState<ConsultContext["patient"]["files"][number] | null>(null);
@@ -27,8 +30,12 @@ export function PatientPanel({
             <div className="min-w-0">
               <p className="font-display text-lg font-semibold">{patient.name}</p>
               <p className="text-ink-muted text-sm">
-                {patient.ageSex}. {consult.kind === "new" ? "New patient" : "Follow-up"}.
+                {patient.ageSex}
+                {real ? "." : `. ${consult.kind === "new" ? "New patient" : "Follow-up"}.`}
               </p>
+              {patient.attendingAdult ? (
+                <p className="text-ink-muted text-sm">With: {patient.attendingAdult}</p>
+              ) : null}
             </div>
           </div>
 
@@ -39,47 +46,60 @@ export function PatientPanel({
             <p className="mt-1">{consult.reason}</p>
           </section>
 
-          <section aria-labelledby="al-h">
-            <h3 id="al-h" className="text-ink-muted text-sm font-semibold">
-              Allergies
-            </h3>
-            {consult.allergies.length ? (
-              <ul className="mt-1 flex flex-wrap gap-2">
-                {consult.allergies.map((a) => (
-                  <li key={a}>
-                    <Badge tone="danger" icon={<Warning weight="fill" className="size-3.5" />}>
-                      {a}
-                    </Badge>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-1">None recorded</p>
-            )}
-          </section>
+          {real ? (
+            <section aria-labelledby="hx-h" className="grid gap-1">
+              <h3 id="hx-h" className="text-ink-muted text-sm font-semibold">
+                Health history and allergies
+              </h3>
+              <p>Not recorded yet. They will appear here when the patient adds them.</p>
+            </section>
+          ) : null}
 
-          <section aria-labelledby="hx-h" className="grid gap-3">
-            <h3 id="hx-h" className="text-ink-muted text-sm font-semibold">
-              Health history
-            </h3>
-            <p>
-              <span className="text-ink-muted">Conditions: </span>
-              {patient.conditions.length ? patient.conditions.join(", ") : "None recorded"}
-            </p>
-            <p>
-              <span className="text-ink-muted">Takes now: </span>
-              {patient.medicines.length ? patient.medicines.join(", ") : "None recorded"}
-            </p>
-            {patient.pastVisits.length ? (
-              <ul className="grid gap-2">
-                {patient.pastVisits.map((v) => (
-                  <li key={v.date} className="bg-primary-tint rounded-lg p-3 text-sm">
-                    <span className="font-semibold">{formatSlotDay(v.date)}.</span> {v.summary}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </section>
+          {real ? null : (
+            <>
+              <section aria-labelledby="al-h">
+                <h3 id="al-h" className="text-ink-muted text-sm font-semibold">
+                  Allergies
+                </h3>
+                {consult.allergies.length ? (
+                  <ul className="mt-1 flex flex-wrap gap-2">
+                    {consult.allergies.map((a) => (
+                      <li key={a}>
+                        <Badge tone="danger" icon={<Warning weight="fill" className="size-3.5" />}>
+                          {a}
+                        </Badge>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-1">None recorded</p>
+                )}
+              </section>
+
+              <section aria-labelledby="hx-h" className="grid gap-3">
+                <h3 id="hx-h" className="text-ink-muted text-sm font-semibold">
+                  Health history
+                </h3>
+                <p>
+                  <span className="text-ink-muted">Conditions: </span>
+                  {patient.conditions.length ? patient.conditions.join(", ") : "None recorded"}
+                </p>
+                <p>
+                  <span className="text-ink-muted">Takes now: </span>
+                  {patient.medicines.length ? patient.medicines.join(", ") : "None recorded"}
+                </p>
+                {patient.pastVisits.length ? (
+                  <ul className="grid gap-2">
+                    {patient.pastVisits.map((v) => (
+                      <li key={v.date} className="bg-primary-tint rounded-lg p-3 text-sm">
+                        <span className="font-semibold">{formatSlotDay(v.date)}.</span> {v.summary}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </section>
+            </>
+          )}
         </>
       ) : null}
       {part !== "info" ? (

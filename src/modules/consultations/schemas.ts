@@ -25,3 +25,28 @@ export type JoinWindow = { earlyMinutes: number; lateMinutes: number };
 
 /** A token can still be renewed for this long after the join window closes (a call that runs over). */
 export const MAX_OVERRUN_MINUTES = 120;
+
+/** What the assigned doctor sees when opening a consultation: an allow-list, never a database row. */
+export type ConsoleView = {
+  appointmentId: string;
+  status: "scheduled" | "in_progress";
+  startAt: string;
+  endAt: string;
+  patient: {
+    name: string;
+    ageYears: number;
+    sex: string;
+    /** "self", or how the patient is related to the account holder who booked. */
+    relation: string;
+    isMinor: boolean;
+    attendingAdult: { name: string; relation: string } | null;
+  };
+  /** What the patient wrote when booking. Clinical text: reading it is logged. */
+  reason: string | null;
+  doctor: {
+    name: string;
+    qualifications: string;
+    registrationNo: string;
+    council: string;
+  };
+};

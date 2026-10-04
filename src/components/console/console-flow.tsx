@@ -14,6 +14,7 @@ import { NotesPanel } from "./notes-panel";
 import { PatientPanel } from "./patient-panel";
 import { RxBuilder, type RxState } from "./rx-builder";
 import { RxPreview } from "./rx-preview";
+import { RealVideoPane } from "./real-video-pane";
 import { VideoPane } from "./video-pane";
 
 type Tab = "patient" | "files" | "notes" | "rx";
@@ -42,7 +43,18 @@ function Card({
   );
 }
 
-export function ConsoleFlow({ ctx }: { ctx: ConsultContext }) {
+/**
+ * `real` runs the console on a real consultation: real video and the patient's details from the
+ * server. Notes and prescriptions are not part of it yet (clinical records, Phase 7), so those
+ * panels say so rather than pretend to save.
+ */
+export function ConsoleFlow({
+  ctx,
+  real,
+}: {
+  ctx: ConsultContext;
+  real?: { appointmentId: string };
+}) {
   const { toast } = useToast();
   const { consult, patient, doctor } = ctx;
   const [tab, setTab] = useState<Tab>("patient");
@@ -86,12 +98,20 @@ export function ConsoleFlow({ ctx }: { ctx: ConsultContext }) {
           Consultation ended
         </h1>
         <Notice
-          tone={sent ? "info" : "warning"}
-          title={sent ? "Prescription sent" : "No prescription was sent"}
+          tone={sent || real ? "info" : "warning"}
+          title={
+            real
+              ? "The consultation is closed"
+              : sent
+                ? "Prescription sent"
+                : "No prescription was sent"
+          }
         >
-          {sent
-            ? `${patient.name} can see it in their records.`
-            : `${patient.name} will not receive a prescription for this consultation.`}
+          {real
+            ? `${patient.name} has been disconnected and cannot rejoin.`
+            : sent
+              ? `${patient.name} can see it in their records.`
+              : `${patient.name} will not receive a prescription for this consultation.`}
         </Notice>
         <div>
           <ButtonLink href="/doctor/dashboard" size="lg">
@@ -132,11 +152,21 @@ export function ConsoleFlow({ ctx }: { ctx: ConsultContext }) {
 
       <div className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_24rem] xl:grid-cols-[20rem_minmax(0,1fr)_26rem]">
         <div className="min-w-0 lg:col-start-1 lg:row-start-1 xl:col-start-2">
-          <VideoPane
-            patientName={patient.name}
-            doctorName={doctor.name}
-            onEnd={() => setEndOpen(true)}
-          />
+          {real ? (
+            <RealVideoPane
+              appointmentId={real.appointmentId}
+              patientName={patient.name}
+              doctorName={doctor.name}
+              canStart={consult.canStart}
+              onEnded={() => setEnded(true)}
+            />
+          ) : (
+            <VideoPane
+              patientName={patient.name}
+              doctorName={doctor.name}
+              onEnd={() => setEndOpen(true)}
+            />
+          )}
         </div>
 
         <div className="grid min-w-0 content-start gap-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 xl:contents">
@@ -173,7 +203,7 @@ export function ConsoleFlow({ ctx }: { ctx: ConsultContext }) {
             className={cn(show("patient"), "xl:col-start-1 xl:row-start-1 xl:block")}
           >
             <Card id="p-h" title="Patient">
-              <PatientPanel ctx={ctx} part="info" />
+              <PatientPanel ctx={ctx} part="info" real={Boolean(real)} />
             </Card>
           </div>
           <div
@@ -183,7 +213,7 @@ export function ConsoleFlow({ ctx }: { ctx: ConsultContext }) {
             className={cn(show("files"), "xl:col-start-1 xl:row-start-2 xl:block")}
           >
             <Card id="f-h" title="Files">
-              <PatientPanel ctx={ctx} part="files" />
+              <PatientPanel ctx={ctx} part="files" real={Boolean(real)} />
             </Card>
           </div>
           <div
@@ -193,7 +223,14 @@ export function ConsoleFlow({ ctx }: { ctx: ConsultContext }) {
             className={cn(show("notes"), "xl:col-start-2 xl:row-start-2 xl:block")}
           >
             <Card id="n-h" title="Notes">
-              <NotesPanel value={notes} onChange={setNotes} />
+              {real ? (
+                <Notice tone="info" title="Notes are not available yet">
+                  Consultation notes arrive with clinical records. Nothing written here would be
+                  saved.
+                </Notice>
+              ) : (
+                <NotesPanel value={notes} onChange={setNotes} />
+              )}
             </Card>
           </div>
           <div
@@ -203,15 +240,22 @@ export function ConsoleFlow({ ctx }: { ctx: ConsultContext }) {
             className={cn(show("rx"), "xl:col-start-3 xl:row-span-2 xl:row-start-1 xl:block")}
           >
             <Card id="r-h" title="Prescription">
-              <RxBuilder
-                allergies={consult.allergies}
-                value={rx}
-                onChange={setRx}
-                onPreview={() => setPreview(true)}
-                sent={sent}
-                onSend={() => void send()}
-                sending={sending}
-              />
+              {real ? (
+                <Notice tone="info" title="Prescriptions are not available yet">
+                  The prescription builder arrives with clinical records. No prescription can be
+                  sent from here yet.
+                </Notice>
+              ) : (
+                <RxBuilder
+                  allergies={consult.allergies}
+                  value={rx}
+                  onChange={setRx}
+                  onPreview={() => setPreview(true)}
+                  sent={sent}
+                  onSend={() => void send()}
+                  sending={sending}
+                />
+              )}
             </Card>
           </div>
         </div>

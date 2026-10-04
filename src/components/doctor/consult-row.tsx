@@ -33,11 +33,14 @@ export function ConsultRow({ c, showDate = false }: Props) {
       </div>
       <div className="min-w-0 flex-1">
         <p className="font-semibold">
-          {c.patientName} <span className="text-ink-muted font-normal">({c.ageSex})</span>
+          {c.patientName}{" "}
+          {c.ageSex ? <span className="text-ink-muted font-normal">({c.ageSex})</span> : null}
         </p>
-        <p className="text-ink-muted text-sm">
-          {c.reason}. {c.kind === "new" ? "New patient" : "Follow-up"}.
-        </p>
+        {c.reason ? (
+          <p className="text-ink-muted text-sm">
+            {c.reason}. {c.kind === "new" ? "New patient" : "Follow-up"}.
+          </p>
+        ) : null}
         {c.allergies.length ? (
           <p className="text-danger mt-1 flex items-center gap-1 text-sm font-medium">
             <Warning aria-hidden weight="fill" className="size-4 shrink-0" />

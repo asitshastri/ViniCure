@@ -4,9 +4,18 @@ import { AppError, errors } from "../../lib/errors/app-error";
 import { logger } from "../../lib/logging/logger";
 import { uuidv7 } from "../../lib/ids";
 import type { ConsentService } from "../consent/service";
+import type { Crypto } from "../../lib/crypto/crypto";
+import type { PhiAccessEntry } from "../../lib/audit/audit";
+import { ageFromDob } from "../../lib/age";
 import { assertAllowed, can, type Principal } from "../identity/policy";
 import type { ConsultationRepo, JoinAppointment, ParticipantRow } from "./repo";
-import { MAX_OVERRUN_MINUTES, type EndView, type JoinView, type JoinWindow } from "./schemas";
+import {
+  MAX_OVERRUN_MINUTES,
+  type ConsoleView,
+  type EndView,
+  type JoinView,
+  type JoinWindow,
+} from "./schemas";
 
 // Joining, renewing and ending a video consultation (P6-03, P6-04). Every token is built for one
 // person, one room and one provider number, and only after the server has checked, in this order:
@@ -33,6 +42,10 @@ type Deps = {
   now?: () => number;
   /** For tests: the provider number to try next. */
   newUid?: () => number;
+  /** Decrypts the reason the patient wrote (the console only). */
+  crypto?: () => Crypto;
+  /** Writes the PHI access log. A read with no log entry is not allowed to succeed. */
+  phiLog?: (entry: PhiAccessEntry) => Promise<void>;
 };
 
 export class ConsultationService {
@@ -241,5 +254,63 @@ export class ConsultationService {
     if (!result) throw errors.conflict({ detail: "This consultation has already ended." });
     logger.info({ event: "consultation_ended", result });
     return { status: result };
+  }
+
+  /**
+   * What the assigned doctor sees on opening a consultation: who the patient is and what they
+   * wrote when booking. Only the assigned doctor (everyone else gets the same 404), only while the
+   * appointment is booked and not over. Reading it is a clinical read: the PHI access log entry is
+   * written first, and if it cannot be written nothing is returned.
+   */
+  async console(principal: Principal, appointmentId: string): Promise<ConsoleView> {
+    const row = await this.deps.repo.consoleRow(appointmentId);
+    if (!row) throw errors.notFound();
+    const assigned = row.doctorUserId !== null && row.doctorUserId === principal.userId;
+    // The policy answers 404 for anyone who is not connected to this patient; being assigned is
+    // required on top (a patient reading their own file is not a doctor opening the console).
+    assertAllowed(
+      can.patientProfile.read(principal, { ownerUserId: row.patientAccountUserId, assigned }),
+    );
+    if (!assigned) throw errors.notFound();
+    if (row.status !== "scheduled" && row.status !== "in_progress") {
+      throw errors.conflict({ detail: "This consultation is closed." });
+    }
+    if (!this.deps.phiLog || !this.deps.crypto) {
+      throw errors.internal({ cause: new Error("console not wired") });
+    }
+    await this.deps.phiLog({
+      actorUserId: principal.userId,
+      patientId: row.patientId,
+      resourceType: "patient_summary",
+      resourceId: row.appointmentId,
+      purpose: "treatment",
+    });
+    const reason = row.reasonEnc
+      ? await this.deps.crypto().decrypt(row.reasonEnc, "appointments.reason_enc")
+      : null;
+    return {
+      appointmentId: row.appointmentId,
+      status: row.status,
+      startAt: row.startAt.toISOString(),
+      endAt: row.endAt.toISOString(),
+      patient: {
+        name: row.patientName,
+        ageYears: ageFromDob(row.dob, this.now()),
+        sex: row.gender,
+        relation: row.relation,
+        isMinor: row.isMinor,
+        attendingAdult:
+          row.attendingAdultName && row.attendingAdultRelation
+            ? { name: row.attendingAdultName, relation: row.attendingAdultRelation }
+            : null,
+      },
+      reason,
+      doctor: {
+        name: row.doctorName,
+        qualifications: row.doctorQualifications,
+        registrationNo: row.doctorRegistrationNo,
+        council: row.doctorCouncil,
+      },
+    };
   }
 }

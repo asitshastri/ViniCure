@@ -487,6 +487,17 @@ export const ACCESS_MATRIX: Record<RouteKey, MatrixEntry> = {
     probeAllowed: false,
     why: "Renewal for someone already in the room. Refused after the consultation ended, after the seat was revoked, or well after the booked time.",
   },
+  "GET /api/v1/consultations/:appointmentId/context": {
+    auth: "session",
+    roles: ["doctor"],
+    roleDenied: "not_found",
+    rateLimit: "auth_read",
+    audited: true,
+    freshLogin: false,
+    fullSession: true,
+    probeAllowed: false,
+    why: "Only the assigned doctor (404 for anyone else, including the patient and admins). Patient name, age, sex and the reason they wrote; every read is written to the PHI access log first.",
+  },
   "POST /api/v1/consultations/:appointmentId/end": {
     auth: "session",
     roles: ["doctor"],
