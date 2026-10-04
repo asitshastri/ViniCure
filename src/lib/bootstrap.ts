@@ -9,6 +9,7 @@ import { MemoryDurableStore, createIdempotency } from "./idempotency/idempotency
 import { PgDurableStore } from "./idempotency/repo";
 import { installSignalHandlers } from "./lifecycle";
 import { logger } from "./logging/logger";
+import { authenticateRequest } from "../modules/identity";
 import { RateLimiter } from "./rate-limit/limiter";
 
 // Wires the shared modules once, when the server starts (src/instrumentation.ts).
@@ -29,7 +30,13 @@ export function bootstrap(): void {
     env: config.APP_ENV,
     hashSecret: config.AUTH_SECRET ?? DEV_HASH_SECRET,
   });
-  configureApi({ rateLimit: limiter.check, trustedProxyHops: config.TRUSTED_PROXY_HOPS });
+  configureApi({
+    rateLimit: limiter.check,
+    trustedProxyHops: config.TRUSTED_PROXY_HOPS,
+    // Session lookup (P2): reads the session cookie and the roles of the signed-in person.
+    authenticate: authenticateRequest,
+    trustedOrigins: [new URL(config.APP_URL).origin, ...config.AUTH_TRUSTED_ORIGINS],
+  });
 
   let crypto: Crypto | undefined;
   if (config.CRYPTO_PROVIDER === "local" && config.LOCAL_DEV_KEY) {

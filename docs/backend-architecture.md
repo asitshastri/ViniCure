@@ -270,7 +270,8 @@ Auth column: `public`, `session` (any signed-in user), `patient`, `doctor`, `sta
 | GET, PATCH, DELETE | `/api/v1/patients/:id` | patient, owner | Delete is a soft delete |
 | GET, DELETE | `/api/v1/sessions`, `/api/v1/sessions/:id` | session | Own sessions only |
 | POST | `/api/v1/admin/invitations` | admin | Invite doctor or staff |
-| POST | `/api/v1/invitations/:token/accept` | public (token) | Set password, enrol TOTP |
+| POST | `/api/v1/invitations/:token/enrol` | public (token) | Show the authenticator address and backup codes (step 1) |
+| POST | `/api/v1/invitations/:token/accept` | public (token) | Set name and password, confirm the first code, create the account (step 2) |
 | POST | `/api/v1/staff/password-reset/request` | public | 3 per 15 minutes per IP. Same response whether or not the email exists. |
 | POST | `/api/v1/staff/password-reset/confirm` | public (token) | Single-use token. Invalidates other sessions. |
 

@@ -3,6 +3,7 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import type { Role } from "../../lib/api/types";
 import { twoFactorSchema } from "./schema";
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordHasher } from "./password";
 import { isStaff } from "./session-policy";
 
 // Staff sign-in (P2-05): email, password and a mandatory authenticator code (TOTP), with backup
@@ -89,6 +90,7 @@ export const staffEmailAndPassword: NonNullable<BetterAuthOptions["emailAndPassw
   disableSignUp: true,
   autoSignIn: false,
   requireEmailVerification: true,
-  minPasswordLength: 12,
-  maxPasswordLength: 128,
+  minPasswordLength: PASSWORD_MIN_LENGTH,
+  maxPasswordLength: PASSWORD_MAX_LENGTH,
+  password: passwordHasher,
 };

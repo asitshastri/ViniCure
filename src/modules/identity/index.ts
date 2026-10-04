@@ -1,13 +1,16 @@
+import type { Actor } from "../../lib/api/types";
 import { getConfig } from "../../lib/config/config";
 import { getDatabase, queryable } from "../../lib/db/pool";
 import { globalSingleton } from "../../lib/singleton";
 import { HCaptchaVerifier } from "../../lib/adapters/hcaptcha";
-import { getSmsProvider } from "../../lib/adapters/registry";
+import { getEmailProvider, getSmsProvider } from "../../lib/adapters/registry";
 import { getCache } from "../../lib/cache";
 import { logger } from "../../lib/logging/logger";
 import { RateLimiter } from "../../lib/rate-limit/limiter";
 import { createAuth, type Auth } from "./auth";
 import { guardOtpRequest, type OtpGuardDeps } from "./otp-guard";
+import { invitationCrypto } from "./invitation-crypto";
+import { InvitationService } from "./invitations";
 import { createPhonePlugin } from "./phone";
 import { isStaff } from "./session-policy";
 import { createStaffPlugins, staffEmailAndPassword } from "./staff";
@@ -90,7 +93,47 @@ export function guardAuthRequest(request: Request): Promise<void> {
   return guardOtpRequest(request, getOtpGuardDeps());
 }
 
+function getRepo(): IdentityRepo {
+  return new IdentityRepo(queryable(getDatabase()));
+}
+
+/**
+ * Who is making this request? Reads the session cookie, checks it against the database (a
+ * revoked session fails at once) and loads the roles. Plugged into withApi at start-up.
+ */
+export async function authenticateRequest(request: Request): Promise<Actor | null> {
+  const found = await getAuth().api.getSession({ headers: request.headers });
+  if (!found) return null;
+  const state = await getRepo().accountState(found.user.id);
+  if (!state || state.status !== "active") return null;
+  return {
+    userId: found.user.id,
+    roles: state.roles,
+    sessionId: found.session.id,
+    lastSignInAt: new Date(found.session.createdAt),
+  };
+}
+
+const invitationHolder = globalSingleton("invitations", () => ({
+  service: undefined as InvitationService | undefined,
+}));
+
+/** Staff invitations (P2-06): create, enrol the authenticator, accept. */
+export function getInvitations(): InvitationService {
+  if (invitationHolder.service) return invitationHolder.service;
+  invitationHolder.service = new InvitationService({
+    repo: getRepo(),
+    email: getEmailProvider(),
+    crypto: invitationCrypto(getAuth()),
+    appUrl: getConfig().APP_URL,
+  });
+  return invitationHolder.service;
+}
+
+export { INVITABLE_ROLES } from "./invitations";
+
 export function resetAuthForTest(): void {
   holder.auth = undefined;
   guardHolder.deps = undefined;
+  invitationHolder.service = undefined;
 }

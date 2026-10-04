@@ -128,6 +128,30 @@ async function enforceRateLimit(
   }
 }
 
+/**
+ * Origin check for state-changing requests, on top of SameSite cookies. A browser always sends
+ * Origin on a cross-site POST, so a foreign Origin is refused. A request with no Origin (a
+ * server calling us, such as a payment webhook) passes here and relies on its own signature;
+ * a browser that says it is cross-site without Origin (Sec-Fetch-Site) is refused too.
+ */
+function enforceOrigin(request: Request, logger: Logger, path: string): void {
+  if (request.method === "GET" || request.method === "HEAD") return;
+  const { trustedOrigins } = getApiDeps();
+  if (!trustedOrigins) {
+    if (isProduction()) {
+      throw errors.unavailable({ cause: new Error("trusted origins not configured") });
+    }
+    return;
+  }
+  const origin = request.headers.get("origin");
+  const site = request.headers.get("sec-fetch-site");
+  const foreign = origin ? !trustedOrigins.includes(origin) : site === "cross-site";
+  if (foreign) {
+    logger.warn({ event: "origin_refused", route: path });
+    throw errors.forbidden();
+  }
+}
+
 function toResponse(result: HandlerResult | undefined): Response {
   if (result instanceof Response) return result;
   if (result === null || result === undefined) return new Response(null, { status: 204 });
@@ -196,6 +220,9 @@ export function withApi<
 
     try {
       if (request.method !== config.method) throw new AppError("method_not_allowed");
+
+      // 0. Origin check for state-changing requests.
+      enforceOrigin(request, logger, config.path);
 
       // 1. Coarse rate limit by address, before any work is done.
       await enforceRateLimit(config, request, undefined, logger);

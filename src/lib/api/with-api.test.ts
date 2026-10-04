@@ -365,6 +365,7 @@ describe("idempotency and audit", () => {
     nextActor = patient;
     configureApi({
       production: true,
+      trustedOrigins: ["http://x.test"],
       rateLimit: async () => ({ allowed: true, limit: 1, remaining: 1, retryAfterSeconds: 0 }),
     });
     const res = await withApi(
@@ -449,5 +450,55 @@ describe("route files", () => {
         ).toBe(true);
       }
     }
+  });
+});
+
+describe("origin check on state-changing requests", () => {
+  const route = () =>
+    withApi({ method: "POST", path: "/api/v1/o", auth: "public", rateLimit: "write" }, () => ({
+      ok: true,
+    }));
+  const allow = async () => ({ allowed: true, limit: 1, remaining: 1, retryAfterSeconds: 0 });
+
+  it("refuses a foreign Origin, allows our own, and allows a caller with no Origin", async () => {
+    configureApi({
+      production: true,
+      trustedOrigins: ["https://vinicure.example"],
+      rateLimit: allow,
+    });
+    const handler = route();
+    expect((await handler(post({}, { origin: "https://evil.example" }))).status).toBe(403);
+    expect((await handler(post({}, { origin: "https://vinicure.example" }))).status).toBe(200);
+    expect((await handler(post({}))).status).toBe(200);
+  });
+
+  it("refuses a browser that says it is cross-site but sends no Origin", async () => {
+    configureApi({
+      production: true,
+      trustedOrigins: ["https://vinicure.example"],
+      rateLimit: allow,
+    });
+    const res = await route()(post({}, { "sec-fetch-site": "cross-site" }));
+    expect(res.status).toBe(403);
+  });
+
+  it("does not look at GET requests", async () => {
+    configureApi({
+      production: true,
+      trustedOrigins: ["https://vinicure.example"],
+      rateLimit: allow,
+    });
+    const handler = withApi(
+      { method: "GET", path: "/api/v1/g", auth: "public", rateLimit: "public_read" },
+      () => ({ ok: true }),
+    );
+    expect(
+      (await handler(get("http://x.test/api/v1/g", { origin: "https://evil.example" }))).status,
+    ).toBe(200);
+  });
+
+  it("production without trusted origins refuses to serve a state-changing request", async () => {
+    configureApi({ production: true, rateLimit: allow });
+    expect((await route()(post({}))).status).toBe(503);
   });
 });

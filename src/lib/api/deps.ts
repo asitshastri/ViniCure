@@ -30,6 +30,11 @@ export type ApiDeps = {
   idempotency?: IdempotencyRunner;
   /** Overrides NODE_ENV === "production". Used by tests. */
   production?: boolean;
+  /**
+   * Origins allowed to send state-changing requests (our own site). A POST, PUT, PATCH or
+   * DELETE whose Origin header names another site is refused. Required in production.
+   */
+  trustedOrigins?: readonly string[];
   /** How many proxies sit in front of the app (load balancer, CDN). Default 1. */
   trustedProxyHops?: number;
 };
