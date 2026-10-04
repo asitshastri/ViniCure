@@ -7,13 +7,13 @@ docker compose -f docker/compose.yml up -d
 docker compose -f docker/compose.yml ps
 ```
 
-| Service     | Address                                                | Used for                                                                             |
-| ----------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| Postgres 17 | `localhost:5432`, user `vinicure`, database `vinicure` | Main database                                                                        |
-| Valkey 8    | `localhost:6379`                                       | Rate limits, idempotency, short-lived state                                          |
-| S3 test server       | `localhost:9000` (API), `localhost:9001` (console)     | Fake S3. Buckets `vinicure-files` and `vinicure-exports` are created by `s3-init` |
-| Mailpit     | `localhost:8025` (inbox), `localhost:1025` (SMTP)      | Catches outgoing email                                                               |
-| ClamAV      | `localhost:3310`                                       | Virus scanning. The first start downloads signatures and takes a few minutes         |
+| Service        | Address                                                | Used for                                                                          |
+| -------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| Postgres 17    | `localhost:5432`, user `vinicure`, database `vinicure` | Main database                                                                     |
+| Valkey 8       | `localhost:6379`                                       | Rate limits, idempotency, short-lived state                                       |
+| S3 test server | `localhost:9000` (API), `localhost:9001` (console)     | Fake S3. Buckets `vinicure-files` and `vinicure-exports` are created by `s3-init` |
+| Mailpit        | `localhost:8025` (inbox), `localhost:1025` (SMTP)      | Catches outgoing email                                                            |
+| ClamAV         | `localhost:3310`                                       | Virus scanning. The first start downloads signatures and takes a few minutes      |
 
 All ports listen on this computer only. The passwords in `compose.yml` are throwaway values for local use and must never be reused anywhere else.
 

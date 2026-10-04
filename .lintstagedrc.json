@@ -1,0 +1,5 @@
+{
+  "*": "node scripts/secret-scan.mjs --",
+  "*.{ts,tsx,mts,js,mjs}": ["eslint --max-warnings=0", "prettier --check"],
+  "*.{json,md,css,yml,yaml}": "prettier --check"
+}

@@ -1,0 +1,15 @@
+# gitleaks settings (P0-09). The default rules apply; these are the only exceptions.
+title = "ViniCure gitleaks"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fake secrets used to test our own secret scanner, and the public throwaway local database password"
+paths = [
+  '''src/security/secret-scan\.test\.ts''',
+  '''scripts/secret-scan\.mjs''',
+]
+regexes = [
+  '''dev-only-change-me''',
+]

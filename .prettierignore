@@ -6,3 +6,6 @@ design-system
 TODO.md
 CLAUDE.md
 docs
+
+# third-party skill files copied in (their own style)
+.claude/
