@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "e2e": "playwright test",
+    "db:seed": "esbuild db/seed.mts --bundle --platform=node --format=esm --packages=external --outfile=dist/seed.mjs && node --env-file-if-exists=.env.local dist/seed.mjs",
     "db:migrate": "pnpm build:migrate && node --env-file-if-exists=.env.local dist/migrate.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

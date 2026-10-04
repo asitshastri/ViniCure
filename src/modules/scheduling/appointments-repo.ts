@@ -287,4 +287,56 @@ export class AppointmentRepo {
     );
     return rows.length === 1;
   }
+
+  // ---- the release job and late payment ----
+
+  /**
+   * Marks holds that have run out as expired, oldest first, `limit` at a time, with the history
+   * row in the same statement. Rows being handled by another worker are skipped, so two workers
+   * never fight over one hold. Returns the doctors whose slots were freed.
+   */
+  async releaseExpiredHolds(limit: number): Promise<{ id: string; doctorId: string }[]> {
+    const { rows } = await this.db.query(
+      `WITH due AS (
+         SELECT id FROM appointments
+          WHERE status = 'held' AND hold_expires_at <= now()
+          ORDER BY hold_expires_at LIMIT $1 FOR UPDATE SKIP LOCKED
+       ), gone AS (
+         UPDATE appointments a SET status = 'expired', hold_expires_at = NULL
+           FROM due WHERE a.id = due.id RETURNING a.id, a.doctor_id
+       ), logged AS (
+         INSERT INTO appointment_status_history (appointment_id, from_status, to_status, reason)
+         SELECT id, 'held', 'expired', 'hold ran out' FROM gone
+       )
+       SELECT id, doctor_id FROM gone`,
+      [limit],
+    );
+    return rows.map((r) => ({ id: String(r.id), doctorId: String(r.doctor_id) }));
+  }
+
+  /**
+   * Confirms a paid appointment (held to scheduled). If the hold already ran out, it is brought
+   * back only if the time is still free: the exclusion constraint decides, so a time that went
+   * to someone else raises 23P01 for the caller. Returns the status the row was in, or null if
+   * it was in neither state.
+   */
+  async confirmPaid(input: {
+    id: string;
+    from: "held" | "expired";
+    changedBy: string | null;
+  }): Promise<boolean> {
+    const { rows } = await this.db.query(
+      `WITH moved AS (
+         UPDATE appointments SET status = 'scheduled', hold_expires_at = NULL
+          WHERE id = $1 AND status = $2 RETURNING id
+       ), logged AS (
+         INSERT INTO appointment_status_history (appointment_id, from_status, to_status, changed_by, reason)
+         SELECT id, $2, 'scheduled', $3, CASE WHEN $2 = 'expired' THEN 'paid after the hold ran out' ELSE 'paid' END
+           FROM moved
+       )
+       SELECT id FROM moved`,
+      [input.id, input.from, input.changedBy],
+    );
+    return rows.length === 1;
+  }
 }

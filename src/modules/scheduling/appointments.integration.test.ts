@@ -186,4 +186,52 @@ describe.skipIf(!url)("slot holds under concurrency (real Postgres)", () => {
     );
     expect(cancels.rows[0]?.n).toBe(1);
   });
+
+  it("two release jobs at once free each hold once; a late payment loses to a new hold", async () => {
+    const people = await Promise.all([newPerson(), newPerson(), newPerson()]);
+    const ids: string[] = [];
+    // 09:00 to 11:30 are used by earlier tests; use another weekday's worth: the next Monday.
+    for (const [i, p] of people.entries()) {
+      const h = await service.hold(
+        p.principal,
+        holdBody.parse({
+          patientId: p.patientId,
+          doctorId,
+          startAt: new Date(`2026-11-09T${["09:00", "09:30", "10:00"][i]}:00+05:30`).toISOString(),
+        }),
+      );
+      await pool.query(
+        "UPDATE appointments SET hold_expires_at = now() - interval '1 minute' WHERE id = $1",
+        [h.id],
+      );
+      ids.push(h.id);
+    }
+    // The doctor's rule is for Mondays, so 9 Nov is a valid day too.
+    const [a, b] = await Promise.all([
+      service.releaseExpired(1, 10),
+      service.releaseExpired(1, 10),
+    ]);
+    // Holds left by earlier test runs are released first (oldest first), so finish the backlog.
+    expect(a + b).toBeGreaterThanOrEqual(1);
+    await service.releaseExpired(200, 100);
+    const { rows } = await pool.query(
+      "SELECT appointment_id, count(*)::int AS n FROM appointment_status_history WHERE appointment_id = ANY($1) AND to_status = 'expired' GROUP BY appointment_id",
+      [ids],
+    );
+    expect(rows).toHaveLength(3);
+    for (const r of rows) expect(r.n).toBe(1);
+    // Somebody else takes the first slot; the late payment for the old hold is slot_lost.
+    const first = people[0] as Awaited<ReturnType<typeof newPerson>>;
+    const rival = await newPerson();
+    await service.hold(
+      rival.principal,
+      holdBody.parse({
+        patientId: rival.patientId,
+        doctorId,
+        startAt: new Date("2026-11-09T09:00:00+05:30").toISOString(),
+      }),
+    );
+    expect(await service.confirmAfterPayment(ids[0] as string, null)).toBe("slot_lost");
+    void first;
+  });
 });

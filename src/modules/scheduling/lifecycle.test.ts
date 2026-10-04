@@ -434,3 +434,113 @@ describe("who can read", () => {
     }
   });
 });
+
+describe("the release job", () => {
+  const expireNow = (id: string) =>
+    q.query("UPDATE appointments SET hold_expires_at = now() - interval '1 minute' WHERE id=$1", [
+      id,
+    ]);
+  const hold = (at: string, who = asha, patientId = ashaPatient) =>
+    service.hold(who, holdBody.parse({ patientId, doctorId, startAt: SLOT(at) }));
+
+  it("expires only holds that have run out, with history, and leaves everything else alone", async () => {
+    const old = await hold("09:00");
+    const fresh = await hold("09:30");
+    const paid = await confirmed(SLOT("10:00"));
+    await expireNow(old.id);
+    const released = await service.releaseExpired();
+    expect(released).toBeGreaterThanOrEqual(1);
+    expect(await status(old.id)).toBe("expired");
+    expect(await status(fresh.id)).toBe("held");
+    expect(await status(paid)).toBe("scheduled");
+    expect((await history(old.id)).map((h) => h.to_status)).toEqual(["held", "expired"]);
+    expect(
+      (await q.query("SELECT hold_expires_at FROM appointments WHERE id=$1", [old.id])).rows[0]
+        ?.hold_expires_at,
+    ).toBeNull();
+  });
+
+  it("running it again changes nothing, and a freed slot can be held by someone else", async () => {
+    const old = await hold("09:00");
+    await expireNow(old.id);
+    await service.releaseExpired();
+    const before = (await history(old.id)).length;
+    expect(await service.releaseExpired()).toBe(0);
+    expect((await history(old.id)).length).toBe(before);
+    const ravisProfile = await profile(ravi);
+    expect((await hold("09:00", ravi, ravisProfile)).status).toBe("held");
+  });
+
+  it("works through a backlog in batches", async () => {
+    const ids: string[] = [];
+    for (const t of ["09:00", "09:30", "10:00", "10:30", "11:00"]) {
+      const h = await hold(t, asha);
+      await q.query("UPDATE appointments SET booked_by_user_id = $2 WHERE id = $1", [
+        h.id,
+        (await person()).userId,
+      ]); // different bookers: the open-hold cap is per person
+      await expireNow(h.id);
+      ids.push(h.id);
+    }
+    expect(await service.releaseExpired(2, 10)).toBeGreaterThanOrEqual(5);
+    for (const id of ids) expect(await status(id)).toBe("expired");
+  });
+});
+
+describe("a payment arriving (the late-payment hook)", () => {
+  const heldAt = (at: string, who = asha, patientId = ashaPatient) =>
+    service.hold(who, holdBody.parse({ patientId, doctorId, startAt: SLOT(at) }));
+  const expireNow = (id: string) =>
+    q.query("UPDATE appointments SET hold_expires_at = now() - interval '1 minute' WHERE id=$1", [
+      id,
+    ]);
+
+  it("a payment inside the hold confirms it", async () => {
+    const h = await heldAt("09:00");
+    expect(await service.confirmAfterPayment(h.id, null)).toBe("confirmed");
+    expect(await status(h.id)).toBe("scheduled");
+    expect((await history(h.id)).map((x) => x.to_status)).toEqual(["held", "scheduled"]);
+    expect(
+      (await q.query("SELECT hold_expires_at FROM appointments WHERE id=$1", [h.id])).rows[0]
+        ?.hold_expires_at,
+    ).toBeNull();
+  });
+
+  it("a repeated payment event confirms once and then says already", async () => {
+    const h = await heldAt("09:00");
+    expect(await service.confirmAfterPayment(h.id, null)).toBe("confirmed");
+    expect(await service.confirmAfterPayment(h.id, null)).toBe("already");
+    expect((await history(h.id)).length).toBe(2);
+  });
+
+  it("a late payment confirms if the time is still free, whether or not the job has run", async () => {
+    const h = await heldAt("09:00");
+    await expireNow(h.id);
+    expect(await service.confirmAfterPayment(h.id, null)).toBe("confirmed_late");
+    const h2 = await heldAt("09:30");
+    await expireNow(h2.id);
+    await service.releaseExpired();
+    expect(await status(h2.id)).toBe("expired");
+    expect(await service.confirmAfterPayment(h2.id, null)).toBe("confirmed_late");
+    expect(await status(h2.id)).toBe("scheduled");
+  });
+
+  it("a late payment for a time someone else now holds or has booked is slot_lost, and changes nothing", async () => {
+    const h = await heldAt("10:00");
+    await expireNow(h.id);
+    await service.releaseExpired();
+    const ravisProfile = await profile(ravi);
+    const other = await heldAt("10:00", ravi, ravisProfile);
+    expect(await service.confirmAfterPayment(h.id, null)).toBe("slot_lost");
+    expect(await status(h.id)).toBe("expired");
+    expect(await status(other.id)).toBe("held");
+  });
+
+  it("a released, cancelled or unknown appointment is not payable", async () => {
+    const h = await heldAt("10:30");
+    await service.cancel(asha, h.id, { reason: "changed_mind" });
+    expect(await service.confirmAfterPayment(h.id, null)).toBe("not_payable");
+    expect(await service.confirmAfterPayment(uuidv7(), null)).toBe("not_payable");
+    expect(await status(h.id)).toBe("cancelled_by_patient");
+  });
+});

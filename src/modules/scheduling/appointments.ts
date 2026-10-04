@@ -331,4 +331,64 @@ export class AppointmentService {
     await this.deps.slots.invalidate(detail.doctorId);
     return toDetailView(await this.load(id));
   }
+
+  // ---- called by the system, not by a person ----
+
+  /** Frees holds that ran out. The release job calls this until nothing is due. */
+  async releaseExpired(batch = 200, maxBatches = 20): Promise<number> {
+    let total = 0;
+    const doctors = new Set<string>();
+    for (let i = 0; i < maxBatches; i++) {
+      const freed = await this.deps.repo.releaseExpiredHolds(batch);
+      total += freed.length;
+      for (const f of freed) doctors.add(f.doctorId);
+      if (freed.length < batch) break;
+    }
+    for (const doctorId of doctors)
+      await this.deps.slots.invalidate(doctorId).catch(() => undefined);
+    return total;
+  }
+
+  /**
+   * The payment hook (P5 calls it when a payment is captured). It never charges or refunds; it
+   * only says what happened to the appointment, and the payment code acts on the answer:
+   *   confirmed       the hold was still valid
+   *   confirmed_late  the hold had run out but the time was still free, so it is confirmed
+   *   already         it was already confirmed (a repeated webhook)
+   *   slot_lost       the time went to someone else: refund automatically and tell the patient
+   *   not_payable     released or cancelled meanwhile, or in another state: refund
+   */
+  async confirmAfterPayment(
+    appointmentId: string,
+    changedBy: string | null,
+  ): Promise<"confirmed" | "confirmed_late" | "already" | "slot_lost" | "not_payable"> {
+    const row = await this.deps.repo.findById(appointmentId);
+    if (!row) return "not_payable";
+    if (row.status === "scheduled" || row.status === "in_progress" || row.status === "completed") {
+      return "already";
+    }
+    if (row.status !== "held" && row.status !== "expired") return "not_payable";
+    try {
+      const done = await this.deps.repo.confirmPaid({
+        id: appointmentId,
+        from: row.status,
+        changedBy,
+      });
+      if (!done) {
+        // Moved between the read and the write: look again once.
+        const again = await this.deps.repo.findById(appointmentId);
+        return again && ["scheduled", "in_progress", "completed"].includes(again.status)
+          ? "already"
+          : "not_payable";
+      }
+    } catch (error) {
+      if (isRace(error)) return "slot_lost";
+      throw error;
+    }
+    await this.deps.slots.invalidate(row.doctorId).catch(() => undefined);
+    const late =
+      row.status === "expired" ||
+      (row.holdExpiresAt !== null && row.holdExpiresAt.getTime() <= Date.now());
+    return late ? "confirmed_late" : "confirmed";
+  }
 }
