@@ -46,6 +46,8 @@ type Deps = {
   crypto?: () => Crypto;
   /** Writes the PHI access log. A read with no log entry is not allowed to succeed. */
   phiLog?: (entry: PhiAccessEntry) => Promise<void>;
+  /** Stops any recording of a consultation that is ending (P6-08). */
+  stopRecording?: (consultationId: string) => Promise<unknown>;
 };
 
 export class ConsultationService {
@@ -252,6 +254,12 @@ export class ConsultationService {
     if (!consultation) throw errors.conflict({ detail: "This consultation has not started." });
     const result = await this.deps.repo.end(consultation.id, appt.id, principal.userId);
     if (!result) throw errors.conflict({ detail: "This consultation has already ended." });
+    // Ending the call ends any recording with it. A provider problem never keeps the call open.
+    try {
+      await this.deps.stopRecording?.(consultation.id);
+    } catch (error) {
+      logger.error({ event: "recording_stop_on_end_failed", err: error });
+    }
     logger.info({ event: "consultation_ended", result });
     return { status: result };
   }

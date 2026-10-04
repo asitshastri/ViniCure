@@ -73,14 +73,14 @@ describe("seed data", () => {
   });
 
   it("draft consent texts are loaded once, say they are placeholders, and match their hash", async () => {
-    expect(await seedDemoConsents(db())).toBe(2);
+    expect(await seedDemoConsents(db())).toBe(3);
     expect(await seedDemoConsents(db())).toBe(0);
     const rows = (
       await t.db.query(
         "SELECT kind, body, content_hash FROM consent_policies WHERE version = 'draft-placeholder-1' ORDER BY kind",
       )
     ).rows as { kind: string; body: string; content_hash: string }[];
-    expect(rows.map((r) => r.kind)).toEqual(["telemedicine", "video"]);
+    expect(rows.map((r) => r.kind)).toEqual(["recording", "telemedicine", "video"]);
     const { createHash } = await import("node:crypto");
     for (const r of rows) {
       expect(r.body).toMatch(/DRAFT PLACEHOLDER, NOT LEGAL TEXT/);

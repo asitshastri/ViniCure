@@ -81,9 +81,11 @@ export function videoContract(make: () => VideoProvider) {
       const video = make();
       if (!video.startRecording || !video.stopRecording) return;
       const { roomRef } = await video.createRoom();
-      const { recordingRef } = await video.startRecording(roomRef);
+      const target = { bucket: "recordings-test", objectKey: "recording/2041/x.mp4" };
+      const { recordingRef } = await video.startRecording(roomRef, target);
       await expect(video.stopRecording(recordingRef)).resolves.toBeUndefined();
-      await rejectsWith(video.startRecording("nope"), "rejected");
+      await rejectsWith(video.startRecording("nope", target), "rejected");
+      await rejectsWith(video.stopRecording("rec_unknown"), "rejected");
     });
   });
 }

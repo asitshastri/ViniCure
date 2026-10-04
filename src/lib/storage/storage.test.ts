@@ -328,3 +328,72 @@ describe("files the server makes itself", () => {
     expect(store.written).toHaveLength(0);
   });
 });
+
+describe("the recordings bucket", () => {
+  const MP4 = Uint8Array.from([
+    0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d, 0, 0, 0, 0,
+  ]);
+  const key = "recording/2043/0190a1b2-c3d4-7e5f-8a9b-123456789abc.mp4";
+  let mem: MemoryObjectStore;
+  let withBucket: StorageService;
+  beforeEach(() => {
+    mem = new MemoryObjectStore();
+    withBucket = new StorageService(mem, {
+      ...config,
+      buckets: { ...config.buckets, recordings: "vc-recordings" },
+    });
+  });
+
+  it("recordings have their own bucket, and only the video provider writes there", async () => {
+    expect(PURPOSE_POLICY.recording.bucket).toBe("recordings");
+    expect(PURPOSE_POLICY.recording.clientUpload).toBe(false);
+    expect(PURPOSE_POLICY.recording.types).toEqual(["video/mp4"]);
+    await expect(
+      withBucket.createUploadSlot({
+        purpose: "recording",
+        contentType: "video/mp4",
+        sizeBytes: 100,
+      }),
+    ).rejects.toMatchObject({ code: "file_rejected" });
+  });
+
+  it("a new recording key is random and under recording/", () => {
+    const a = withBucket.newKey("recording", "video/mp4");
+    expect(a).toMatch(/^recording\/\d{4}\/[0-9a-f-]{36}\.mp4$/);
+    expect(withBucket.newKey("recording", "video/mp4")).not.toBe(a);
+  });
+
+  it("looks at what the provider wrote: its size and first bytes, or nothing yet", async () => {
+    expect(await withBucket.inspect(key)).toBeNull();
+    mem.seed("vc-recordings", key, MP4, 4_000_000);
+    const found = await withBucket.inspect(key);
+    expect(found?.sizeBytes).toBe(4_000_000);
+    expect(detectType(found?.head ?? new Uint8Array())).toBe("video/mp4");
+  });
+
+  it("refuses keys that are not ours, from any bucket", async () => {
+    for (const bad of [
+      "../x",
+      "recording/../../etc/passwd",
+      "kyc/2043/x.pdf.mp4",
+      "recording/2043/x",
+    ]) {
+      await expect(withBucket.inspect(bad)).rejects.toMatchObject({ code: "not_found" });
+      await expect(withBucket.sha256Of(bad)).rejects.toMatchObject({ code: "not_found" });
+    }
+  });
+
+  it("hashes a stored object and removes it from the recordings bucket", async () => {
+    mem.seed("vc-recordings", key, MP4, 16);
+    expect(await withBucket.sha256Of(key)).toMatch(/^[0-9a-f]{64}$/);
+    await withBucket.remove("recording", key);
+    expect(mem.deleted).toEqual([`vc-recordings/${key}`]);
+  });
+
+  it("where no recordings bucket is configured nothing touches storage", async () => {
+    const without = new StorageService(mem, config);
+    await expect(without.inspect(key)).rejects.toMatchObject({ code: "unavailable" });
+    await expect(without.remove("recording", key)).rejects.toMatchObject({ code: "unavailable" });
+    expect(mem.deleted).toEqual([]);
+  });
+});

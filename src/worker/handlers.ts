@@ -2,7 +2,7 @@ import { getQueue } from "../lib/queue/producer";
 import { getConfig } from "../lib/config/config";
 import { queryable, getDatabase } from "../lib/db/pool";
 import type { Handlers } from "../lib/queue/queue";
-import { getFileScanner } from "../lib/adapters/registry";
+import { getFileScanner, getPaymentProvider, getVideoProvider } from "../lib/adapters/registry";
 import { DirectoryRepo } from "../modules/directory/repo";
 import { DirectoryService } from "../modules/directory/service";
 import { getStorage } from "../lib/storage";
@@ -11,7 +11,9 @@ import { createInvoiceServiceFrom } from "../modules/payments/invoice-wiring";
 import { PaymentRepo } from "../modules/payments/repo";
 import { createPaymentServices } from "../modules/payments/wiring";
 import { txRunner } from "../lib/db/pool";
-import { getPaymentProvider } from "../lib/adapters/registry";
+import { RecordingRepo } from "../modules/consultations/recording-repo";
+import { RecordingService } from "../modules/consultations/recording";
+import { isEnabled } from "../lib/config/flags";
 import { StepUpRepo } from "../modules/identity/stepup/repo";
 
 // Job handlers, one per queue (backend-architecture.md section 8). Each later task adds its
@@ -32,7 +34,38 @@ function payments() {
   });
 }
 
+// The recording service as the worker uses it: it only checks files and cleans up. It never
+// starts a recording. The daily sweep re-queues a lost file job the same way the web does.
+function recordings() {
+  return new RecordingService({
+    repo: new RecordingRepo(queryable(getDatabase()), txRunner()),
+    video: getVideoProvider,
+    enabled: () => isEnabled("recording"),
+    retentionDays: () => getConfig().RECORDING_RETENTION_DAYS,
+    newKey: () => {
+      throw new Error("the worker does not start recordings");
+    },
+    bucket: () => getConfig().S3_BUCKET_RECORDINGS ?? "",
+    enqueueStore: async (recordingId) => {
+      await (await getQueue()).enqueue("recording.store", { recordingId });
+    },
+    storage: getStorage,
+  });
+}
+
 export const handlers: Handlers = {
+  // Checks one stopped recording's file and registers it (P6-08). A file that has not arrived
+  // yet throws, so the queue retries; a file that is not a real mp4 is deleted.
+  "recording.store": async ({ recordingId }, { logger }) => {
+    const result = await recordings().finalize(recordingId);
+    logger.info({ event: "recording_store_done", result });
+  },
+  // Daily: deletes recordings past their retention date, re-queues lost file jobs and fails
+  // recordings that were never stopped (P6-08). Expired exports are P9's.
+  "retention.purge": async (_payload, { logger }) => {
+    const report = await recordings().sweep();
+    logger.info({ event: "retention_purge_done", ...report });
+  },
   // Handles one stored gateway event. A gateway outage throws, so the queue retries it later;
   // an event already handled is skipped.
   "payment.webhook.process": async ({ eventId }, { logger }) => {

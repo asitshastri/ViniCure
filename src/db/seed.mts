@@ -159,6 +159,8 @@ export async function seedDemoConsents(db: SeedDb): Promise<number> {
       "DRAFT PLACEHOLDER, NOT LEGAL TEXT. I understand this is an online consultation with a registered doctor, that it is not for emergencies, and that the doctor may advise me to see a doctor in person.",
     video:
       "DRAFT PLACEHOLDER, NOT LEGAL TEXT. I agree to a video call with my doctor. The call is not recorded unless both of us agree.",
+    recording:
+      "DRAFT PLACEHOLDER, NOT LEGAL TEXT. I agree that this one consultation may be recorded, in audio and video, and kept for a limited time. I can take my agreement back at any time and the recording stops.",
   };
   let added = 0;
   for (const [kind, body] of Object.entries(texts)) {

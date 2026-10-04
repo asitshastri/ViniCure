@@ -16,7 +16,7 @@ export type DetectedType =
   "application/pdf" | "image/jpeg" | "image/png" | "image/webp" | "video/mp4";
 
 export type PurposePolicy = {
-  bucket: "files" | "exports";
+  bucket: "files" | "exports" | "recordings";
   /** Only these types, checked against the declared type and again against the bytes. */
   types: readonly DetectedType[];
   maxBytes: number;
@@ -51,7 +51,13 @@ export const PURPOSE_POLICY: Record<FilePurpose, PurposePolicy> = {
     maxBytes: 5 * MB,
     clientUpload: false,
   },
-  recording: { bucket: "files", types: ["video/mp4"], maxBytes: 2048 * MB, clientUpload: false },
+  // Recordings live in their own bucket in Mumbai (P6-08), written by the video provider.
+  recording: {
+    bucket: "recordings",
+    types: ["video/mp4"],
+    maxBytes: 2048 * MB,
+    clientUpload: false,
+  },
   export: {
     bucket: "exports",
     types: ["application/pdf"],

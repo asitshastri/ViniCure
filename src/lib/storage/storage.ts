@@ -21,7 +21,7 @@ import {
 // random key, never the file name the client sent.
 
 export type StorageConfig = {
-  buckets: { files: string; exports: string };
+  buckets: { files: string; exports: string; recordings?: string };
   region: string;
   /** MinIO endpoint in development. Empty in production. */
   endpoint?: string;
@@ -187,6 +187,13 @@ export class StorageService {
     private readonly now: () => number = Date.now,
   ) {}
 
+  /** The bucket for a purpose. The recordings bucket exists only when recording is set up. */
+  private bucket(name: "files" | "exports" | "recordings"): string {
+    const bucket = this.config.buckets[name];
+    if (!bucket) throw new AppError("unavailable", { detail: "File storage is not available." });
+    return bucket;
+  }
+
   /** The random storage key for a new object. The client's file name is never part of it. */
   newKey(purpose: FilePurpose, type: DetectedType): string {
     const year = new Date(this.now()).getUTCFullYear();
@@ -213,7 +220,7 @@ export class StorageService {
       throw new AppError("file_rejected", { detail: "This file is too large or empty." });
     }
 
-    const bucket = this.config.buckets[policy.bucket];
+    const bucket = this.bucket(policy.bucket);
     const storageKey = this.newKey(input.purpose, type);
     const ttl = this.config.signedUrlTtlSeconds;
     const url = await this.store.presignPut({
@@ -246,7 +253,7 @@ export class StorageService {
     if (!KEY_SHAPE.test(input.storageKey) || !input.storageKey.startsWith(`${input.purpose}/`)) {
       throw new AppError("file_rejected", { detail: "Unknown file." });
     }
-    const bucket = this.config.buckets[policy.bucket];
+    const bucket = this.bucket(policy.bucket);
     const info = await this.store.head(bucket, input.storageKey);
     if (!info) throw new AppError("file_rejected", { detail: "The upload did not arrive." });
 
@@ -278,7 +285,7 @@ export class StorageService {
     const name = safeDownloadName(input.fileName, `file.${extensionFor(input.type)}`);
     const ttl = this.config.signedUrlTtlSeconds;
     const url = await this.store.presignGet({
-      bucket: this.config.buckets[policy.bucket],
+      bucket: this.bucket(policy.bucket),
       key: input.storageKey,
       ttlSeconds: ttl,
       contentType: input.type,
@@ -311,7 +318,7 @@ export class StorageService {
     }
     const storageKey = this.newKey(input.purpose, type);
     await this.store.put({
-      bucket: this.config.buckets[policy.bucket],
+      bucket: this.bucket(policy.bucket),
       key: storageKey,
       body: input.bytes,
       contentType: type,
@@ -330,10 +337,32 @@ export class StorageService {
     if (!KEY_SHAPE.test(storageKey) || !(purpose in PURPOSE_POLICY)) {
       throw new AppError("not_found");
     }
-    return this.store.read(this.config.buckets[PURPOSE_POLICY[purpose].bucket], storageKey);
+    return this.store.read(this.bucket(PURPOSE_POLICY[purpose].bucket), storageKey);
+  }
+
+  /**
+   * What the provider wrote at a key we chose: its size and first bytes, or null if nothing is
+   * there yet. The purpose comes from the key itself.
+   */
+  async inspect(storageKey: string): Promise<{ sizeBytes: number; head: Uint8Array } | null> {
+    const purpose = storageKey.split("/")[0] as FilePurpose;
+    if (!KEY_SHAPE.test(storageKey) || !(purpose in PURPOSE_POLICY)) {
+      throw new AppError("not_found");
+    }
+    const bucket = this.bucket(PURPOSE_POLICY[purpose].bucket);
+    const info = await this.store.head(bucket, storageKey);
+    if (!info) return null;
+    return { sizeBytes: info.sizeBytes, head: await this.store.readHead(bucket, storageKey, 16) };
+  }
+
+  /** SHA-256 of a stored object, read as a stream (it can be large). */
+  async sha256Of(storageKey: string): Promise<string> {
+    const hash = createHash("sha256");
+    for await (const chunk of await this.openForScan(storageKey)) hash.update(chunk);
+    return hash.digest("hex");
   }
 
   async remove(purpose: FilePurpose, storageKey: string): Promise<void> {
-    await this.store.delete(this.config.buckets[PURPOSE_POLICY[purpose].bucket], storageKey);
+    await this.store.delete(this.bucket(PURPOSE_POLICY[purpose].bucket), storageKey);
   }
 }

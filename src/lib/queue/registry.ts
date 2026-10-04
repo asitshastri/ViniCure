@@ -69,6 +69,12 @@ export const QUEUES = {
     payload: z.strictObject({ paymentId: id }),
     policy: { retryLimit: 5, retryDelay: 15, retryBackoff: true, expireInSeconds: 300 },
   },
+  // Checks a stopped consultation recording's file and registers it (P6-08). Retries while the
+  // provider is still writing the file.
+  "recording.store": {
+    payload: z.strictObject({ recordingId: id }),
+    policy: { retryLimit: 8, retryDelay: 30, retryBackoff: true, expireInSeconds: 900 },
+  },
   "export.build": {
     payload: z.strictObject({ dataRequestId: id }),
     policy: { retryLimit: 3, retryDelay: 60, retryBackoff: true, expireInSeconds: 3600 },

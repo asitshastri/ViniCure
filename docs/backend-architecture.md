@@ -416,7 +416,8 @@ pg-boss runs in the worker process on the same Postgres, in its own schema. Prod
 | `prescription.render_pdf`, `invoice.render_pdf` | Issue or capture | Render and store PDF | 5 |
 | `export.build` | Data request | Build and store export archive | 3 |
 | `erasure.run` | Approved request | Anonymize per rules | 3 |
-| `retention.purge` | Cron daily | Purge expired exports and recordings | 3 |
+| `retention.purge` | Cron daily | Purge expired recordings (exports: P9) and re-queue lost recording jobs | 3 |
+| `recording.store` | Recording stopped | Check the recorded file and register it | 8 |
 | `audit.partition` | Cron monthly | Create next audit partitions | 3 |
 | `crypto.reencrypt` | Manual | Rotate encryption keys | 3 |
 
@@ -495,7 +496,7 @@ Rules:
 - **UID:** one numeric UID per participant per consultation, stored in `consultation_participants.provider_uid`. The token is built for that UID and channel only.
 - **Token lifetime:** 1 hour. The client asks for a new token when the SDK warns that the token will expire. Renewal is denied once the consultation has ended or the participant was revoked.
 - **Join checks:** appointment is scheduled or in progress, payment captured, within the join window (config, proposal: 10 minutes before start to 90 minutes after), video consent on record, and the caller is the patient owner or the assigned doctor.
-- **Recording:** off by default (feature flag). Requires recording consent from both parties. Stored in the Mumbai bucket. Retention job deletes after the configured period (HUMAN legal).
+- **Recording (P6-08):** off unless `FEATURE_RECORDING` is on, and then only with `S3_BUCKET_RECORDINGS` (its own private bucket), `S3_REGION=ap-south-1` (Mumbai) and `RECORDING_RETENTION_DAYS` set (a legal decision, no default; the app refuses to start with the flag on and any of them missing). Both people agree, each for that one consultation (`user_consents.consultation_id`), to the recording text in force; a database trigger refuses a recording row without both live consents. Only the assigned doctor starts or stops it, only while the call is live, one at a time. The provider writes to a key we choose (`recording/<year>/<uuid>.mp4`); a withdrawal by either person, the doctor stopping, or the consultation ending stops it at once and queues `recording.store`, which checks the file (mp4 magic bytes, size) before registering it in `files` (scan state stays `pending`: a recording is too large for the virus scanner, so it is never offered for download yet). `retention.purge` deletes the object, then the records, once `retention_until` has passed. Routes: `GET` state, `POST` consent, withdraw, start, stop under `/api/v1/consultations/:appointmentId/recording`. Operations alert on the log events `recording_stop_failed`, `recording_runaway`, `recording_file_missing`, `recording_rejected`. Playback is not built.
 - **Failure handling:** reconnect logic, audio-only fallback, and a "problem joining" link that notifies support.
 - **Pilot:** keep `VideoProvider` swappable and compare Agora with one alternative on real Indian mobile networks before launch.
 

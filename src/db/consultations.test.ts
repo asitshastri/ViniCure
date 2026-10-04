@@ -215,34 +215,120 @@ describe("consultations", () => {
     await part(other, 4294967295, "doctor");
   });
 
-  it("a recording needs two different consents and a file once it is stored", async () => {
+  // Migration 0022: a recording needs a live recording consent from each of the two people, for
+  // this consultation, and the database says so itself.
+  async function recordingFixture() {
     const f = await fixture();
-    const cid = await consult(f);
-    const pol = await policy("recording");
-    const patientConsent = id();
-    const doctorConsent = id();
-    await t.app.query(
-      `INSERT INTO user_consents (id, user_id, patient_id, policy_id) VALUES ($1,$2,$3,$4)`,
-      [patientConsent, f.user, f.patient, pol],
-    );
+    const cid = await consult(f, {
+      status: "live",
+      started: "2031-01-01T10:00:00Z",
+    });
     const doctorUser = id();
     await t.app.query("INSERT INTO users (id, name, email) VALUES ($1,'D',$2)", [
       doctorUser,
       `${doctorUser}@example.com`,
     ]);
-    await t.app.query(`INSERT INTO user_consents (id, user_id, policy_id) VALUES ($1,$2,$3)`, [
-      doctorConsent,
-      doctorUser,
-      pol,
-    ]);
-    const rec = (over: { p?: string; d?: string; status?: string } = {}) =>
+    await t.app.query("UPDATE doctors SET user_id = $2 WHERE id = $1", [f.doctor, doctorUser]);
+    const pol = await policy("recording");
+    const consent = async (userId: string, patientId: string | null, consultationId = cid) => {
+      const cons = id();
+      await t.app.query(
+        `INSERT INTO user_consents (id, user_id, patient_id, policy_id, consultation_id) VALUES ($1,$2,$3,$4,$5)`,
+        [cons, userId, patientId, pol, consultationId],
+      );
+      return cons;
+    };
+    const rec = (p: string, d: string, over: { status?: string; consultation?: string } = {}) =>
       t.app.query(
         `INSERT INTO consultation_recordings (id, consultation_id, patient_consent_id, doctor_consent_id, status, retention_until)
          VALUES ($1,$2,$3,$4,$5,'2031-06-01')`,
-        [id(), cid, over.p ?? patientConsent, over.d ?? doctorConsent, over.status ?? "recording"],
+        [id(), over.consultation ?? cid, p, d, over.status ?? "recording"],
       );
-    await rejects(rec({ d: patientConsent }), /consultation_recordings_consents_check/);
-    await rejects(rec({ status: "stored" }), /consultation_recordings_stored_check/);
-    await rec();
+    return { f, cid, doctorUser, pol, consent, rec };
+  }
+
+  it("a recording needs a live recording consent from the patient and from the doctor, for this consultation", async () => {
+    const { f, doctorUser, consent, rec } = await recordingFixture();
+    const patientConsent = await consent(f.user, f.patient);
+    const doctorConsent = await consent(doctorUser, null);
+    await rec(patientConsent, doctorConsent);
+    // The same consent twice, or the two swapped, is not two people's agreement.
+    await rejects(
+      rec(patientConsent, patientConsent),
+      /consultation_recordings_consents_check|live recording consent/,
+    );
+    await rejects(rec(doctorConsent, patientConsent), /live recording consent/);
+    // A consent of another kind does not count.
+    const video = id();
+    await t.app.query(
+      `INSERT INTO user_consents (id, user_id, patient_id, policy_id) VALUES ($1,$2,$3,$4)`,
+      [video, f.user, f.patient, await policy("video")],
+    );
+    await rejects(rec(video, doctorConsent), /live recording consent/);
+    // Neither does one given for a different consultation.
+    const other = await recordingFixture();
+    const wrongPatient = await consent(f.user, f.patient, other.cid);
+    await rejects(rec(wrongPatient, doctorConsent), /live recording consent/);
+  });
+
+  it("a withdrawn consent cannot start a recording, and one recording runs at a time", async () => {
+    const { f, doctorUser, consent, rec } = await recordingFixture();
+    const patientConsent = await consent(f.user, f.patient);
+    const doctorConsent = await consent(doctorUser, null);
+    await rec(patientConsent, doctorConsent);
+    await rejects(rec(patientConsent, doctorConsent), /consultation_recordings_active_idx/);
+    await t.app.query("UPDATE user_consents SET withdrawn_at = now() WHERE id = $1", [
+      patientConsent,
+    ]);
+    await rejects(
+      rec(patientConsent, doctorConsent, { status: "failed" }),
+      /live recording consent/,
+    );
+  });
+
+  it("a file belongs to a stored recording, a stopped one has a stop time, and the key has a fixed shape", async () => {
+    const { f, doctorUser, consent, cid } = await recordingFixture();
+    const patientConsent = await consent(f.user, f.patient);
+    const doctorConsent = await consent(doctorUser, null);
+    const insert = (over: Record<string, unknown>) => {
+      const row = { status: "recording", key: null, stopped: null, file: null, ...over };
+      return t.app.query(
+        `INSERT INTO consultation_recordings
+           (id, consultation_id, patient_consent_id, doctor_consent_id, status, object_key, stopped_at, file_id, retention_until)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'2031-06-01')`,
+        [id(), cid, patientConsent, doctorConsent, row.status, row.key, row.stopped, row.file],
+      );
+    };
+    await rejects(
+      insert({ status: "stored", stopped: "2031-01-01T10:30:00Z" }),
+      /consultation_recordings_stored_check/,
+    );
+    await rejects(insert({ status: "stopped" }), /consultation_recordings_stopped_check/);
+    await rejects(
+      insert({ status: "failed", key: "../../etc/passwd" }),
+      /consultation_recordings_key_check/,
+    );
+    await insert({
+      status: "stopped",
+      stopped: "2031-01-01T10:30:00Z",
+      key: `recording/2031/${id()}.mp4`,
+    });
+  });
+
+  it("a recording consent is for one consultation and keeps the consent record rules", async () => {
+    const { f, consent } = await recordingFixture();
+    const mine = await consent(f.user, f.patient);
+    // The same person may agree again for another consultation, but not twice for this one.
+    await rejects(consent(f.user, f.patient), /user_consents_live_idx/);
+    const second = await recordingFixture();
+    await consent(f.user, f.patient, second.cid);
+    // The consultation of a consent cannot be moved to another one.
+    await rejects(
+      t.app.query("UPDATE user_consents SET consultation_id = $2 WHERE id = $1", [
+        mine,
+        second.cid,
+      ]),
+      /permission denied/,
+    );
   });
 });

@@ -29,7 +29,15 @@ export interface VideoProvider {
     role: "host" | "audience";
     ttlSeconds: number;
   }): Promise<{ token: string; expiresAt: Date }>;
-  startRecording?(roomRef: string): Promise<{ recordingRef: string }>;
+  /**
+   * Starts recording the room into our own private bucket, as the one object `objectKey`. The
+   * provider writes to the bucket and key we name; it never chooses where the file goes. Optional:
+   * a provider that cannot record is simply not offered recording (P6-08).
+   */
+  startRecording?(
+    roomRef: string,
+    target: { bucket: string; objectKey: string },
+  ): Promise<{ recordingRef: string }>;
   stopRecording?(recordingRef: string): Promise<void>;
 }
 

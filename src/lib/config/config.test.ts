@@ -101,9 +101,30 @@ describe("feature flags", () => {
       FEATURE_AI_TRIAGE: "true",
       FEATURE_RECORDING: "1",
       FEATURE_REFERRALS: "false",
+      S3_BUCKET_RECORDINGS: "recordings",
+      RECORDING_RETENTION_DAYS: "90",
+      S3_REGION: "ap-south-1",
     });
     expect(isEnabled("ai_triage", config)).toBe(true);
     expect(isEnabled("recording", config)).toBe(true);
     expect(isEnabled("referrals", config)).toBe(false);
+  });
+
+  it("recording stays closed without a recordings bucket in Mumbai and a retention period", () => {
+    expect(() => loadConfig({ FEATURE_RECORDING: "1" })).toThrow(/S3_BUCKET_RECORDINGS/);
+    expect(() => loadConfig({ FEATURE_RECORDING: "1" })).toThrow(/RECORDING_RETENTION_DAYS/);
+    const ok = {
+      FEATURE_RECORDING: "1",
+      S3_BUCKET_RECORDINGS: "recordings",
+      RECORDING_RETENTION_DAYS: "90",
+      S3_REGION: "ap-south-1",
+    };
+    expect(() => loadConfig({ ...ok, S3_REGION: "us-east-1" })).toThrow(/ap-south-1/);
+    expect(() => loadConfig({ ...ok, RECORDING_RETENTION_DAYS: "0" })).toThrow(
+      /RECORDING_RETENTION_DAYS/,
+    );
+    expect(isEnabled("recording", loadConfig(ok))).toBe(true);
+    // Off by default: the two settings alone change nothing.
+    expect(isEnabled("recording", loadConfig({ S3_BUCKET_RECORDINGS: "recordings" }))).toBe(false);
   });
 });

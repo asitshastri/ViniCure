@@ -6,6 +6,8 @@ import type { Queryable } from "../../lib/db/queryable";
 import { uuidv7 } from "../../lib/ids";
 import { ConsentRepo } from "../consent/repo";
 import { ConsentService } from "../consent/service";
+import { RecordingRepo } from "./recording-repo";
+import { RecordingService } from "./recording";
 import { ConsultationRepo } from "./repo";
 import { ConsultationService } from "./service";
 
@@ -17,6 +19,7 @@ describe.skipIf(!url)("consultations on real Postgres", () => {
   let pool: pg.Pool;
   let service: ConsultationService;
   let consent: ConsentService;
+  let recording: RecordingService;
   const video = new FakeVideoProvider();
 
   beforeAll(() => {
@@ -54,6 +57,18 @@ describe.skipIf(!url)("consultations on real Postgres", () => {
       appId: () => "fake_app_id",
       tokenTtlSeconds: () => 3600,
       window: () => ({ earlyMinutes: 10, lateMinutes: 30 }),
+    });
+    recording = new RecordingService({
+      repo: new RecordingRepo(db, tx),
+      video: () => video,
+      enabled: () => true,
+      retentionDays: () => 30,
+      newKey: () => `recording/2043/${uuidv7()}.mp4`,
+      bucket: () => "it-recordings",
+      enqueueStore: async () => undefined,
+      storage: () => {
+        throw new Error("not used here");
+      },
     });
   });
   afterAll(() => pool.end());
@@ -171,6 +186,51 @@ describe.skipIf(!url)("consultations on real Postgres", () => {
       [appt],
     );
     expect(done.rows[0]?.n).toBe(1);
+  });
+
+  it("many doctor clicks at once start one recording, and a withdrawal at the same moment leaves none running", async () => {
+    const { patient, doctor, appt } = await setup();
+    const policyId = await pool
+      .query(
+        `INSERT INTO consent_policies (id, kind, version, language, body, content_hash, effective_from)
+         VALUES ($1,'recording',$2,'en','r',$3, CURRENT_DATE) RETURNING id`,
+        [uuidv7(), `it-${uuidv7()}`, createHash("sha256").update("r").digest("hex")],
+      )
+      .then((r) => String(r.rows[0]?.id));
+    await service.join(patient, appt);
+    await service.join(doctor, appt);
+    await recording.consent(patient, appt, { policyId }, null);
+    await recording.consent(doctor, appt, { policyId }, null);
+    const starts = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        recording.start(doctor, appt).then(
+          () => "started",
+          () => "refused",
+        ),
+      ),
+    );
+    expect(starts.filter((r) => r === "started")).toHaveLength(1);
+    expect(video.recordings.size).toBe(1);
+
+    // The patient withdraws while the doctor stops and starts again: when it settles, if the
+    // patient's agreement is gone, nothing may be recording.
+    await Promise.all([
+      recording.withdraw(patient, appt),
+      recording.stop(doctor, appt).catch(() => undefined),
+      recording.start(doctor, appt).catch(() => undefined),
+    ]);
+    const running = await pool.query(
+      `SELECT count(*)::int AS n FROM consultation_recordings r
+         JOIN consultations c ON c.id = r.consultation_id
+        WHERE c.appointment_id = $1 AND r.status = 'recording'`,
+      [appt],
+    );
+    const live = await pool.query(
+      `SELECT count(*)::int AS n FROM user_consents WHERE user_id = $1 AND withdrawn_at IS NULL AND consultation_id IS NOT NULL`,
+      [patient.userId],
+    );
+    expect(live.rows[0]?.n).toBe(0);
+    expect(running.rows[0]?.n).toBe(0);
   });
 
   it("the app role cannot rewrite or delete a consent, a policy text or a seat's revocation history", async () => {

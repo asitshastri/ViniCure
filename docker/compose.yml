@@ -52,7 +52,7 @@ services:
     ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
     volumes: ["s3data:/data"]
 
-  # One-off job: creates the two private buckets, then exits.
+  # One-off job: creates the private buckets, then exits.
   s3-init:
     image: amazon/aws-cli:latest
     depends_on: [s3]
@@ -62,7 +62,7 @@ services:
       AWS_DEFAULT_REGION: ap-south-1
     entrypoint: >
       /bin/sh -c "
-      for b in vinicure-files vinicure-exports; do
+      for b in vinicure-files vinicure-exports vinicure-recordings; do
         for i in 1 2 3 4 5 6 7 8 9 10; do
           aws --endpoint-url http://s3:9000 s3api head-bucket --bucket $$b 2>/dev/null && break;
           aws --endpoint-url http://s3:9000 s3api create-bucket --bucket $$b 2>/dev/null && break;
@@ -120,6 +120,7 @@ services:
       KMS_KEY_ID: local-placeholder
       S3_BUCKET_FILES: vinicure-files
       S3_BUCKET_EXPORTS: vinicure-exports
+      S3_BUCKET_RECORDINGS: vinicure-recordings
       S3_REGION: ap-south-1
     ports: ["127.0.0.1:3000:3000"]
     depends_on:

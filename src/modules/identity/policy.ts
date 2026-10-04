@@ -91,9 +91,11 @@ export const MATRIX = {
     support: ["read"],
   },
   consultation: {
-    owner: ["join"],
+    // Recording (P6-08): each of the two people agrees or withdraws for themselves; only the
+    // doctor starts and stops it.
+    owner: ["join", "recordingConsent"],
     // Only the assigned doctor ends a consultation (for everyone).
-    assignedDoctor: ["join", "end"],
+    assignedDoctor: ["join", "end", "recordingConsent", "recordingControl"],
   },
   clinicalNote: {
     assignedDoctor: ["read", "write"],
@@ -223,7 +225,7 @@ export function decide(
 
     if (granted) {
       // Join has conditions that the owner is told about, because the answer is useful.
-      if (resource === "consultation" && relation === "owner") {
+      if (resource === "consultation" && relation === "owner" && action === "join") {
         if (facts.paid !== true) return deny("payment_required", "forbidden");
         if (facts.inWindow !== true) return deny("outside_window", "forbidden");
       }

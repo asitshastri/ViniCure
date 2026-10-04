@@ -59,6 +59,8 @@ const schema = z.object({
   // Storage
   S3_BUCKET_FILES: optionalString,
   S3_BUCKET_EXPORTS: optionalString,
+  /** Only for consultation recordings (P6-08); must be in Mumbai (ap-south-1). */
+  S3_BUCKET_RECORDINGS: optionalString,
   S3_REGION: optionalString,
   S3_ENDPOINT: z.url().optional(),
   SIGNED_URL_TTL_SECONDS: z.coerce.number().int().min(30).max(3600).default(300),
@@ -105,6 +107,8 @@ const schema = z.object({
   // Feature flags, all off by default
   FEATURE_AI_TRIAGE: flag,
   FEATURE_RECORDING: flag,
+  /** How long a recording is kept, in days. A legal decision: no default, and recording stays closed without it. */
+  RECORDING_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).optional(),
   FEATURE_REFERRALS: flag,
   /** Reward for each referral, in paise, stored when the referral is made. 0 until the business decides it. */
   REFERRAL_REWARD_PAISE: z.coerce.number().int().min(0).max(1_000_000).default(0),
@@ -177,6 +181,20 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
   const config = parsed.data;
   if (Boolean(config.GOOGLE_CLIENT_ID) !== Boolean(config.GOOGLE_CLIENT_SECRET)) {
     throw new ConfigError(["GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set together"]);
+  }
+  if (config.FEATURE_RECORDING) {
+    const problems: string[] = [];
+    if (!config.S3_BUCKET_RECORDINGS)
+      problems.push("S3_BUCKET_RECORDINGS is required when FEATURE_RECORDING is on");
+    if (config.RECORDING_RETENTION_DAYS === undefined) {
+      problems.push(
+        "RECORDING_RETENTION_DAYS is required when FEATURE_RECORDING is on (a legal decision, no default)",
+      );
+    }
+    if (config.S3_REGION !== "ap-south-1") {
+      problems.push("S3_REGION must be ap-south-1 (Mumbai) when FEATURE_RECORDING is on");
+    }
+    if (problems.length > 0) throw new ConfigError(problems);
   }
   if (config.NODE_ENV === "production") {
     const problems = productionProblems(config);

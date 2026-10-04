@@ -44,7 +44,10 @@ function requirePhone(to: string): void {
 export class FakeVideoProvider implements VideoProvider {
   readonly failures = new FailureSwitch();
   readonly rooms = new Set<string>();
-  readonly recordings = new Map<string, { roomRef: string; stopped: boolean }>();
+  readonly recordings = new Map<
+    string,
+    { roomRef: string; stopped: boolean; bucket: string; objectKey: string }
+  >();
 
   async createRoom() {
     this.failures.check();
@@ -75,11 +78,14 @@ export class FakeVideoProvider implements VideoProvider {
     return { token, expiresAt };
   }
 
-  async startRecording(roomRef: string) {
+  async startRecording(roomRef: string, target: { bucket: string; objectKey: string }) {
     this.failures.check();
     if (!this.rooms.has(roomRef)) throw new AdapterError("rejected", "unknown room");
+    if (!target.bucket || !target.objectKey) {
+      throw new AdapterError("invalid_input", "a bucket and an object key are needed");
+    }
     const recordingRef = `rec_${randomUUID()}`;
-    this.recordings.set(recordingRef, { roomRef, stopped: false });
+    this.recordings.set(recordingRef, { roomRef, stopped: false, ...target });
     return { recordingRef };
   }
 

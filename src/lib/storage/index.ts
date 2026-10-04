@@ -22,7 +22,11 @@ export function getStorage(): StorageService {
       ...(config.S3_ENDPOINT ? { endpoint: config.S3_ENDPOINT } : {}),
     }),
     {
-      buckets: { files: config.S3_BUCKET_FILES, exports: config.S3_BUCKET_EXPORTS },
+      buckets: {
+        files: config.S3_BUCKET_FILES,
+        exports: config.S3_BUCKET_EXPORTS,
+        ...(config.S3_BUCKET_RECORDINGS ? { recordings: config.S3_BUCKET_RECORDINGS } : {}),
+      },
       region: config.S3_REGION,
       ...(config.S3_ENDPOINT ? { endpoint: config.S3_ENDPOINT } : {}),
       signedUrlTtlSeconds: config.SIGNED_URL_TTL_SECONDS,

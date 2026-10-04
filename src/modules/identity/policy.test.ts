@@ -54,7 +54,12 @@ const EXPECT: Record<Resource, Record<string, (keyof typeof who)[]>> = {
     review: ["owner"],
     updateStatus: ["assignedDoctor"],
   },
-  consultation: { join: ["assignedDoctor"], end: ["assignedDoctor"] }, // owner needs paid and in window: tested below
+  consultation: {
+    join: ["assignedDoctor"], // the owner needs paid and in window: tested below
+    end: ["assignedDoctor"],
+    recordingConsent: ["owner", "assignedDoctor"],
+    recordingControl: ["assignedDoctor"],
+  },
   clinicalNote: { read: ["assignedDoctor"], write: ["assignedDoctor"] },
   prescription: { read: ["owner", "assignedDoctor"], write: ["assignedDoctor"] },
   healthRecord: { read: ["owner", "assignedDoctor"], write: ["owner", "assignedDoctor"] },

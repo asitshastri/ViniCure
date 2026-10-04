@@ -50,3 +50,19 @@ export type ConsoleView = {
     council: string;
   };
 };
+
+// Recording (P6-08). Off by default; both people agree for each consultation.
+
+export const recordingConsentBody = z.object({ policyId: z.uuid() }).strict();
+export type RecordingConsentBody = z.infer<typeof recordingConsentBody>;
+
+/** What the call screen needs to show about recording, for the person asking. */
+export type RecordingView = {
+  /** False when the feature is off or the provider cannot record: nothing else is shown. */
+  enabled: boolean;
+  /** The text this person still has to agree to; null once they have. */
+  consentText: { policyId: string; version: string; language: string; body: string } | null;
+  agreed: { me: boolean; other: boolean };
+  /** True while the call is being recorded. Both people are told. */
+  recording: boolean;
+};

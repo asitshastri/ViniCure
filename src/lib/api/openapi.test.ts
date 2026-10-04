@@ -95,5 +95,6 @@ describe("the real API", () => {
     if (process.env.UPDATE_OPENAPI === "1") writeFileSync(specFile, generated);
     expect(existsSync(specFile), "run: UPDATE_OPENAPI=1 pnpm test").toBe(true);
     expect(readFileSync(specFile, "utf8").replace(/\r\n/g, "\n")).toBe(generated);
-  });
+    // Importing every route takes seconds alone and far longer beside 80 other test files.
+  }, 120_000);
 });
