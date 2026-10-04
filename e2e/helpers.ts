@@ -152,6 +152,16 @@ export async function cleanup() {
        AND id NOT IN (SELECT patient_id FROM appointments)`,
     [like],
   );
+  // A doctor record made for a test staff account goes first (hours and time off with it).
+  const mine =
+    "(SELECT d.id FROM doctors d JOIN users u ON u.id = d.user_id WHERE u.email LIKE $1)";
+  await db().query(`DELETE FROM doctor_availability_rules WHERE doctor_id IN ${mine}`, [like]);
+  await db().query(`DELETE FROM doctor_time_off WHERE doctor_id IN ${mine}`, [like]);
+  await db().query(`DELETE FROM doctor_specialties WHERE doctor_id IN ${mine}`, [like]);
+  await db().query(
+    "DELETE FROM doctors WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)",
+    [like],
+  );
   await db().query("DELETE FROM users WHERE email LIKE $1", [like]);
 }
 
@@ -202,4 +212,15 @@ export async function patientSignIn(page: Page) {
   await typeCode(page, await otpFor(phone));
   await expect(page).toHaveURL(/\/patient\/dashboard/);
   return phone;
+}
+
+/** Signs a staff member in with password and authenticator code. */
+export async function staffSignIn(page: Page, staff: Staff) {
+  await page.goto("/login/staff");
+  await page.getByLabel(/email/i).fill(staff.email);
+  await page.getByLabel(/^password/i).fill(PASSWORD);
+  await page.getByRole("button", { name: /sign in|continue/i }).click();
+  await expect(page.getByLabel("Digit 1 of 6")).toBeVisible();
+  await typeCode(page, codeNow(staff.secret));
+  await expect(page).toHaveURL(/\/doctor\/dashboard/);
 }

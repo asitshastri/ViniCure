@@ -1,17 +1,20 @@
 import { z } from "zod";
 import { getCache } from "../../lib/cache";
 import { getConfig } from "../../lib/config/config";
-import { getDatabase, queryable } from "../../lib/db/pool";
+import { getDatabase, queryable, txRunner } from "../../lib/db/pool";
 import { globalSingleton } from "../../lib/singleton";
 import { getCrypto } from "../../lib/crypto/crypto";
 import { PatientRepo } from "../patients/repo";
 import { AppointmentRepo } from "./appointments-repo";
 import { AppointmentService } from "./appointments";
+import { AvailabilityRepo } from "./availability-repo";
+import { AvailabilityService } from "./availability";
 import { SchedulingRepo } from "./repo";
 import { SlotService } from "./service";
 
 export { SlotService } from "./service";
 export * from "./appointments";
+export * from "./availability-schemas";
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use the format YYYY-MM-DD.");
 export const slotsQuery = z.object({ from: date.optional(), to: date.optional() }).strict();
@@ -19,6 +22,7 @@ export const slotsQuery = z.object({ from: date.optional(), to: date.optional() 
 const holder = globalSingleton("scheduling", () => ({
   slots: undefined as SlotService | undefined,
   appointments: undefined as AppointmentService | undefined,
+  availability: undefined as AvailabilityService | undefined,
 }));
 
 export function getSlots(): SlotService {
@@ -46,4 +50,12 @@ export function getAppointments(): AppointmentService {
     crypto: getCrypto,
   });
   return holder.appointments;
+}
+
+export function getAvailability(): AvailabilityService {
+  holder.availability ??= new AvailabilityService({
+    repo: new AvailabilityRepo(queryable(getDatabase()), txRunner()),
+    slots: getSlots(),
+  });
+  return holder.availability;
 }

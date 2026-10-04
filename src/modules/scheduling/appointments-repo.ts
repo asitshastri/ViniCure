@@ -38,8 +38,12 @@ function toRow(r: Record<string, unknown>): AppointmentRow {
 export type AppointmentDetail = AppointmentRow & {
   doctorName: string;
   doctorUserId: string | null;
+  doctorRegistrationNo: string;
+  doctorSpecialty: string | null;
   patientName: string;
   patientAccountUserId: string;
+  /** The booking account has already reviewed this consultation. */
+  reviewed: boolean;
   rescheduleCount: number;
   /** start_at with full precision, for the page cursor. */
   cursorTime: string;
@@ -47,7 +51,11 @@ export type AppointmentDetail = AppointmentRow & {
 
 const DETAIL_COLUMNS =
   COLUMNS +
-  ", d.display_name AS doctor_name, d.user_id AS doctor_user_id, p.full_name AS patient_name," +
+  ", d.display_name AS doctor_name, d.user_id AS doctor_user_id, d.registration_no AS doctor_registration_no," +
+  " (SELECT sp.name FROM doctor_specialties ds JOIN specialties sp ON sp.id = ds.specialty_id" +
+  "   WHERE ds.doctor_id = d.id AND ds.is_primary) AS doctor_specialty," +
+  " EXISTS (SELECT 1 FROM reviews rv WHERE rv.appointment_id = a.id) AS reviewed," +
+  " p.full_name AS patient_name," +
   " p.account_user_id AS patient_account_user_id, a.reschedule_count," +
   " to_char(a.start_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS cursor_time";
 const DETAIL_FROM =
@@ -58,6 +66,9 @@ function toDetail(r: Record<string, unknown>): AppointmentDetail {
     ...toRow(r),
     doctorName: String(r.doctor_name),
     doctorUserId: r.doctor_user_id === null ? null : String(r.doctor_user_id),
+    doctorRegistrationNo: String(r.doctor_registration_no),
+    doctorSpecialty: r.doctor_specialty === null ? null : String(r.doctor_specialty),
+    reviewed: r.reviewed === true,
     patientName: String(r.patient_name),
     patientAccountUserId: String(r.patient_account_user_id),
     rescheduleCount: Number(r.reschedule_count),

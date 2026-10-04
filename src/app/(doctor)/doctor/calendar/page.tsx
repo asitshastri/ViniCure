@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { AvailabilityEditor } from "@/components/doctor/availability-editor";
+import { HoursEditor } from "@/components/doctor/hours-editor";
 import { TimeOffManager } from "@/components/doctor/time-off";
+import { TimeOffReal } from "@/components/doctor/time-off-real";
 import { SectionCard } from "@/components/profile/section-card";
 import { PageHeader } from "@/components/shell/page-header";
 import {
@@ -10,13 +12,27 @@ import {
   getTimeOff,
   getTodayDate,
 } from "@/lib/data/doctor";
+import { loadRealSchedule } from "@/lib/data/schedule-real";
+import { isRealDirectory } from "@/lib/data/directory-real";
 import { formatSlotDay } from "@/lib/data/doctors";
 
 export const metadata: Metadata = { title: "Schedule" };
 
-export default function CalendarPage() {
+export default async function CalendarPage() {
+  // The doctor's real bookings, hours and time off when the database is configured.
+  const real = isRealDirectory() ? await loadRealSchedule() : null;
   const today = getTodayDate();
-  const booked = getDoctorConsults().filter((c) => c.status === "upcoming" && c.date >= today);
+  const booked = real
+    ? real.booked
+    : getDoctorConsults()
+        .filter((c) => c.status === "upcoming" && c.date >= today)
+        .map((c) => ({
+          id: c.id,
+          date: c.date,
+          time: c.time,
+          patientName: c.patientName,
+          reason: c.reason,
+        }));
   const dates = [...new Set(booked.map((c) => c.date))].sort();
   const availability = getAvailability();
 
@@ -49,7 +65,9 @@ export default function CalendarPage() {
                             {formatClock(c.time)}
                           </span>
                           <span>{c.patientName}</span>
-                          <span className="text-ink-muted text-sm">{c.reason}</span>
+                          {c.reason ? (
+                            <span className="text-ink-muted text-sm">{c.reason}</span>
+                          ) : null}
                         </li>
                       ))}
                   </ul>
@@ -65,14 +83,22 @@ export default function CalendarPage() {
           title="Your weekly hours"
           description="Patients can book only inside these hours. Changes apply to new bookings."
         >
-          <AvailabilityEditor initial={availability} />
+          {real ? (
+            <HoursEditor initial={real.rules} />
+          ) : (
+            <AvailabilityEditor initial={availability} />
+          )}
         </SectionCard>
         <SectionCard
           id="time-off"
           title="Time off"
           description="Block days when you cannot see patients."
         >
-          <TimeOffManager initial={getTimeOff()} />
+          {real ? (
+            <TimeOffReal initial={real.timeOff} />
+          ) : (
+            <TimeOffManager initial={getTimeOff()} />
+          )}
         </SectionCard>
       </div>
     </>

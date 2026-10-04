@@ -53,15 +53,21 @@ export const appointmentsQuery = z
 /** What the caller sees of a booking. No reason text, no patient contact details. */
 export type AppointmentDetailView = AppointmentView & {
   doctorName: string;
+  doctorRegistrationNo: string;
+  doctorSpecialty: string | null;
   patientName: string;
   rescheduleCount: number;
+  reviewed: boolean;
 };
 
 export const toDetailView = (d: AppointmentDetail): AppointmentDetailView => ({
   ...toAppointmentView(d),
   doctorName: d.doctorName,
+  doctorRegistrationNo: d.doctorRegistrationNo,
+  doctorSpecialty: d.doctorSpecialty,
   patientName: d.patientName,
   rescheduleCount: d.rescheduleCount,
+  reviewed: d.reviewed,
 });
 
 const cursorError = () =>

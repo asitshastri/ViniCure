@@ -23,7 +23,7 @@ const TABS: Array<{ id: TabId; label: string }> = [
 ];
 
 function tabOf(a: AppointmentView): TabId {
-  if (a.status === "upcoming") return "upcoming";
+  if (a.status === "upcoming" || a.status === "held") return "upcoming";
   if (a.status === "cancelled") return "cancelled";
   return "past";
 }
@@ -47,9 +47,11 @@ type Props = {
   initial: AppointmentView[];
   tab: TabId;
   slotsByDoctor: Record<string, DoctorSlot[]>;
+  /** Real bookings: changes go to the server, and refund wording is left out. */
+  real?: boolean;
 };
 
-export function AppointmentsView({ initial, tab, slotsByDoctor }: Props) {
+export function AppointmentsView({ initial, tab, slotsByDoctor, real = false }: Props) {
   const { toast } = useToast();
   const [items, setItems] = useState(initial);
   const [cancelling, setCancelling] = useState<AppointmentView | null>(null);
@@ -130,6 +132,7 @@ export function AppointmentsView({ initial, tab, slotsByDoctor }: Props) {
       )}
 
       <CancelDialog
+        real={real}
         appt={cancelling}
         onClose={() => setCancelling(null)}
         onDone={(id, refundPaise) => {
@@ -150,14 +153,17 @@ export function AppointmentsView({ initial, tab, slotsByDoctor }: Props) {
           toast({
             tone: "success",
             title: "Appointment cancelled",
-            description: refundPaise
-              ? `${formatRupees(refundPaise)} will be refunded in 5 to 7 working days.`
-              : "No refund applies to a late cancellation.",
+            description: real
+              ? "The time is free again."
+              : refundPaise
+                ? `${formatRupees(refundPaise)} will be refunded in 5 to 7 working days.`
+                : "No refund applies to a late cancellation.",
           });
           settle();
         }}
       />
       <RescheduleDialog
+        real={real}
         appt={moving}
         slots={moving ? (slotsByDoctor[moving.doctorId] ?? []) : []}
         onClose={() => setMoving(null)}
@@ -175,6 +181,7 @@ export function AppointmentsView({ initial, tab, slotsByDoctor }: Props) {
         }}
       />
       <ReviewDialog
+        real={real}
         appt={rating}
         onClose={() => setRating(null)}
         onDone={(id) => {

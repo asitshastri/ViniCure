@@ -5,6 +5,7 @@ import { AppError } from "../../lib/errors/app-error";
 import { uuidv7 } from "../../lib/ids";
 import type { Role } from "../../lib/api/types";
 import { DirectoryRepo } from "../directory/repo";
+import { AppointmentRepo } from "../scheduling/appointments-repo";
 import type { Principal } from "../identity/policy";
 import { PatientRepo } from "../patients/repo";
 import { EngagementRepo } from "./repo";
@@ -110,6 +111,8 @@ describe("writing a review", () => {
     });
     expect(view).toMatchObject({ rating: 5, status: "pending" });
     expect((await service.publicReviews(doctorId, { limit: 10 })).items).toEqual([]);
+    // The patient's own appointment list now knows it has been reviewed.
+    expect((await new AppointmentRepo(q).findDetail(appt))?.reviewed).toBe(true);
     expect(await code(service.submitReview(asha, appt, { rating: 1 }))).toBe("conflict");
     expect(
       (await q.query("SELECT count(*)::int AS n FROM reviews WHERE appointment_id=$1", [appt]))

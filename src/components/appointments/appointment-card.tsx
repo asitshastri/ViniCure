@@ -74,14 +74,32 @@ export function AppointmentCard({ appt: a, onReschedule, onCancel, onReview }: P
           {a.canJoin ? "Starting now." : `Starts in ${formatCountdown(a.minutesUntil)}.`}
         </p>
       ) : null}
-      {a.status === "cancelled" && a.refund ? (
+      {a.status === "held" ? (
         <p className="text-ink-muted text-sm">
-          Cancelled by {a.cancelledBy === "doctor" ? "the doctor" : "you"}.{" "}
-          {a.refund.status === "processed"
-            ? `Refund of ${formatRupees(a.refund.amountPaise)} sent to your account.`
-            : a.refund.status === "pending"
-              ? `Refund of ${formatRupees(a.refund.amountPaise)} is on its way, usually 5 to 7 working days.`
-              : "No refund, as it was a late cancellation."}
+          This time is kept for you
+          {a.holdUntil
+            ? ` until ${new Date(a.holdUntil).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit" })} IST`
+            : ""}
+          . Online payment is not open yet, so nothing has been charged and the booking is not
+          confirmed.
+        </p>
+      ) : null}
+      {a.status === "cancelled" ? (
+        <p className="text-ink-muted text-sm">
+          Cancelled by{" "}
+          {a.cancelledBy === "doctor"
+            ? "the doctor"
+            : a.cancelledBy === "admin"
+              ? "ViniCure"
+              : "you"}
+          .{" "}
+          {a.refund
+            ? a.refund.status === "processed"
+              ? `Refund of ${formatRupees(a.refund.amountPaise)} sent to your account.`
+              : a.refund.status === "pending"
+                ? `Refund of ${formatRupees(a.refund.amountPaise)} is on its way, usually 5 to 7 working days.`
+                : "No refund, as it was a late cancellation."
+            : null}
         </p>
       ) : null}
       {a.status === "no_show" ? (
@@ -140,6 +158,16 @@ export function AppointmentCard({ appt: a, onReschedule, onCancel, onReview }: P
               </ButtonLink>
             ) : null}
           </>
+        ) : null}
+        {a.status === "held" ? (
+          <Button
+            variant="ghost"
+            className="text-danger hover:bg-danger-soft"
+            onClick={() => onCancel(a)}
+          >
+            <CalendarX aria-hidden className="size-5" />
+            Let this time go
+          </Button>
         ) : null}
         {a.status === "cancelled" || a.status === "no_show" ? (
           <ButtonLink href={`/doctors/${a.doctorId}`} variant="secondary">

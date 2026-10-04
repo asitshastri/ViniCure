@@ -130,6 +130,11 @@ export const MATRIX = {
     ownerRoles: ["doctor"],
     admin: ["read", "review"],
   },
+  doctorSchedule: {
+    // A doctor's own working hours and time off.
+    owner: ["read", "write"],
+    ownerRoles: ["doctor"],
+  },
   review: {
     // Moderation of patient reviews before they are public.
     admin: ["read", "moderate"],

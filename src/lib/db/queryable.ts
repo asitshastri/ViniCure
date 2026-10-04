@@ -3,3 +3,11 @@
 export interface Queryable {
   query(text: string, params?: unknown[]): Promise<{ rows: Record<string, unknown>[] }>;
 }
+
+/**
+ * Runs several statements as one unit: all of them happen or none do. The function gets a
+ * Queryable bound to the one transaction. Used where a change must not be seen half done.
+ */
+export interface TxRunner {
+  transaction<T>(fn: (q: Queryable) => Promise<T>): Promise<T>;
+}

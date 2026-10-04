@@ -7,11 +7,13 @@ import { closeDb, db, patientSignIn, run } from "./helpers";
 
 /** No accessibility violations on the screen as it is now (WCAG 2.1 A and AA rules). */
 async function accessible(page: Page) {
+  // Let transitions finish, so contrast is measured on the settled screen.
+  await page.waitForTimeout(500);
   const result = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
   expect(
-    result.violations.map((v) => `${v.id}: ${v.nodes.length}`),
+    result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(" | ")}`),
     page.url(),
   ).toEqual([]);
 }

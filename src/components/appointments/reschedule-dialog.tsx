@@ -7,6 +7,7 @@ import { Select } from "@/components/ui/field";
 import { Notice } from "@/components/auth/notice";
 import { cn } from "@/lib/cn";
 import { rescheduleAppointment } from "@/lib/data/appointments";
+import { moveBooking } from "@/lib/data/appointments-api";
 import { formatSlotDay, formatSlotTime } from "@/lib/data/doctors";
 import type { AppointmentView, DoctorSlot } from "@/lib/types";
 
@@ -15,9 +16,10 @@ type Props = {
   slots: DoctorSlot[];
   onClose: () => void;
   onDone: (id: string, slot: DoctorSlot) => void;
+  real?: boolean;
 };
 
-export function RescheduleDialog({ appt, slots, onClose, onDone }: Props) {
+export function RescheduleDialog({ appt, slots, onClose, onDone, real = false }: Props) {
   const days = useMemo(() => [...new Set(slots.map((s) => s.date))], [slots]);
   const [day, setDay] = useState<string>("");
   const [slotId, setSlotId] = useState("");
@@ -39,9 +41,19 @@ export function RescheduleDialog({ appt, slots, onClose, onDone }: Props) {
     if (!appt || !slotId) return;
     setBusy(true);
     setError(undefined);
-    const result = await rescheduleAppointment({ id: appt.id, slotId });
+    const result = real
+      ? await moveBooking(appt.id, slotId)
+      : await rescheduleAppointment({ id: appt.id, slotId });
     setBusy(false);
-    if (result.status === "slot_taken") {
+    if (real && (result.status === "refused" || result.status === "error")) {
+      setError(
+        result.status === "refused"
+          ? result.message
+          : "We could not move this appointment. Nothing changed. Try again.",
+      );
+      return;
+    }
+    if (result.status === "slot_taken" || result.status === "taken") {
       setTaken((t) => [...t, slotId]);
       setSlotId("");
       setError("Someone booked that time while you were choosing. Pick another time.");

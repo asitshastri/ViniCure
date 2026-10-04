@@ -380,6 +380,8 @@ describe("who can read", () => {
     expect(Object.keys(read).sort()).toEqual([
       "doctorId",
       "doctorName",
+      "doctorRegistrationNo",
+      "doctorSpecialty",
       "endAt",
       "feePaise",
       "holdExpiresAt",
@@ -387,6 +389,7 @@ describe("who can read", () => {
       "patientId",
       "patientName",
       "rescheduleCount",
+      "reviewed",
       "startAt",
       "status",
     ]);

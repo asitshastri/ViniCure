@@ -7,6 +7,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Field, Textarea } from "@/components/ui/field";
 import { Notice } from "@/components/auth/notice";
 import { cancelAppointment, refundFor } from "@/lib/data/appointments";
+import { cancelBooking } from "@/lib/data/appointments-api";
 import { formatSlotDay, formatSlotTime } from "@/lib/data/doctors";
 import { formatRupees } from "@/lib/format";
 import { CANCEL_REASONS, cancelForm } from "@/lib/schemas/appointments";
@@ -16,9 +17,12 @@ type Props = {
   appt: AppointmentView | null;
   onClose: () => void;
   onDone: (id: string, refundPaise: number) => void;
+  /** Real bookings: the server decides; no refund wording and no free-text note. */
+  real?: boolean;
 };
 
-export function CancelDialog({ appt, onClose, onDone }: Props) {
+export function CancelDialog({ appt, onClose, onDone, real = false }: Props) {
+  const [failure, setFailure] = useState<string>();
   const uid = useId();
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
@@ -32,13 +36,34 @@ export function CancelDialog({ appt, onClose, onDone }: Props) {
     setNote("");
     setErrors({});
     setFailed(false);
+    setFailure(undefined);
     onClose();
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!appt) return;
-    const parsed = cancelForm.safeParse({ reason, note });
+    const parsed = cancelForm.safeParse({ reason, note: real ? "" : note });
+    if (real && !reason) {
+      setErrors({ reason: "Choose a reason." });
+      return;
+    }
+    if (real) {
+      setErrors({});
+      setFailed(false);
+      setFailure(undefined);
+      setBusy(true);
+      const result = await cancelBooking(appt.id, reason);
+      setBusy(false);
+      if (result.status === "ok") {
+        onDone(appt.id, 0);
+        setReason("");
+      } else {
+        setFailed(true);
+        if (result.status === "refused") setFailure(result.message);
+      }
+      return;
+    }
     if (!parsed.success) {
       const next: { reason?: string; note?: string } = {};
       for (const i of parsed.error.issues) next[i.path[0] as "reason" | "note"] ??= i.message;
@@ -89,10 +114,16 @@ export function CancelDialog({ appt, onClose, onDone }: Props) {
         <form id={formId} noValidate onSubmit={(e) => void submit(e)} className="grid gap-4">
           {failed ? (
             <Notice tone="danger" title="Could not cancel">
-              Something went wrong and nothing changed. Try again.
+              {failure ?? "Something went wrong and nothing changed. Try again."}
             </Notice>
           ) : null}
-          {refund > 0 ? (
+          {real ? (
+            appt.status === "held" ? (
+              <Notice tone="info" title="Nothing was charged">
+                This time was only held for you. Letting it go frees it for someone else.
+              </Notice>
+            ) : null
+          ) : refund > 0 ? (
             <Notice tone="info" title={`You get ${formatRupees(refund)} back`}>
               Cancelling more than 2 hours ahead is free. The refund reaches you in 5 to 7 working
               days.
@@ -119,22 +150,26 @@ export function CancelDialog({ appt, onClose, onDone }: Props) {
               </p>
             ) : null}
           </fieldset>
-          <Field inputId={`${uid}-note`} label="Anything to add? (optional)" error={errors.note}>
-            {({ describedBy, invalid }) => (
-              <Textarea
-                id={`${uid}-note`}
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                maxLength={300}
-                className="min-h-20"
-                aria-describedby={describedBy}
-                aria-invalid={invalid || undefined}
-              />
-            )}
-          </Field>
-          <p className="text-ink-muted text-sm">
-            Prototype: write “simulate error” in the box to see a failed cancel.
-          </p>
+          {real ? null : (
+            <Field inputId={`${uid}-note`} label="Anything to add? (optional)" error={errors.note}>
+              {({ describedBy, invalid }) => (
+                <Textarea
+                  id={`${uid}-note`}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  maxLength={300}
+                  className="min-h-20"
+                  aria-describedby={describedBy}
+                  aria-invalid={invalid || undefined}
+                />
+              )}
+            </Field>
+          )}
+          {real ? null : (
+            <p className="text-ink-muted text-sm">
+              Prototype: write “simulate error” in the box to see a failed cancel.
+            </p>
+          )}
         </form>
       ) : null}
     </Dialog>

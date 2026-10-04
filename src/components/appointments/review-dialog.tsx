@@ -7,14 +7,21 @@ import { Dialog } from "@/components/ui/dialog";
 import { Field, Textarea } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
 import { reviewAppointment } from "@/lib/data/appointments";
+import { reviewBooking } from "@/lib/data/appointments-api";
 import { reviewForm } from "@/lib/schemas/appointments";
 import type { AppointmentView } from "@/lib/types";
 
 const WORDS = ["", "Poor", "Fair", "Good", "Very good", "Excellent"];
 
-type Props = { appt: AppointmentView | null; onClose: () => void; onDone: (id: string) => void };
+type Props = {
+  appt: AppointmentView | null;
+  onClose: () => void;
+  onDone: (id: string) => void;
+  real?: boolean;
+};
 
-export function ReviewDialog({ appt, onClose, onDone }: Props) {
+export function ReviewDialog({ appt, onClose, onDone, real = false }: Props) {
+  const [problem, setProblem] = useState<string>();
   const uid = useId();
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
@@ -40,8 +47,22 @@ export function ReviewDialog({ appt, onClose, onDone }: Props) {
       return;
     }
     setBusy(true);
-    await reviewAppointment();
-    setBusy(false);
+    if (real) {
+      const result = await reviewBooking(appt.id, rating, comment);
+      setBusy(false);
+      if (result.status !== "ok") {
+        setProblem(
+          result.status === "refused"
+            ? result.message
+            : "We could not save your review. Try again in a moment.",
+        );
+        return;
+      }
+    } else {
+      await reviewAppointment();
+      setBusy(false);
+    }
+    setProblem(undefined);
     onDone(appt.id);
     setRating(0);
     setComment("");
@@ -55,7 +76,11 @@ export function ReviewDialog({ appt, onClose, onDone }: Props) {
       dismissible={!busy}
       variant="sheet"
       title={appt ? `Rate your visit with ${appt.doctorName}` : "Rate your visit"}
-      description="Your review is shown with your first name and initial only."
+      description={
+        real
+          ? "Your review is checked before it is shown. It never shows your name."
+          : "Your review is shown with your first name and initial only."
+      }
       footer={
         <>
           <Button variant="secondary" onClick={close} disabled={busy}>
@@ -68,6 +93,11 @@ export function ReviewDialog({ appt, onClose, onDone }: Props) {
       }
     >
       <form id={formId} noValidate onSubmit={(e) => void submit(e)} className="grid gap-4">
+        {problem ? (
+          <p role="alert" className="text-danger font-medium">
+            {problem}
+          </p>
+        ) : null}
         <fieldset>
           <legend className="mb-2 font-semibold">How was it?</legend>
           <div className="flex items-center gap-1">

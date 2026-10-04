@@ -176,7 +176,8 @@ export type FaqGroup = { id: string; title: string; items: FaqItem[] };
 
 export type SupportTopic = "booking" | "payment" | "technical" | "records" | "doctor" | "other";
 
-export type AppointmentStatus = "upcoming" | "completed" | "cancelled" | "no_show";
+/** "held" is a booking whose time is kept but not yet paid for (real bookings only). */
+export type AppointmentStatus = "upcoming" | "held" | "completed" | "cancelled" | "no_show";
 
 export type Appointment = {
   id: string;
@@ -198,7 +199,9 @@ export type Appointment = {
   /** Last day a discounted follow-up can be booked, if one applies. */
   followUpUntil?: string;
   followUpFeePaise?: number;
-  cancelledBy?: "patient" | "doctor";
+  /** Real bookings: when an unpaid hold runs out (ISO time). */
+  holdUntil?: string;
+  cancelledBy?: "patient" | "doctor" | "admin";
   refund?: { status: "processed" | "pending" | "none"; amountPaise: number };
 };
 

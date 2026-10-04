@@ -5,7 +5,7 @@ import { registerReadinessCheck } from "../health/checks";
 import { registerShutdownHook } from "../lifecycle";
 import { logger } from "../logging/logger";
 import { globalSingleton } from "../singleton";
-import type { Queryable } from "./queryable";
+import type { Queryable, TxRunner } from "./queryable";
 
 // Database module. One pool per process, sized by DATABASE_POOL_MAX so that
 // tasks x pool stays under the database connection limit. The pool connects as
@@ -84,4 +84,28 @@ export async function closeDatabase(): Promise<void> {
   if (!db) return;
   holder.db = undefined;
   await db.pool.end();
+}
+
+/** Transactions on the process-wide pool: BEGIN, run, COMMIT, or ROLLBACK if anything throws. */
+export function txRunner(db: Database = getDatabase()): TxRunner {
+  return {
+    async transaction<T>(fn: (q: Queryable) => Promise<T>): Promise<T> {
+      const client = await db.pool.connect();
+      try {
+        await client.query("BEGIN");
+        const result = await fn({
+          query: async (text, params) => ({
+            rows: (await client.query(text, params)).rows as Record<string, unknown>[],
+          }),
+        });
+        await client.query("COMMIT");
+        return result;
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+  };
 }

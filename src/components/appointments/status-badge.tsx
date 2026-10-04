@@ -1,10 +1,17 @@
-import { CalendarCheck, CheckCircle, Prohibit, UserMinus } from "@phosphor-icons/react/ssr";
+import {
+  CalendarCheck,
+  CheckCircle,
+  Hourglass,
+  Prohibit,
+  UserMinus,
+} from "@phosphor-icons/react/ssr";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import type { AppointmentStatus } from "@/lib/types";
 
 const map: Record<AppointmentStatus, { label: string; tone: BadgeTone; Icon: typeof CheckCircle }> =
   {
     upcoming: { label: "Upcoming", tone: "info", Icon: CalendarCheck },
+    held: { label: "Held, not paid", tone: "warning", Icon: Hourglass },
     completed: { label: "Completed", tone: "success", Icon: CheckCircle },
     cancelled: { label: "Cancelled", tone: "danger", Icon: Prohibit },
     no_show: { label: "Missed", tone: "warning", Icon: UserMinus },
