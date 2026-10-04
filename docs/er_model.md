@@ -544,6 +544,7 @@ Notes:
 - `idempotency_key` and `gateway_event_id` are unique, so a repeated request or webhook cannot create a second payment.
 - `earnings_ledger` is append-only. A capture writes doctor share and platform fee entries. A refund writes reversals.
 - Tax treatment on invoices: confirm with an accountant.
+- Migration 0017 adds `payments.payer_user_id`, `currency` (INR only) and `failure_code`, `refunds.idempotency_key` and `processed_at`, `invoice_counters` (one row per financial year, locked while a number is taken, so numbers are sequential with no gaps), `earnings_ledger.refund_id`, `payouts.paid_on` and `note`. `payment_events` keeps only the fields we need from the gateway (never contact details or account numbers); only `processed_at` can change, once. An appointment can have one paid payment at a time (unique index); failed and open attempts do not count.
 
 ---
 
