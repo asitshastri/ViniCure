@@ -124,6 +124,10 @@ export const MATRIX = {
     admin: ["read", "refund"],
     support: ["read"],
   },
+  payout: {
+    // Paying doctors what the ledger owes them (manual settlement from a CSV).
+    admin: ["read", "create", "settle"],
+  },
   doctorProfile: {
     // The doctor's own application; admins review it (approve, reject, suspend, reinstate).
     owner: ["read", "write"],

@@ -4,6 +4,8 @@ import { getDatabase, queryable, txRunner } from "../../lib/db/pool";
 import { globalSingleton } from "../../lib/singleton";
 import { getQueue } from "../../lib/queue/producer";
 import type { InvoiceService } from "./invoice";
+import { PayoutRepo } from "./payout-repo";
+import { PayoutService } from "./payouts";
 import { createInvoiceServiceFrom } from "./invoice-wiring";
 import { PaymentService } from "./service";
 
@@ -14,6 +16,7 @@ export { WebhookService } from "./webhook";
 export { RefundService } from "./refunds";
 export { InvoiceService, includedTax, invoiceNumber } from "./invoice";
 export { createInvoiceServiceFrom } from "./invoice-wiring";
+export * from "./payouts";
 export { LedgerService, splitPayment } from "./ledger";
 export { ReconcileService } from "./reconcile";
 
@@ -25,6 +28,7 @@ export { createPaymentServices } from "./wiring";
 const holder = globalSingleton("payments", () => ({
   service: undefined as PaymentService | undefined,
   invoices: undefined as InvoiceService | undefined,
+  payouts: undefined as PayoutService | undefined,
   parts: undefined as ReturnType<typeof createPaymentServices> | undefined,
 }));
 
@@ -53,6 +57,13 @@ export function getPayments(): PaymentService {
 }
 
 export const getWebhook = () => parts().webhook;
+export function getPayouts(): PayoutService {
+  holder.payouts ??= new PayoutService({
+    repo: new PayoutRepo(queryable(getDatabase()), txRunner()),
+  });
+  return holder.payouts;
+}
+
 export function getInvoices(): InvoiceService {
   holder.invoices ??= createInvoiceService();
   return holder.invoices;

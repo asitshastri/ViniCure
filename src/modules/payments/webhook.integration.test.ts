@@ -300,4 +300,61 @@ describe.skipIf(!url)("payment webhook on real Postgres", () => {
     );
     await expect(pool.query("DELETE FROM invoices")).rejects.toThrow(/permission denied/);
   });
+
+  it("two payout runs at the same moment claim a doctor's balance once", async () => {
+    const { PayoutRepo } = await import("./payout-repo");
+    const { PayoutService } = await import("./payouts");
+    const { order, gwPay, appt } = await paid();
+    await parts.settlement.settle((await parts.repo.findById(order.paymentId))!, gwPay);
+    const doctor = String(
+      (await pool.query("SELECT doctor_id FROM appointments WHERE id=$1", [appt])).rows[0]
+        ?.doctor_id,
+    );
+    const db: Queryable = {
+      query: async (text, params) => ({
+        rows: (await pool.query(text, params)).rows as Record<string, unknown>[],
+      }),
+    };
+    const tx = {
+      async transaction<T>(fn: (q: Queryable) => Promise<T>): Promise<T> {
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          const out = await fn({
+            query: async (t, p) => ({
+              rows: (await client.query(t, p)).rows as Record<string, unknown>[],
+            }),
+          });
+          await client.query("COMMIT");
+          return out;
+        } catch (e) {
+          await client.query("ROLLBACK").catch(() => undefined);
+          throw e;
+        } finally {
+          client.release();
+        }
+      },
+    };
+    const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+    // "Today" is a week from now for the service, so both periods are over.
+    const service = new PayoutService({
+      repo: new PayoutRepo(db, tx),
+      now: () => Date.now() + 7 * 86_400_000,
+    });
+    const admin = { userId: crypto.randomUUID(), roles: ["admin" as const] };
+    await Promise.all([
+      service.create(admin, { periodStart: day(0), periodEnd: day(2) }),
+      service.create(admin, { periodStart: day(0), periodEnd: day(3) }),
+      service.create(admin, { periodStart: day(1), periodEnd: day(4) }),
+    ]);
+    const payouts = await pool.query("SELECT amount_paise FROM payouts WHERE doctor_id=$1", [
+      doctor,
+    ]);
+    expect(payouts.rows.map((r) => Number(r.amount_paise))).toEqual([30000]);
+    expect(await parts.ledgerRepo.doctorBalance(doctor)).toBe(0);
+    // The app role cannot take a payout out of the ledger.
+    await expect(
+      pool.query("DELETE FROM earnings_ledger WHERE doctor_id=$1", [doctor]),
+    ).rejects.toThrow(/permission denied/);
+  });
 });
