@@ -88,6 +88,10 @@ const schema = z.object({
   AI_MODEL: optionalString,
   AI_DAILY_BUDGET: z.coerce.number().int().min(0).optional(),
 
+  // Development only: pages behind sign-in show mock data without a real session, so the
+  // screens can be previewed with no database. Refused in production (see productionProblems).
+  UI_MOCK_SESSION: flag,
+
   // Feature flags, all off by default
   FEATURE_AI_TRIAGE: flag,
   FEATURE_RECORDING: flag,
@@ -134,6 +138,7 @@ function productionProblems(config: z.output<typeof schema>): string[] {
   if (config.CRYPTO_PROVIDER === "kms" && !config.KMS_KEY_ID) {
     problems.push("KMS_KEY_ID is required when CRYPTO_PROVIDER is kms");
   }
+  if (config.UI_MOCK_SESSION) problems.push("UI_MOCK_SESSION must not be set in production");
   if (config.LOCAL_DEV_KEY) problems.push("LOCAL_DEV_KEY must not be set in production");
   if (config.S3_ENDPOINT)
     problems.push("S3_ENDPOINT (local storage) must not be set in production");

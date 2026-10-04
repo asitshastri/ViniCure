@@ -102,7 +102,12 @@ function getRepo(): IdentityRepo {
  * revoked session fails at once) and loads the roles. Plugged into withApi at start-up.
  */
 export async function authenticateRequest(request: Request): Promise<Actor | null> {
-  const found = await getAuth().api.getSession({ headers: request.headers });
+  return actorFromHeaders(request.headers);
+}
+
+/** Same lookup for server components, which have headers but no Request. */
+export async function actorFromHeaders(headers: Headers): Promise<Actor | null> {
+  const found = await getAuth().api.getSession({ headers });
   if (!found) return null;
   const state = await getRepo().accountState(found.user.id);
   if (!state || state.status !== "active") return null;

@@ -1,7 +1,9 @@
+import { requireRole } from "@/modules/identity/page-guard-next";
 import { SkipLink } from "@/components/shell/skip-link";
 
 // Call screens use the whole window, so they have no site header, footer or dashboard sidebar.
-export default function CallLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function CallLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  await requireRole(["patient", "doctor"]);
   return (
     <>
       <SkipLink />
