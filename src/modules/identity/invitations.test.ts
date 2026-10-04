@@ -56,18 +56,7 @@ async function setup() {
     baseUrl: ORIGIN,
     trustedOrigins: [ORIGIN],
     production: true,
-    accountState: async (id) => {
-      const { rows } = await q.query(`SELECT two_factor_enabled, status FROM users WHERE id = $1`, [
-        id,
-      ]);
-      const user = rows[0];
-      if (!user) return null;
-      return {
-        roles: await repo.rolesOf(id),
-        twoFactorEnabled: user.two_factor_enabled === true,
-        status: "active",
-      };
-    },
+    rolesOf: (id) => repo.rolesOf(id),
     emailAndPassword: staffEmailAndPassword,
     plugins: [
       ...createStaffPlugins(),

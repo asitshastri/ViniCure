@@ -29,7 +29,20 @@ function setup(options: { production: boolean; roles?: Role[] }) {
     baseUrl: options.production ? "https://vinicure.example" : "http://localhost:3000",
     trustedOrigins: [options.production ? "https://vinicure.example" : "http://localhost:3000"],
     production: options.production,
-    accountState: async () => ({ roles: roles.current, twoFactorEnabled: true, status: "active" }),
+    rolesOf: async () => roles.current,
+    // Only the column definition of the two-factor plugin, so the session hook can read it.
+    plugins: [
+      {
+        id: "two-factor-column",
+        schema: {
+          user: {
+            fields: {
+              twoFactorEnabled: { type: "boolean", required: false, defaultValue: false },
+            },
+          },
+        },
+      },
+    ],
     emailAndPassword: { enabled: true, disableSignUp: false },
   });
   const origin = options.production ? "https://vinicure.example" : "http://localhost:3000";
@@ -44,12 +57,23 @@ function setup(options: { production: boolean; roles?: Role[] }) {
   return { auth, db, roles, request, origin };
 }
 
+const credentials = { email: "asha@example.com", password: "a-long-test-password-123" };
+
+// Signs a person up and returns the response that carries their session cookie. A staff account
+// cannot get a session without two-factor (staff.ts), so for a staff role the account is made as
+// a patient, given two-factor and the role, and then signs in (this file has no two-factor
+// plugin, so the sign-in gives the session directly).
 async function signUp(ctx: ReturnType<typeof setup>) {
-  return ctx.request("/sign-up/email", {
-    email: "asha@example.com",
-    password: "a-long-test-password-123",
-    name: "Asha",
-  });
+  const wanted = ctx.roles.current;
+  const staff = wanted.some((role) => role !== "patient");
+  if (staff) ctx.roles.current = ["patient"];
+  const res = await ctx.request("/sign-up/email", { ...credentials, name: "Asha" });
+  if (!staff) return res;
+  const user = ctx.db.users?.[0] as Row;
+  user.twoFactorEnabled = true;
+  ctx.roles.current = wanted;
+  ctx.db.auth_sessions?.splice(0);
+  return ctx.request("/sign-in/email", credentials);
 }
 
 describe("session cookie", () => {
@@ -117,7 +141,7 @@ describe("session lifetimes", () => {
       baseUrl: "https://vinicure.example",
       trustedOrigins: [],
       production: true,
-      accountState: async () => null,
+      rolesOf: async () => [],
     });
     expect(options.session?.cookieCache?.enabled).toBe(false);
     expect(options.session?.freshAge).toBe(FRESH_LOGIN_SECONDS);

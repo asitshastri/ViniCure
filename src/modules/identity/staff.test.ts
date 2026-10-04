@@ -41,15 +41,7 @@ function setup() {
     baseUrl: ORIGIN,
     trustedOrigins: [ORIGIN],
     production: true,
-    accountState: async (id) => {
-      const user = db.users?.find((u) => u.id === id);
-      if (!user) return null;
-      return {
-        roles: rolesByUser.get(id) ?? [],
-        twoFactorEnabled: user.two_factor_enabled === true,
-        status: (user.status as "active") ?? "active",
-      };
-    },
+    rolesOf: async (id) => rolesByUser.get(id) ?? [],
     emailAndPassword: staffEmailAndPassword,
     plugins: [
       ...createStaffPlugins(),

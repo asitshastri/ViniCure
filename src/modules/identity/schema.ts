@@ -7,6 +7,10 @@ import type { BetterAuthOptions } from "better-auth";
 export const identityModels = {
   user: {
     modelName: "users",
+    // Our own column, unknown to Better Auth until declared. input:false: a client can never set it.
+    additionalFields: {
+      status: { type: "string", required: false, defaultValue: "active", input: false },
+    },
     fields: {
       emailVerified: "email_verified",
       createdAt: "created_at",

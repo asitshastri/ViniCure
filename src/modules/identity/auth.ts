@@ -1,4 +1,5 @@
-import { betterAuth, type BetterAuthOptions } from "better-auth";
+import { betterAuth, getCurrentAdapter, type BetterAuthOptions } from "better-auth";
+import type { Role } from "../../lib/api/types";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { uuidv7 } from "../../lib/ids";
 import { identityModels } from "./schema";
@@ -20,8 +21,11 @@ export type IdentityDeps = {
   trustedOrigins: readonly string[];
   /** Secure cookies and the __Host- prefix are on whenever this is true. */
   production: boolean;
-  /** Roles, two-factor state and status of a user, read whenever a session is about to be created. */
-  accountState: (userId: string) => Promise<AccountState | null>;
+  /**
+   * The roles of a user, read whenever a session is about to be created. Roles are written
+   * before any session exists (invitation, first phone sign-in), so a separate connection sees them.
+   */
+  rolesOf: (userId: string) => Promise<readonly Role[]>;
   /** How many proxies sit in front of the app, for reading the client address. */
   trustedProxyHops?: number;
   /** Extra Better Auth plugins and sign-in methods, added by later tasks (P2-03, P2-05, P2-17). */
@@ -110,8 +114,24 @@ export function buildAuthOptions(deps: IdentityDeps): BetterAuthOptions {
     databaseHooks: {
       session: {
         create: {
-          before: async (session) => {
-            const state = await deps.accountState(session.userId);
+          before: async (session, ctx) => {
+            // The user row is read through Better Auth's own adapter: during sign-up the user is
+            // created and the session made in one transaction, which a second connection cannot
+            // see yet. No context means we cannot check, so we refuse.
+            const adapter = ctx ? await getCurrentAdapter(ctx.context.adapter) : null;
+            const user = adapter
+              ? await adapter.findOne<{ twoFactorEnabled?: boolean; status?: string }>({
+                  model: "user",
+                  where: [{ field: "id", value: session.userId }],
+                })
+              : null;
+            const state: AccountState | null = user
+              ? {
+                  roles: await deps.rolesOf(session.userId),
+                  twoFactorEnabled: user.twoFactorEnabled === true,
+                  status: (user.status ?? "active") as AccountState["status"],
+                }
+              : null;
             // No session for a missing, locked or deleted account, and none for a staff account
             // that has not enrolled its authenticator (see staff.ts). This holds for every
             // sign-in method, so a new method cannot forget the rule.

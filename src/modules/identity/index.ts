@@ -41,7 +41,7 @@ export function getAuth(): Auth {
     baseUrl: config.APP_URL,
     trustedOrigins: [new URL(config.APP_URL).origin, ...config.AUTH_TRUSTED_ORIGINS],
     production,
-    accountState: (userId) => repo.accountState(userId),
+    rolesOf: (userId) => repo.rolesOf(userId),
     emailAndPassword: staffEmailAndPassword,
     trustedProxyHops: config.TRUSTED_PROXY_HOPS,
     plugins: [

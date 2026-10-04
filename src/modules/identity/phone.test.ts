@@ -32,7 +32,7 @@ function setup(options: { allowed?: string[] } = {}) {
     baseUrl: ORIGIN,
     trustedOrigins: [ORIGIN],
     production: true,
-    accountState: async () => ({ roles: ["patient"], twoFactorEnabled: false, status: "active" }),
+    rolesOf: async () => ["patient"],
     plugins: [
       createPhonePlugin({
         sms,
