@@ -39,7 +39,7 @@ async function setup(staff: Staff) {
     `INSERT INTO doctors (id, user_id, display_name, registration_no, registration_council, qualifications,
        consultation_fee_paise, kyc_status, status)
      VALUES ($1,$2,$3,$4,'E2E Council','MBBS, MD',30000,'approved','active')`,
-    [doctorId, staff.userId, `Dr Console${run}`, `CON-${run}`],
+    [doctorId, staff.userId, `Dr Console${run}`, `CON-${run}-${doctorId.slice(-6)}`],
   );
   // A patient account that never signs in here: the booking belongs to it.
   const user = crypto.randomUUID();

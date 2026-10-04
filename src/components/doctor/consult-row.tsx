@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { CaretRight, PhoneCall, VideoCamera, Warning } from "@phosphor-icons/react/ssr";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { formatClock } from "@/lib/data/doctor";
@@ -19,7 +18,9 @@ export function ConsultRow({ c, showDate = false }: Props) {
   const s = status[c.status];
   const Icon = c.mode === "audio" ? PhoneCall : VideoCamera;
   return (
-    <Link
+    // A plain link on purpose: the console needs its own page load, because the camera and
+    // microphone permission comes with the page's headers and a client-side move keeps the old ones.
+    <a
       href={`/doctor/consultations/${c.id}`}
       className="hover:bg-primary-tint flex min-h-20 items-center gap-4 px-4 py-3"
     >
@@ -54,7 +55,7 @@ export function ConsultRow({ c, showDate = false }: Props) {
         </Badge>
       ) : null}
       <CaretRight aria-hidden className="text-ink-faint size-4 shrink-0" />
-    </Link>
+    </a>
   );
 }
 
