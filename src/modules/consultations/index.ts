@@ -63,6 +63,11 @@ export function getConsultations(): ConsultationService {
   return holder.service;
 }
 
+/** Replaces the recording service (tests). Pass undefined to reset. */
+export function setRecordingForTest(service: RecordingService | undefined): void {
+  holder.recording = service;
+}
+
 /** Replaces the service (tests). Pass undefined to reset. */
 export function setConsultationsForTest(service: ConsultationService | undefined): void {
   holder.service = service;
