@@ -1,10 +1,11 @@
 import pg from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { FakeEmailProvider, FakeSmsProvider } from "../../lib/adapters/fakes";
 import { UUID_PATTERN } from "../../lib/ids";
 import { createAuth } from "./auth";
 import { invitationCrypto } from "./invitation-crypto";
 import { InvitationService, hashToken } from "./invitations";
+import { GOOGLE_AUTH_PATHS, googleProviders } from "./google";
 import { createPhonePlugin } from "./phone";
 import { IdentityRepo } from "./repo";
 import { PATIENT_SESSION_SECONDS, STAFF_SESSION_SECONDS } from "./session-policy";
@@ -57,6 +58,9 @@ describe.skipIf(!url)("Better Auth on real Postgres", () => {
       production: true,
       rolesOf: (id) => repo.rolesOf(id),
       emailAndPassword: staffEmailAndPassword,
+      socialProviders: googleProviders({ clientId: "client-id", clientSecret: "client-secret" }),
+      extraAllowedPaths: GOOGLE_AUTH_PATHS,
+      onSocialUserCreated: (id) => repo.grantPatientRole(id),
       plugins: [
         ...createStaffPlugins("integration-secret-with-at-least-32-characters"),
         createPhonePlugin({
@@ -240,5 +244,94 @@ describe.skipIf(!url)("Better Auth on real Postgres", () => {
       password: "not-the-password-123456",
     });
     expect(wrong.status).toBe(401);
+  });
+
+  describe("Google sign-in on real Postgres", () => {
+    const realFetch = globalThis.fetch;
+    afterEach(() => {
+      globalThis.fetch = realFetch;
+    });
+    const jwt = (claims: object) => {
+      const part = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
+      return `${part({ alg: "none" })}.${part(claims)}.`;
+    };
+
+    it("creates the account, attaches Google's sub, keeps no tokens, grants the patient role, signs in", async () => {
+      const sub = `g-${run}`;
+      globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input instanceof Request ? input.url : input);
+        if (url.startsWith("https://oauth2.googleapis.com/token")) {
+          return new Response(
+            JSON.stringify({
+              access_token: "google-access-token",
+              refresh_token: "google-refresh-token",
+              token_type: "Bearer",
+              expires_in: 3600,
+              id_token: jwt({
+                iss: "https://accounts.google.com",
+                aud: "client-id",
+                exp: Math.floor(Date.now() / 1000) + 3600,
+                sub,
+                email: `it-${run}-google@gmail.com`,
+                email_verified: true,
+                name: "Google Patient",
+              }),
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }
+        return realFetch(input as RequestInfo, init);
+      }) as typeof fetch;
+
+      const auth = make();
+      const start = await post(auth, "/sign-in/social", {
+        provider: "google",
+        callbackURL: "/patient/dashboard",
+      });
+      const { url: authorizeUrl } = (await start.json()) as { url: string };
+      const state = new URL(authorizeUrl).searchParams.get("state");
+      const jar = start.headers
+        .getSetCookie()
+        .map((c) => c.split(";")[0])
+        .join("; ");
+      const callback = await auth.handler(
+        new Request(`${origin}/api/auth/callback/google?code=fake&state=${state}`, {
+          headers: { cookie: jar },
+          redirect: "manual",
+        }),
+      );
+      expect(callback.status).toBe(302);
+      expect(callback.headers.get("location")).toContain("/patient/dashboard");
+      expect(callback.headers.getSetCookie().some((c) => c.startsWith("__Host-vc_session="))).toBe(
+        true,
+      );
+
+      const user = (
+        await pool.query("SELECT id, email FROM users WHERE email = $1", [
+          `it-${run}-google@gmail.com`,
+        ])
+      ).rows[0];
+      const account = (
+        await pool.query(
+          "SELECT provider_id, account_id, access_token, refresh_token, id_token FROM auth_accounts WHERE user_id = $1",
+          [user.id],
+        )
+      ).rows[0];
+      expect(account).toMatchObject({
+        provider_id: "google",
+        account_id: sub,
+        access_token: null,
+        refresh_token: null,
+        id_token: null,
+      });
+      expect(await new IdentityRepo(queryable()).rolesOf(user.id)).toEqual(["patient"]);
+      expect(
+        (
+          await pool.query("SELECT count(*)::int AS n FROM auth_sessions WHERE user_id = $1", [
+            user.id,
+          ])
+        ).rows[0].n,
+      ).toBe(1);
+    });
   });
 });

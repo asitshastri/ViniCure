@@ -380,3 +380,47 @@ test.describe("staff password reset", () => {
     await expect(page.getByText(/expired or was already used/i)).toBeVisible();
   });
 });
+
+test.describe("Google sign-in button", () => {
+  test("starts the sign-in with our state and leaves for Google; nothing else is stored", async ({
+    page,
+  }) => {
+    let googleUrl = "";
+    await page.route("https://accounts.google.com/**", async (route) => {
+      googleUrl = route.request().url();
+      await route.abort();
+    });
+    await page.goto("/login");
+    await page.getByRole("button", { name: /continue with google/i }).click();
+    await expect.poll(() => googleUrl).toContain("accounts.google.com");
+    const url = new URL(googleUrl);
+    expect(url.searchParams.get("client_id")).toBe("e2e-client-id.apps.googleusercontent.com");
+    // Identity scopes only (Better Auth lists some twice).
+    expect(new Set((url.searchParams.get("scope") ?? "").split(" "))).toEqual(
+      new Set(["openid", "email", "profile"]),
+    );
+    expect(url.searchParams.get("state")).toBeTruthy();
+    expect(url.searchParams.get("code_challenge")).toBeTruthy(); // PKCE
+    expect(url.searchParams.get("redirect_uri")).toBe(
+      "http://localhost:3100/api/auth/callback/google",
+    );
+    expect(url.searchParams.get("prompt")).toBe("select_account");
+  });
+
+  test("a refused Google sign-in comes back to the login page with a clear message", async ({
+    page,
+  }) => {
+    await page.goto("/login?error=account_not_linked");
+    await expect(page.getByText(/sign in with your mobile number, then add Google/i)).toBeVisible();
+  });
+
+  test("the settings page offers to add Google only to a signed-in patient, and asks for a fresh sign-in", async ({
+    page,
+  }) => {
+    await patientSignIn(page);
+    await page.goto("/patient/settings");
+    await expect(page.getByText(/mobile number and code/i)).toBeVisible();
+    await expect(page.getByText("Verified")).toBeVisible();
+    await expect(page.getByRole("button", { name: /add google/i })).toBeVisible();
+  });
+});

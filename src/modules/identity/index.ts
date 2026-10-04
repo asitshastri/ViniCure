@@ -8,6 +8,7 @@ import { getCache } from "../../lib/cache";
 import { logger } from "../../lib/logging/logger";
 import { RateLimiter } from "../../lib/rate-limit/limiter";
 import { PASSWORD_RESET_SECONDS, createAuth, type Auth } from "./auth";
+import { GOOGLE_AUTH_PATHS, googleProviders } from "./google";
 import { guardOtpRequest, type OtpGuardDeps } from "./otp-guard";
 import { guardSignIn, type AfterResponse, type SignInGuardDeps } from "./sign-in-guard";
 import { invitationCrypto } from "./invitation-crypto";
@@ -36,6 +37,10 @@ export function getAuth(): Auth {
   const production = config.NODE_ENV === "production";
   const database = getDatabase();
   const repo = new IdentityRepo(queryable(database));
+  const google =
+    config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET
+      ? { clientId: config.GOOGLE_CLIENT_ID, clientSecret: config.GOOGLE_CLIENT_SECRET }
+      : undefined;
   holder.auth = createAuth({
     database: database.pool,
     secret: config.AUTH_SECRET ?? DEV_SECRET,
@@ -45,6 +50,9 @@ export function getAuth(): Auth {
     rolesOf: (userId) => repo.rolesOf(userId),
     emailAndPassword: staffEmailAndPassword,
     trustedProxyHops: config.TRUSTED_PROXY_HOPS,
+    socialProviders: googleProviders(google),
+    extraAllowedPaths: google ? GOOGLE_AUTH_PATHS : new Set<string>(),
+    onSocialUserCreated: (userId) => repo.grantPatientRole(userId),
     sendPasswordReset: async ({ to, token }) => {
       await getEmailProvider().send({
         to,
@@ -179,7 +187,17 @@ export function getInvitations(): InvitationService {
 }
 
 export { INVITABLE_ROLES } from "./invitations";
+
+/** Whether the sign-in page should offer Google. Server side only. */
+export function googleSignInEnabled(): boolean {
+  const config = getConfig();
+  return Boolean(config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET);
+}
 export { expiredSessionCookie } from "./sessions";
+
+export function signInMethodsOf(userId: string) {
+  return getRepo().signInMethods(userId);
+}
 
 export function getSessions(): SessionService {
   return new SessionService(getRepo());

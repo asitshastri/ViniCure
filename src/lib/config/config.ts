@@ -159,6 +159,9 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     );
   }
   const config = parsed.data;
+  if (Boolean(config.GOOGLE_CLIENT_ID) !== Boolean(config.GOOGLE_CLIENT_SECRET)) {
+    throw new ConfigError(["GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set together"]);
+  }
   if (config.NODE_ENV === "production") {
     const problems = productionProblems(config);
     if (problems.length > 0) throw new ConfigError(problems);

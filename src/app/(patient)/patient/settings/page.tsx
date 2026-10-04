@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SignInMethodsPanel } from "@/components/profile/sign-in-methods";
 import { SectionCard } from "@/components/profile/section-card";
 import { ConsentPanel, DataPanel, SessionsPanel } from "@/components/profile/settings-panels";
 import { PageHeader } from "@/components/shell/page-header";
@@ -20,6 +21,13 @@ export default function SettingsPage() {
           description="Choose how we may use your information. You can change this at any time."
         >
           <ConsentPanel initial={getConsents()} />
+        </SectionCard>
+        <SectionCard
+          id="methods"
+          title="Ways to sign in"
+          description="Your mobile number, and Google if you add it."
+        >
+          <SignInMethodsPanel />
         </SectionCard>
         <SectionCard
           id="sessions"

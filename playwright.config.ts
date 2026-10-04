@@ -17,6 +17,10 @@ export const E2E_ENV = {
   APP_URL: `http://localhost:${E2E_PORT}`,
   LOCAL_DEV_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=", // 32 bytes, throwaway
   LOG_LEVEL: "warn",
+  // Fake Google credentials: the button appears and the server builds Google's address; the
+  // browser is stopped before it leaves for google.com. No real sign-in is attempted here.
+  GOOGLE_CLIENT_ID: "e2e-client-id.apps.googleusercontent.com",
+  GOOGLE_CLIENT_SECRET: "e2e-client-secret",
 };
 
 const cloudChromium = "/opt/pw-browsers/chromium";

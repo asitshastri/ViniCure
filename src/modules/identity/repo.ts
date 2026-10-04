@@ -58,6 +58,11 @@ export class IdentityRepo {
       `UPDATE users SET phone_verified_at = now(), last_active_at = now() WHERE id = $1`,
       [userId],
     );
+    await this.grantPatientRole(userId);
+  }
+
+  /** Gives a user who has no role yet the patient role. Staff always hold a role, so never get it. */
+  async grantPatientRole(userId: string): Promise<void> {
     await this.db.query(
       `INSERT INTO user_roles (user_id, role_id)
        SELECT $1::uuid, r.id FROM roles r
@@ -214,6 +219,18 @@ export class IdentityRepo {
     );
     const row = rows[0];
     return row && row.user_id ? String(row.user_id) : null;
+  }
+
+  // ---- Sign-in methods (P2-17) ----
+
+  /** Which ways of signing in this account has, for the settings page. Booleans only. */
+  async signInMethods(userId: string): Promise<{ phone: boolean; google: boolean }> {
+    const { rows } = await this.db.query(
+      `SELECT (SELECT phone_number_verified FROM users WHERE id = $1) AS phone,
+              EXISTS (SELECT 1 FROM auth_accounts WHERE user_id = $1 AND provider_id = 'google') AS google`,
+      [userId],
+    );
+    return { phone: rows[0]?.phone === true, google: rows[0]?.google === true };
   }
 
   // ---- Sessions (P2-10) ----

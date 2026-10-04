@@ -21,6 +21,16 @@ export const ALLOWED_AUTH_PATHS: ReadonlySet<string> = new Set([
   "/reset-password", // staff: the link's token plus the new password (P2-16)
 ]);
 
+/**
+ * Endpoints opened only by a configured method, never by default (Google, P2-17). They are
+ * classified here so the inventory test knows them; `extraAllowedPaths` opens them.
+ */
+export const OPTIONAL_AUTH_PATHS: Readonly<Record<string, string>> = {
+  "/sign-in/social": "starts a Google sign-in (only when Google is configured)",
+  "/callback/:id": "Google's answer; only /callback/google is opened",
+  "/link-social": "adds Google to a signed-in account (only when Google is configured)",
+};
+
 /** Endpoints that exist in Better Auth and are deliberately closed, with the reason. */
 export const CLOSED_AUTH_PATHS: Readonly<Record<string, string>> = {
   "/ok": "no need; our own /api/health exists",
@@ -44,9 +54,6 @@ export const CLOSED_AUTH_PATHS: Readonly<Record<string, string>> = {
   "/phone-number/reset-password": "patients have no password",
   "/sign-in/phone-number": "patients have no password",
   "/sign-up/email": "accounts are made by invitation or by phone verification only",
-  "/sign-in/social": "Google arrives with P2-17",
-  "/callback/:id": "Google arrives with P2-17",
-  "/link-social": "linking needs the proof flow of P2-17",
   "/unlink-account": "P2-17 and P2-18",
   "/get-access-token": "we never call a provider on the person's behalf",
   "/refresh-token": "same",
@@ -58,7 +65,14 @@ export const CLOSED_AUTH_PATHS: Readonly<Record<string, string>> = {
   "/two-factor/generate-backup-codes": "regeneration gets its own audited screen later",
 };
 
-export function isAllowedAuthPath(path: string, extra: ReadonlySet<string> = new Set()): boolean {
+export function isAllowedAuthPath(
+  path: string,
+  extra: ReadonlySet<string> = new Set(),
+  params?: Record<string, unknown>,
+): boolean {
+  // The provider callback is one route for every provider; Better Auth reports it as
+  // "/callback/:id". Only the providers named in `extra` ("/callback/<id>") get through.
+  if (path === "/callback/:id") return extra.has(`/callback/${String(params?.id ?? "")}`);
   return ALLOWED_AUTH_PATHS.has(path) || extra.has(path);
 }
 

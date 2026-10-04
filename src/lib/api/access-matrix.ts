@@ -211,4 +211,14 @@ export const ACCESS_MATRIX: Record<RouteKey, MatrixEntry> = {
     probeAllowed: false,
     why: "Describes only the caller (id and roles). Used by the sign-in screens.",
   },
+  "GET /api/v1/me/sign-in-methods": {
+    auth: "session",
+    roles: ["patient"],
+    roleDenied: "not_found",
+    rateLimit: "auth_read",
+    audited: false,
+    freshLogin: false,
+    probeAllowed: false,
+    why: "A patient sees which sign-in methods their own account has (booleans only).",
+  },
 };

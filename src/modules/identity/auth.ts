@@ -3,9 +3,14 @@ import type { Role } from "../../lib/api/types";
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { uuidv7 } from "../../lib/ids";
 import { identityModels } from "./schema";
-import { PATIENT_SESSION_SECONDS, FRESH_LOGIN_SECONDS, sessionExpiry } from "./session-policy";
+import {
+  PATIENT_SESSION_SECONDS,
+  FRESH_LOGIN_SECONDS,
+  isFreshLogin,
+  isStaff,
+  sessionExpiry,
+} from "./session-policy";
 import { PASSWORD_PROBLEM_TEXT, passwordProblem } from "./password";
-import { isStaff } from "./session-policy";
 import { sessionRefusal, type AccountState } from "./staff";
 import { UPDATE_USER_FIELDS, hashIdentifier, isAllowedAuthPath, stripTokens } from "./surface";
 
@@ -37,6 +42,8 @@ export type IdentityDeps = {
   sendPasswordReset?: (input: { to: string; token: string }) => Promise<void>;
   /** Reports a failed side effect (an email that could not be sent) without personal data. */
   onSideEffectFailure?: (what: string) => void;
+  /** A person was just created through a social sign-in (Google): give them the patient role. */
+  onSocialUserCreated?: (userId: string) => Promise<void>;
   /** Extra Better Auth plugins and sign-in methods, added by later tasks (P2-03, P2-05, P2-17). */
   plugins?: BetterAuthOptions["plugins"];
   emailAndPassword?: BetterAuthOptions["emailAndPassword"];
@@ -93,6 +100,26 @@ async function enforcePasswordPolicy(
   }
 }
 
+const isSocialPath = (path?: string) =>
+  path === "/sign-in/social" || path?.startsWith("/callback/");
+
+async function requireFreshPatientSession(
+  ctx: Parameters<typeof getSessionFromCtx>[0],
+  deps: { rolesOf: (userId: string) => Promise<readonly Role[]> },
+): Promise<void> {
+  const found = await getSessionFromCtx(ctx);
+  if (!found) throw new APIError("UNAUTHORIZED", { message: "Sign in first." });
+  if (!isFreshLogin(new Date(found.session.createdAt))) {
+    throw new APIError("FORBIDDEN", {
+      message: "Sign in again to do this.",
+      code: "FRESH_LOGIN_REQUIRED",
+    });
+  }
+  if (isStaff(await deps.rolesOf(found.user.id))) {
+    throw new APIError("FORBIDDEN", { message: "Not available for this account." });
+  }
+}
+
 export function buildAuthOptions(deps: IdentityDeps): BetterAuthOptions {
   const cookieName = (suffix: string) => (deps.production ? `__Host-vc_${suffix}` : `vc_${suffix}`);
 
@@ -104,6 +131,13 @@ export function buildAuthOptions(deps: IdentityDeps): BetterAuthOptions {
     database: deps.database,
     trustedOrigins: [...deps.trustedOrigins],
     ...identityModels,
+    account: {
+      ...identityModels.account,
+      // Explicit linking from a signed-in session is allowed; joining by matching email never is.
+      // allowDifferentEmails: a patient who signed up by phone has no real email to match, and a
+      // link is never decided by email anyway (it needs the signed-in session).
+      accountLinking: { enabled: true, disableImplicitLinking: true, allowDifferentEmails: true },
+    },
 
     emailAndPassword: {
       ...(deps.emailAndPassword ?? { enabled: false }),
@@ -187,7 +221,7 @@ export function buildAuthOptions(deps: IdentityDeps): BetterAuthOptions {
       // browser) is left to the rate limits and captcha.
       before: createAuthMiddleware(async (ctx) => {
         // Default deny: only the paths in surface.ts exist.
-        if (!isAllowedAuthPath(ctx.path ?? "", deps.extraAllowedPaths)) {
+        if (!isAllowedAuthPath(ctx.path ?? "", deps.extraAllowedPaths, ctx.params)) {
           throw new APIError("NOT_FOUND", { message: "Not found" });
         }
         const origin = ctx.request?.headers.get("origin");
@@ -197,6 +231,8 @@ export function buildAuthOptions(deps: IdentityDeps): BetterAuthOptions {
         if (origin ? !ctx.context.trustedOrigins.includes(origin) : crossSite) {
           throw new APIError("FORBIDDEN", { message: "Invalid origin" });
         }
+        // Adding Google to an account: signed in, signed in recently, not staff.
+        if (ctx.path === "/link-social") await requireFreshPatientSession(ctx, deps);
         // New passwords must meet the staff policy, however they are set.
         if (ctx.path === "/reset-password" || ctx.path === "/change-password") {
           const session = ctx.path === "/change-password" ? await getSessionFromCtx(ctx) : null;
@@ -221,6 +257,37 @@ export function buildAuthOptions(deps: IdentityDeps): BetterAuthOptions {
     },
 
     databaseHooks: {
+      user: {
+        create: {
+          // After the user is saved: a person created by Google gets the patient role.
+          after: async (user, ctx) => {
+            if (isSocialPath(ctx?.path)) await deps.onSocialUserCreated?.(user.id);
+          },
+        },
+      },
+      account: {
+        create: {
+          before: async (account) => {
+            if (account.providerId === "credential") return;
+            // Staff cannot have a Google account attached.
+            if (isStaff(await deps.rolesOf(account.userId))) {
+              throw new APIError("FORBIDDEN", { message: "Not available for this account." });
+            }
+            // Keep only who Google says this is (`accountId` is Google's `sub`). The tokens are
+            // not stored: nothing here ever calls Google again.
+            return {
+              data: {
+                ...account,
+                accessToken: null,
+                refreshToken: null,
+                idToken: null,
+                accessTokenExpiresAt: null,
+                refreshTokenExpiresAt: null,
+              },
+            };
+          },
+        },
+      },
       session: {
         create: {
           before: async (session, ctx) => {
@@ -245,6 +312,12 @@ export function buildAuthOptions(deps: IdentityDeps): BetterAuthOptions {
             // that has not enrolled its authenticator (see staff.ts). This holds for every
             // sign-in method, so a new method cannot forget the rule.
             if (!state || sessionRefusal(state)) {
+              throw new APIError("FORBIDDEN", {
+                message: "Sign-in is not available for this account.",
+              });
+            }
+            // Staff sign in with a password and an authenticator, never with Google.
+            if (isSocialPath(ctx?.path) && isStaff(state.roles)) {
               throw new APIError("FORBIDDEN", {
                 message: "Sign-in is not available for this account.",
               });

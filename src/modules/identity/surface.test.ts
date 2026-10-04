@@ -7,6 +7,7 @@ import { createStaffPlugins, staffEmailAndPassword } from "./staff";
 import {
   ALLOWED_AUTH_PATHS,
   CLOSED_AUTH_PATHS,
+  OPTIONAL_AUTH_PATHS,
   hashIdentifier,
   isAllowedAuthPath,
   stripTokens,
@@ -80,16 +81,21 @@ describe("the HTTP surface of Better Auth is classified, endpoint by endpoint", 
     );
     // Server-only endpoints have no path and cannot be reached over HTTP.
     const unclassified = [...paths].filter(
-      (path) => !ALLOWED_AUTH_PATHS.has(path) && !(path in CLOSED_AUTH_PATHS),
+      (path) =>
+        !ALLOWED_AUTH_PATHS.has(path) &&
+        !(path in CLOSED_AUTH_PATHS) &&
+        !(path in OPTIONAL_AUTH_PATHS),
     );
     expect(
       unclassified,
       `New Better Auth endpoints need a decision in src/modules/identity/surface.ts: ${unclassified.join(", ")}`,
     ).toEqual([]);
     // And the lists name only endpoints that exist, so they cannot rot.
-    const stale = [...ALLOWED_AUTH_PATHS, ...Object.keys(CLOSED_AUTH_PATHS)].filter(
-      (path) => !paths.has(path),
-    );
+    const stale = [
+      ...ALLOWED_AUTH_PATHS,
+      ...Object.keys(CLOSED_AUTH_PATHS),
+      ...Object.keys(OPTIONAL_AUTH_PATHS),
+    ].filter((path) => !paths.has(path));
     expect(stale, `Not in Better Auth any more: ${stale.join(", ")}`).toEqual([]);
   });
 
