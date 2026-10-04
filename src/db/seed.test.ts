@@ -1,5 +1,12 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { DEMO_COUNCIL, SPECIALTIES, demoDoctors, seedDemo, seedReference } from "./seed.mts";
+import {
+  DEMO_COUNCIL,
+  SPECIALTIES,
+  demoDoctors,
+  seedDemo,
+  seedDemoConsents,
+  seedReference,
+} from "./seed.mts";
 import { createTestDb } from "./testing";
 
 let t: Awaited<ReturnType<typeof createTestDb>>;
@@ -62,6 +69,22 @@ describe("seed data", () => {
     for (const d of demoDoctors()) {
       expect(d.feePaise).toBeGreaterThanOrEqual(10_000);
       expect(d.feePaise).toBeLessThanOrEqual(500_000);
+    }
+  });
+
+  it("draft consent texts are loaded once, say they are placeholders, and match their hash", async () => {
+    expect(await seedDemoConsents(db())).toBe(2);
+    expect(await seedDemoConsents(db())).toBe(0);
+    const rows = (
+      await t.db.query(
+        "SELECT kind, body, content_hash FROM consent_policies WHERE version = 'draft-placeholder-1' ORDER BY kind",
+      )
+    ).rows as { kind: string; body: string; content_hash: string }[];
+    expect(rows.map((r) => r.kind)).toEqual(["telemedicine", "video"]);
+    const { createHash } = await import("node:crypto");
+    for (const r of rows) {
+      expect(r.body).toMatch(/DRAFT PLACEHOLDER, NOT LEGAL TEXT/);
+      expect(r.content_hash).toBe(createHash("sha256").update(r.body).digest("hex"));
     }
   });
 });

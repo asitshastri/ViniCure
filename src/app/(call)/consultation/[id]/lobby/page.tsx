@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CallFlow } from "@/components/call/call-flow";
 import { getAppointment } from "@/lib/data/appointments";
+import { loadRealAppointment } from "@/lib/data/appointments-real";
+import { isRealDirectory } from "@/lib/data/directory-real";
 
 export const metadata: Metadata = { title: "Consultation", robots: { index: false } };
 
@@ -14,8 +16,12 @@ export default async function ConsultationPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ state?: string }>;
 }) {
-  const appt = getAppointment((await params).id);
+  const id = (await params).id;
+  // With the database configured the booking is the signed-in patient's own (anyone else's is a
+  // 404); without it the sample booking stands in. The join route checks everything again.
+  const real = isRealDirectory();
+  const appt = real ? await loadRealAppointment(id) : getAppointment(id);
   if (!appt) notFound();
   const state = (await searchParams).state;
-  return <CallFlow appt={appt} weakNetwork={state === "lowbw"} />;
+  return <CallFlow appt={appt} weakNetwork={state === "lowbw"} real={real} />;
 }

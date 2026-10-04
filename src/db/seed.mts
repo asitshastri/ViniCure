@@ -146,3 +146,34 @@ export async function seedDemo(db: SeedDb, count = 24): Promise<number> {
   }
   return created;
 }
+
+/**
+ * DRAFT consent texts for development and staging only (P6-05). They say plainly that they are
+ * placeholders and are not legal wording; the real texts come from legal (P9-10) and are loaded
+ * as new versions. Safe to run again: a version is stored once.
+ */
+export const DEMO_CONSENT_VERSION = "draft-placeholder-1";
+export async function seedDemoConsents(db: SeedDb): Promise<number> {
+  const texts: Record<string, string> = {
+    telemedicine:
+      "DRAFT PLACEHOLDER, NOT LEGAL TEXT. I understand this is an online consultation with a registered doctor, that it is not for emergencies, and that the doctor may advise me to see a doctor in person.",
+    video:
+      "DRAFT PLACEHOLDER, NOT LEGAL TEXT. I agree to a video call with my doctor. The call is not recorded unless both of us agree.",
+  };
+  let added = 0;
+  for (const [kind, body] of Object.entries(texts)) {
+    const { rows } = await db.query(
+      `INSERT INTO consent_policies (id, kind, version, language, body, content_hash, effective_from)
+       VALUES ($1, $2, $3, 'en', $4, $5, '2026-01-01') ON CONFLICT DO NOTHING RETURNING id`,
+      [
+        stableUuid(`consent:${kind}:${DEMO_CONSENT_VERSION}`),
+        kind,
+        DEMO_CONSENT_VERSION,
+        body,
+        createHash("sha256").update(body).digest("hex"),
+      ],
+    );
+    added += rows.length;
+  }
+  return added;
+}

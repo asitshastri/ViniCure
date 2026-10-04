@@ -24,6 +24,8 @@ type Props = {
   appt: Appointment;
   weakNetwork: boolean;
   onJoin: (opts: { stream: MediaStream | null; audioOnly: boolean }) => void;
+  /** A real connection test. The sample screens fake one with a short wait. */
+  testNetwork?: () => Promise<"good" | "weak">;
 };
 
 function StatusLine({
@@ -66,7 +68,7 @@ function StatusLine({
   );
 }
 
-export function Lobby({ appt, weakNetwork, onJoin }: Props) {
+export function Lobby({ appt, weakNetwork, onJoin, testNetwork }: Props) {
   const media = useMediaCheck();
   const [net, setNet] = useState<Net>("idle");
   const [audioOnly, setAudioOnly] = useState(false);
@@ -74,6 +76,7 @@ export function Lobby({ appt, weakNetwork, onJoin }: Props) {
   async function runChecks() {
     setNet("testing");
     void media.start();
+    if (testNetwork) return setNet(await testNetwork());
     await new Promise((r) => setTimeout(r, 1600));
     setNet(weakNetwork ? "weak" : "good");
   }
@@ -235,8 +238,10 @@ export function Lobby({ appt, weakNetwork, onJoin }: Props) {
           </p>
         </div>
         <p className="text-ink-muted text-sm">
-          Recording is off. It happens only if you and your doctor both agree. By joining you accept
-          the consultation terms (draft, pending legal review).
+          Recording is off. It happens only if you and your doctor both agree.{" "}
+          {testNetwork
+            ? "Before your first call you will be asked to agree to the consultation terms."
+            : "By joining you accept the consultation terms (draft, pending legal review)."}
         </p>
       </aside>
     </div>

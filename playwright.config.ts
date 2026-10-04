@@ -45,7 +45,17 @@ export default defineConfig({
   use: {
     baseURL: E2E_ENV.APP_URL,
     trace: "retain-on-failure",
-    launchOptions: executablePath ? { executablePath, args: ["--no-sandbox"] } : {},
+    // Chromium's built-in fake camera and microphone, with the permission prompt answered, so the
+    // call screens can be driven without hardware.
+    permissions: ["camera", "microphone"],
+    launchOptions: {
+      ...(executablePath ? { executablePath } : {}),
+      args: [
+        ...(executablePath ? ["--no-sandbox"] : []),
+        "--use-fake-ui-for-media-stream",
+        "--use-fake-device-for-media-stream",
+      ],
+    },
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {

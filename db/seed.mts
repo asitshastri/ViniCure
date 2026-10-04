@@ -1,8 +1,8 @@
 import pg from "pg";
-import { seedDemo, seedReference } from "../src/db/seed.mts";
+import { seedDemo, seedDemoConsents, seedReference } from "../src/db/seed.mts";
 
 // pnpm db:seed          reference data (specialties). Safe anywhere.
-// pnpm db:seed --demo   also fake doctors with working hours. Never in production.
+// pnpm db:seed --demo   also fake doctors with working hours and DRAFT consent texts. Never in production.
 // Connects with DATABASE_URL (the app role). The URL is never printed.
 
 const url = process.env.DATABASE_URL;
@@ -26,7 +26,10 @@ try {
   };
   await seedReference(db);
   console.log("specialties seeded");
-  if (demo) console.log(`demo doctors added: ${await seedDemo(db)}`);
+  if (demo) {
+    console.log(`demo doctors added: ${await seedDemo(db)}`);
+    console.log(`draft consent texts added: ${await seedDemoConsents(db)}`);
+  }
 } catch (error) {
   console.error("seed failed:", (error as Error).message);
   process.exitCode = 1;

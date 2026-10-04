@@ -181,3 +181,43 @@ describe("origin check", () => {
     expect(isOriginAllowed(hook)).toBe(true);
   });
 });
+
+describe("the video SDK", () => {
+  const opts = (pathname: string) => ({ nonce: "abc", production: true, pathname });
+  const agora = /agora|sd-rtn/;
+
+  it("may reach the provider's servers from the call screens, and a worker from a blob", () => {
+    for (const path of [
+      "/consultation/0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b/lobby",
+      "/consultation/abc",
+      "/doctor/consultations/abc",
+    ]) {
+      const csp = securityHeaders(opts(path))["Content-Security-Policy"] ?? "";
+      expect(csp, path).toContain("connect-src 'self' https://*.agora.io wss://*.agora.io");
+      expect(csp, path).toContain("https://*.sd-rtn.com wss://*.sd-rtn.com");
+      expect(csp, path).toContain("worker-src 'self' blob:");
+      // Everything else stays strict.
+      expect(csp, path).toContain("default-src 'self'");
+      expect(csp, path).not.toMatch(/script-src[^;]*unsafe-(inline|eval)/);
+      expect(csp, path).not.toMatch(/script-src[^;]*agora/);
+      expect(csp, path).toContain("frame-ancestors 'none'");
+    }
+  });
+
+  it("is not allowed anywhere else", () => {
+    for (const path of [
+      "/",
+      "/doctors",
+      "/patient/appointments",
+      "/book/x",
+      "/consultations",
+      "/consultation",
+      "/doctor/consultations",
+      "/login",
+    ]) {
+      const csp = securityHeaders(opts(path))["Content-Security-Policy"] ?? "";
+      expect(csp, path).not.toMatch(agora);
+      expect(csp, path).not.toContain("worker-src");
+    }
+  });
+});

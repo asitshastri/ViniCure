@@ -18,14 +18,22 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { cn } from "@/lib/cn";
 import type { Appointment } from "@/lib/types";
+import type { VideoClient } from "@/lib/video";
+import { useRealCall, type Conn } from "./use-real-call";
 import { VideoTile } from "./video-tile";
 
-type Conn = "good" | "weak" | "reconnecting" | "failed";
 type Props = {
   appt: Appointment;
   stream: MediaStream | null;
   startAudioOnly: boolean;
   onEnd: (seconds: number) => void;
+  /** A real call: the video client to drive, and what to do when the connection must be rebuilt or the server ended the call. */
+  real?: {
+    client: VideoClient;
+    appointmentId: string;
+    onRejoin: () => void;
+    onEndedByServer: () => void;
+  };
 };
 
 const fmt = (s: number) =>
@@ -70,12 +78,16 @@ function CtrlButton({
   );
 }
 
-export function LiveCall({ appt, stream, startAudioOnly, onEnd }: Props) {
+export function LiveCall({ appt, stream: lobbyStream, startAudioOnly, onEnd, real }: Props) {
+  const call = useRealCall(real);
+  // A real call shows the camera the video client opened; the sample screens show the lobby's.
+  const stream = real ? real.client.localStream : lobbyStream;
   const [seconds, setSeconds] = useState(0);
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(!startAudioOnly && Boolean(stream?.getVideoTracks().length));
   const [audioOnly, setAudioOnly] = useState(startAudioOnly);
-  const [conn, setConn] = useState<Conn>("good");
+  const [mockConn, setConn] = useState<Conn>("good");
+  const conn = real ? call.conn : mockConn;
   const [attempt, setAttempt] = useState(0);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [info, setInfo] = useState(false);
@@ -87,12 +99,16 @@ export function LiveCall({ appt, stream, startAudioOnly, onEnd }: Props) {
   }, []);
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
+  const client = real?.client;
+  const bump = call.bump;
   useEffect(() => {
-    stream?.getAudioTracks().forEach((t) => (t.enabled = micOn));
-  }, [micOn, stream]);
+    if (client) void client.setMicrophone(micOn);
+    else stream?.getAudioTracks().forEach((t) => (t.enabled = micOn));
+  }, [micOn, stream, client]);
   useEffect(() => {
-    stream?.getVideoTracks().forEach((t) => (t.enabled = camOn && !audioOnly));
-  }, [camOn, audioOnly, stream]);
+    if (client) void client.setCamera(camOn && !audioOnly).then(bump);
+    else stream?.getVideoTracks().forEach((t) => (t.enabled = camOn && !audioOnly));
+  }, [camOn, audioOnly, stream, client, bump]);
 
   // A plain function, so it can call itself for the next attempt.
   function reconnect(n: number) {
@@ -103,6 +119,8 @@ export function LiveCall({ appt, stream, startAudioOnly, onEnd }: Props) {
   }
 
   function retry() {
+    // A real call rebuilds the connection from the start (a new token, the same room).
+    if (real) return real.onRejoin();
     timers.current.forEach(clearTimeout);
     setConn("reconnecting");
     setAttempt(1);
@@ -113,11 +131,13 @@ export function LiveCall({ appt, stream, startAudioOnly, onEnd }: Props) {
     timers.current.forEach(clearTimeout);
     setAudioOnly(true);
     setCamOn(false);
-    setConn("weak");
+    if (!real) setConn("weak");
   }
 
   const selfName = appt.forWhom.split(" (")[0] ?? "You";
   const ConnIcon = conn === "good" ? CellSignalFull : conn === "weak" ? CellSignalLow : WifiSlash;
+  const remote = real?.client.remoteStream ?? null;
+  const remoteVideo = Boolean(remote?.getVideoTracks().some((t) => t.readyState === "live"));
 
   return (
     <div className="on-dark bg-dock flex min-h-dvh flex-col text-white">
@@ -164,7 +184,9 @@ export function LiveCall({ appt, stream, startAudioOnly, onEnd }: Props) {
           <div className="relative">
             <VideoTile
               name={appt.doctorName}
-              videoOn={false}
+              stream={remote}
+              remote={Boolean(real)}
+              videoOn={remoteVideo}
               label={appt.doctorName}
               className="aspect-[3/4] max-h-[62dvh] w-full sm:aspect-video"
             />
@@ -189,7 +211,9 @@ export function LiveCall({ appt, stream, startAudioOnly, onEnd }: Props) {
               >
                 {conn === "reconnecting" ? (
                   <>
-                    <p className="text-xl font-semibold">Reconnecting… attempt {attempt} of 3</p>
+                    <p className="text-xl font-semibold">
+                      Reconnecting…{real ? "" : ` attempt ${attempt} of 3`}
+                    </p>
                     <p className="text-white/80">
                       Please stay on this page. Your doctor will wait.
                     </p>
@@ -214,20 +238,32 @@ export function LiveCall({ appt, stream, startAudioOnly, onEnd }: Props) {
               </div>
             ) : null}
           </div>
-          <PrototypeHint dark>
-            <p>Simulate:</p>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="dock" size="sm" onClick={() => setConn("weak")}>
-                Weak connection
-              </Button>
-              <Button variant="dock" size="sm" onClick={() => reconnect(1)}>
-                Dropped connection
-              </Button>
-              <Button variant="dock" size="sm" onClick={() => setConn("good")}>
-                Back to good
-              </Button>
-            </div>
-          </PrototypeHint>
+          {real && call.remoteLeft ? (
+            <p role="status" className="mt-3 rounded-xl bg-white/10 p-3 text-center">
+              {appt.doctorName} has left the call. You can wait a moment, or leave.
+            </p>
+          ) : null}
+          {real && call.renewalProblem ? (
+            <p role="alert" className="mt-3 rounded-xl bg-white/10 p-3 text-center">
+              We are having trouble keeping the call secure. Stay on this page; we are trying again.
+            </p>
+          ) : null}
+          {real ? null : (
+            <PrototypeHint dark>
+              <p>Simulate:</p>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="dock" size="sm" onClick={() => setConn("weak")}>
+                  Weak connection
+                </Button>
+                <Button variant="dock" size="sm" onClick={() => reconnect(1)}>
+                  Dropped connection
+                </Button>
+                <Button variant="dock" size="sm" onClick={() => setConn("good")}>
+                  Back to good
+                </Button>
+              </div>
+            </PrototypeHint>
+          )}
         </div>
 
         <aside
@@ -274,7 +310,7 @@ export function LiveCall({ appt, stream, startAudioOnly, onEnd }: Props) {
             offLabel="Turn camera on"
             onIcon={VideoCamera}
             offIcon={VideoCameraSlash}
-            disabled={!stream?.getVideoTracks().length || audioOnly}
+            disabled={(!real && !stream?.getVideoTracks().length) || audioOnly}
             onClick={() => setCamOn((v) => !v)}
           />
           {!audioOnly ? (
@@ -284,15 +320,15 @@ export function LiveCall({ appt, stream, startAudioOnly, onEnd }: Props) {
           ) : null}
         </div>
         <Button variant="danger" size="lg" onClick={() => setConfirmEnd(true)}>
-          <PhoneDisconnect aria-hidden weight="fill" className="size-5" /> End
-          <span className="sr-only"> consultation</span>
+          <PhoneDisconnect aria-hidden weight="fill" className="size-5" /> {real ? "Leave" : "End"}
+          <span className="sr-only"> {real ? "the call" : "consultation"}</span>
         </Button>
       </div>
 
       <Dialog
         open={confirmEnd}
         onClose={() => setConfirmEnd(false)}
-        title="End the consultation?"
+        title={real ? "Leave the call?" : "End the consultation?"}
         description="If you leave now, your doctor may not have finished. You can rejoin from your appointments while it is still open."
         footer={
           <>
@@ -300,7 +336,7 @@ export function LiveCall({ appt, stream, startAudioOnly, onEnd }: Props) {
               Stay on the call
             </Button>
             <Button variant="danger" onClick={() => onEnd(seconds)}>
-              End consultation
+              {real ? "Leave the call" : "End consultation"}
             </Button>
           </>
         }

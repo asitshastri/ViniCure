@@ -11,16 +11,24 @@ export function WaitingRoom({
   appt,
   onDoctorJoined,
   onLeave,
+  real = false,
+  remotePresent = false,
 }: {
   appt: Appointment;
   onDoctorJoined: () => void;
   onLeave: () => void;
+  /** A real call waits for the doctor's actual connection; the sample screens pretend after a few seconds. */
+  real?: boolean;
+  remotePresent?: boolean;
 }) {
-  // In the prototype the doctor "joins" after a few seconds. In P6 this waits for the doctor's real connection.
   useEffect(() => {
+    if (real) return;
     const t = setTimeout(onDoctorJoined, WAIT_MS);
     return () => clearTimeout(t);
-  }, [onDoctorJoined]);
+  }, [real, onDoctorJoined]);
+  useEffect(() => {
+    if (real && remotePresent) onDoctorJoined();
+  }, [real, remotePresent, onDoctorJoined]);
 
   return (
     <div className="mx-auto grid min-h-[70dvh] max-w-xl content-center gap-6 px-4 py-10 text-center">

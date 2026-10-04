@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { getConfig } from "@/lib/config/config";
 import type { AppointmentDetailView } from "@/modules/scheduling";
 import { getAppointments, getSlots } from "@/modules/scheduling";
 import { istDate } from "@/modules/scheduling/slots";
@@ -36,6 +37,15 @@ function statusOf(a: AppointmentDetailView): Pick<AppointmentView, "status" | "c
   }
 }
 
+/** For the "Join" button only; the join route decides for real. */
+function canJoinNow(a: AppointmentDetailView, now: number): boolean {
+  if (a.status !== "scheduled" && a.status !== "in_progress") return false;
+  const config = getConfig();
+  const opens = new Date(a.startAt).getTime() - config.VIDEO_JOIN_EARLY_MINUTES * 60_000;
+  const closes = new Date(a.endAt).getTime() + config.VIDEO_JOIN_LATE_MINUTES * 60_000;
+  return now >= opens && now <= closes;
+}
+
 export function toAppointmentView(a: AppointmentDetailView, now: number): AppointmentView {
   const { status, cancelledBy } = statusOf(a);
   const minutesUntil = Math.round((new Date(a.startAt).getTime() - now) / 60000);
@@ -55,8 +65,8 @@ export function toAppointmentView(a: AppointmentDetailView, now: number): Appoin
     hasPrescription: false,
     reviewed: a.reviewed,
     minutesUntil,
-    // Joining opens with video calls; moving is limited by the server, not by this screen.
-    canJoin: false,
+    // Joining: booked (so paid) and inside the window the server enforces. The server checks again.
+    canJoin: canJoinNow(a, now),
     freeChange: true,
   };
   if (cancelledBy) view.cancelledBy = cancelledBy;
@@ -101,4 +111,16 @@ export async function loadRealAppointments(): Promise<{
     }),
   );
   return { all, slotsByDoctor };
+}
+
+/** One of the signed-in patient's appointments, shaped for the call screens. Null when it is not theirs. */
+export async function loadRealAppointment(id: string): Promise<AppointmentView | null> {
+  const actor = await actorFromHeaders(await headers());
+  if (!actor || actor.limited) return null;
+  try {
+    return toAppointmentView(await getAppointments().get(actor, id), Date.now());
+  } catch {
+    // Someone else's appointment and a missing one are the same: nothing to show.
+    return null;
+  }
 }

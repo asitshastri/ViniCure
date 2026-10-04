@@ -7,8 +7,10 @@ import { cn } from "@/lib/cn";
 
 type Props = {
   name: string;
-  /** A live local stream for the person's own tile. The doctor's tile is a placeholder until P6. */
+  /** The picture to show: the person's own camera, or (with `remote`) the other person's audio and video. */
   stream?: MediaStream | null;
+  /** The other person's tile: sound on, not mirrored. Your own tile is muted and mirrored. */
+  remote?: boolean;
   videoOn: boolean;
   muted?: boolean;
   label?: string;
@@ -22,15 +24,21 @@ export function VideoTile({
   stream,
   videoOn,
   muted = false,
+  remote = false,
   label,
   className,
   size = "lg",
 }: Props) {
   const ref = useRef<HTMLVideoElement>(null);
+  const showVideo = videoOn && stream && stream.getVideoTracks().length > 0;
+  // The other person's voice plays through a video element, which stays in the page even while
+  // their camera is off (audio-only), so the sound is never lost with the picture.
+  const playRemoteAudio = remote && stream && stream.getAudioTracks().length > 0;
+  const active = Boolean(showVideo || playRemoteAudio);
+  // The element exists only while there is something to play, so attach the stream when it appears.
   useEffect(() => {
     if (ref.current) ref.current.srcObject = stream ?? null;
-  }, [stream, videoOn]);
-  const showVideo = videoOn && stream && stream.getVideoTracks().length > 0;
+  }, [stream, active]);
   return (
     <div
       className={cn(
@@ -38,22 +46,27 @@ export function VideoTile({
         className,
       )}
     >
-      {showVideo ? (
+      {showVideo || playRemoteAudio ? (
         <video
           ref={ref}
           autoPlay
           playsInline
-          muted
+          muted={!remote}
           aria-label={`${name}, video`}
-          className="size-full -scale-x-100 object-cover"
+          className={cn(
+            "size-full object-cover",
+            !remote && "-scale-x-100",
+            !showVideo && "absolute inset-0 opacity-0",
+          )}
         />
-      ) : (
+      ) : null}
+      {!showVideo ? (
         <Avatar
           name={name}
           size={size === "lg" ? "xl" : "lg"}
           className={size === "lg" ? "!size-28 !text-4xl" : ""}
         />
-      )}
+      ) : null}
       <span className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1 text-sm font-medium text-white">
         {muted ? <MicrophoneSlash aria-hidden weight="fill" className="size-4" /> : null}
         {label ?? name}

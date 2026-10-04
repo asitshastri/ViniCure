@@ -28,6 +28,14 @@ const RAZORPAY = {
   img: "https://cdn.razorpay.com",
 };
 
+/**
+ * The call screens load the video SDK, which talks to the provider's edge servers over HTTPS and
+ * secure websockets. Those origins are allowed on the call screens and nowhere else.
+ */
+const VIDEO = {
+  connect: ["https://*.agora.io", "wss://*.agora.io", "https://*.sd-rtn.com", "wss://*.sd-rtn.com"],
+};
+
 export function allowsCheckout(pathname: string): boolean {
   return CHECKOUT_PATHS.some((pattern) => pattern.test(pathname));
 }
@@ -39,7 +47,12 @@ export function buildCsp({
   pathname = "/",
 }: Pick<HeaderOptions, "nonce" | "production" | "connectOrigins"> & { pathname?: string }): string {
   const checkout = allowsCheckout(pathname);
-  const connect = [...connectOrigins, ...(checkout ? RAZORPAY.connect : [])];
+  const call = allowsMedia(pathname);
+  const connect = [
+    ...connectOrigins,
+    ...(checkout ? RAZORPAY.connect : []),
+    ...(call ? VIDEO.connect : []),
+  ];
   const directives = [
     "default-src 'self'",
     // strict-dynamic lets the nonce-approved Next.js scripts load their chunks.
@@ -50,9 +63,11 @@ export function buildCsp({
     `img-src 'self' blob: data:${checkout ? ` ${RAZORPAY.img}` : ""}`,
     "font-src 'self'",
     "media-src 'self' blob:",
-    // Development needs a websocket for hot reload. The video SDK origin is added with P6.
+    // Development needs a websocket for hot reload. The video provider's origins are added on the call screens only.
     `connect-src 'self'${connect.map((origin) => ` ${origin}`).join("")}${production ? "" : " ws://localhost:* ws://127.0.0.1:*"}`,
     ...(checkout ? [`frame-src 'self' ${RAZORPAY.frame}`] : []),
+    // The video SDK runs some work in a worker made from a blob.
+    ...(call ? ["worker-src 'self' blob:"] : []),
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
