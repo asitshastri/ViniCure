@@ -3,11 +3,12 @@ import { MagnifyingGlass } from "@phosphor-icons/react/ssr";
 import { ActiveFilters, activeFilterCount } from "@/components/doctors/active-filters";
 import { DirectoryFilters } from "@/components/doctors/directory-filters";
 import { DoctorCard } from "@/components/doctors/doctor-card";
-import { PaginationLinks } from "@/components/doctors/pagination-links";
+import { CursorLinks, PaginationLinks } from "@/components/doctors/pagination-links";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getDirectoryFacets, searchDoctors } from "@/lib/data/doctors";
-import { parseDirectoryQuery } from "@/lib/schemas/doctors";
+import { REAL_SORTS, REAL_SORT_LABELS, parseDirectoryQuery } from "@/lib/schemas/doctors";
+import { realFacets, realSearch, isRealDirectory } from "@/lib/data/directory-real";
 
 export const metadata: Metadata = {
   title: "Find a doctor | ViniCure",
@@ -20,15 +21,20 @@ export default async function DoctorsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const query = parseDirectoryQuery(await searchParams);
-  const { specialties, languages } = getDirectoryFacets();
-  const result = searchDoctors(query);
+  const real = isRealDirectory();
+  const { specialties, languages } = real ? await realFacets() : getDirectoryFacets();
+  // The sample data pages by number; the real directory pages by cursor and has no total.
+  const sample = real ? undefined : searchDoctors(query);
+  const live = real ? await realSearch(query) : undefined;
+  const items = sample?.items ?? live?.items ?? [];
   const count = activeFilterCount(query);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
       <h1 className="text-3xl font-semibold sm:text-4xl">Find a doctor</h1>
       <p className="text-ink-muted mt-2 max-w-2xl text-lg">
-        Every doctor here has a verified medical council registration. Sample profiles for now.
+        Every doctor here has a verified medical council registration.
+        {real ? "" : " Sample profiles for now."}
       </p>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[18rem_1fr] lg:gap-10">
@@ -38,25 +44,32 @@ export default async function DoctorsPage({
             specialties={specialties}
             languages={languages}
             activeCount={count}
+            {...(real ? { real: { sorts: REAL_SORTS, labels: REAL_SORT_LABELS } } : {})}
           />
         </aside>
 
         <section aria-labelledby="results-heading" className="grid min-w-0 content-start gap-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 id="results-heading" className="text-xl font-semibold" aria-live="polite">
-              {result.total} {result.total === 1 ? "doctor" : "doctors"} found
+              {sample
+                ? `${sample.total} ${sample.total === 1 ? "doctor" : "doctors"} found`
+                : `${items.length} ${items.length === 1 ? "doctor" : "doctors"} shown`}
             </h2>
-            {result.pageCount > 1 ? (
+            {sample && sample.pageCount > 1 ? (
               <p className="text-ink-muted text-sm">
-                Page {result.page} of {result.pageCount}
+                Page {sample.page} of {sample.pageCount}
               </p>
             ) : null}
           </div>
-          <ActiveFilters query={query} specialties={specialties} />
+          <ActiveFilters
+            query={query}
+            specialties={specialties}
+            {...(real ? { sortLabels: REAL_SORT_LABELS } : {})}
+          />
 
-          {result.items.length ? (
+          {items.length ? (
             <ul className="grid gap-4">
-              {result.items.map((d) => (
+              {items.map((d) => (
                 <li key={d.id}>
                   <DoctorCard doctor={d} />
                 </li>
@@ -71,7 +84,11 @@ export default async function DoctorsPage({
             />
           )}
 
-          <PaginationLinks query={query} page={result.page} pageCount={result.pageCount} />
+          {sample ? (
+            <PaginationLinks query={query} page={sample.page} pageCount={sample.pageCount} />
+          ) : (
+            <CursorLinks query={query} nextCursor={live?.nextCursor ?? null} />
+          )}
         </section>
       </div>
     </div>

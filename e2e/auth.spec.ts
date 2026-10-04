@@ -12,6 +12,7 @@ import {
   db,
   newPhone,
   otpFor,
+  patientSignIn,
   pendingSecret,
   run,
   sessionCount,
@@ -26,17 +27,6 @@ test.afterAll(async () => {
   await cleanup();
   await closeDb();
 });
-
-async function patientSignIn(page: import("@playwright/test").Page) {
-  const phone = newPhone();
-  await page.goto("/login");
-  await page.getByLabel(/mobile number/i).fill(phone);
-  await page.getByRole("button", { name: /send/i }).click();
-  await expect(page.getByLabel("Digit 1 of 6")).toBeVisible();
-  await typeCode(page, await otpFor(phone));
-  await expect(page).toHaveURL(/\/patient\/dashboard/);
-  return phone;
-}
 
 test.describe("patient sign-in by phone", () => {
   test("signs in with the code, lands on the dashboard, session cookie is locked down", async ({

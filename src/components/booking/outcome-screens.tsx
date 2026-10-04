@@ -206,3 +206,40 @@ export function UnavailableScreen({
     </Screen>
   );
 }
+
+/**
+ * A real booking is held but online payment is not open yet (it arrives with the payments work).
+ * The slot is kept for the hold time and can be let go, so nobody is charged and nobody is stuck.
+ */
+export function PaymentsSoonScreen({
+  doctorName,
+  when,
+  releasing,
+  onRelease,
+}: {
+  doctorName: string;
+  when: string;
+  releasing: boolean;
+  onRelease: () => void;
+}) {
+  return (
+    <Screen title="Your time is held" icon={<Clock weight="fill" />} tone="warning">
+      <p className="text-ink-muted text-lg">
+        {when} with {doctorName} is held for you. Online payment is not open yet, so nothing has
+        been charged and the booking is not confirmed.
+      </p>
+      <p className="text-ink-muted">
+        The time is released by itself when the hold ends. If you do not want it, let it go now so
+        someone else can book it.
+      </p>
+      <div className="flex flex-wrap justify-center gap-3 sm:justify-start">
+        <Button size="lg" variant="secondary" loading={releasing} onClick={onRelease}>
+          Let this time go
+        </Button>
+        <ButtonLink href="/patient/appointments" size="lg">
+          My appointments
+        </ButtonLink>
+      </div>
+    </Screen>
+  );
+}

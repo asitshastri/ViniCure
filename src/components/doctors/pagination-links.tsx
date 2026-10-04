@@ -55,3 +55,38 @@ export function PaginationLinks({
     </nav>
   );
 }
+
+/**
+ * Paging for the real directory, which uses a page link (cursor) instead of page numbers. Both
+ * are plain links, so they work without JavaScript and every page has its own URL.
+ */
+export function CursorLinks({
+  query,
+  nextCursor,
+}: {
+  query: DirectoryQuery;
+  nextCursor: string | null;
+}) {
+  if (!nextCursor && !query.cursor) return null;
+  return (
+    <nav aria-label="More doctors" className="flex flex-wrap items-center justify-center gap-4">
+      {query.cursor ? (
+        <Link
+          href={directoryHref(query, { cursor: undefined })}
+          className="text-primary min-h-11 content-center font-semibold underline"
+        >
+          Back to the first doctors
+        </Link>
+      ) : null}
+      {nextCursor ? (
+        <Link
+          href={directoryHref(query, { cursor: nextCursor })}
+          className="border-line-strong text-ink hover:bg-primary-soft inline-flex min-h-11 items-center gap-2 rounded-lg border px-5 font-medium transition-colors"
+        >
+          Show more doctors
+          <CaretRight aria-hidden className="size-5" />
+        </Link>
+      ) : null}
+    </nav>
+  );
+}

@@ -30,20 +30,24 @@ export function BookingCard({ doctor: d }: { doctor: DoctorProfile }) {
           </dt>
           <dd className="font-semibold tabular-nums">{formatRupees(d.feePaise)}</dd>
         </div>
-        <div className="flex items-center justify-between gap-3">
-          <dt className="flex items-center gap-2">
-            <PhoneCall aria-hidden className="text-primary size-5" />
-            Audio
-          </dt>
-          <dd className="font-semibold tabular-nums">{formatRupees(d.audioFeePaise)}</dd>
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <dt className="flex items-center gap-2">
-            <ArrowsClockwise aria-hidden className="text-primary size-5" />
-            Follow-up within 7 days
-          </dt>
-          <dd className="font-semibold tabular-nums">{formatRupees(d.followUpFeePaise)}</dd>
-        </div>
+        {d.audioFeePaise ? (
+          <div className="flex items-center justify-between gap-3">
+            <dt className="flex items-center gap-2">
+              <PhoneCall aria-hidden className="text-primary size-5" />
+              Audio
+            </dt>
+            <dd className="font-semibold tabular-nums">{formatRupees(d.audioFeePaise)}</dd>
+          </div>
+        ) : null}
+        {d.followUpFeePaise ? (
+          <div className="flex items-center justify-between gap-3">
+            <dt className="flex items-center gap-2">
+              <ArrowsClockwise aria-hidden className="text-primary size-5" />
+              Follow-up within 7 days
+            </dt>
+            <dd className="font-semibold tabular-nums">{formatRupees(d.followUpFeePaise)}</dd>
+          </div>
+        ) : null}
       </dl>
 
       <div className="mt-4 grid gap-4">

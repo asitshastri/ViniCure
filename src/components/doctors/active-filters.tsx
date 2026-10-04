@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { X } from "@phosphor-icons/react/ssr";
-import { SORT_LABELS, directoryHref, type DirectoryQuery } from "@/lib/schemas/doctors";
+import {
+  SORT_LABELS,
+  directoryHref,
+  type DirectoryQuery,
+  type DoctorSort,
+} from "@/lib/schemas/doctors";
 import type { Specialty } from "@/lib/types";
 
 export function activeFilterCount(q: DirectoryQuery): number {
@@ -17,9 +22,11 @@ export function activeFilterCount(q: DirectoryQuery): number {
 export function ActiveFilters({
   query,
   specialties,
+  sortLabels = SORT_LABELS,
 }: {
   query: DirectoryQuery;
   specialties: Specialty[];
+  sortLabels?: Record<DoctorSort, string>;
 }) {
   const chips: Array<{ label: string; href: string }> = [];
   const without = (key: keyof DirectoryQuery) =>
@@ -35,7 +42,7 @@ export function ActiveFilters({
     chips.push({ label: "Available today", href: directoryHref(query, { today: false, page: 1 }) });
   if (query.sort !== "relevance")
     chips.push({
-      label: `Sorted: ${SORT_LABELS[query.sort]}`,
+      label: `Sorted: ${sortLabels[query.sort]}`,
       href: directoryHref(query, { sort: "relevance", page: 1 }),
     });
   if (!chips.length) return null;

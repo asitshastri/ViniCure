@@ -24,7 +24,8 @@ export function DoctorCard({ doctor: d }: { doctor: DoctorSummary }) {
               </Link>
             </h2>
             <p className="text-ink-muted">
-              {d.specialty}. {d.qualifications}. {d.experienceYears} years.
+              {d.specialty}. {d.qualifications}.
+              {d.experienceYears !== undefined ? ` ${d.experienceYears} years.` : null}
             </p>
           </div>
         </div>
@@ -38,8 +39,14 @@ export function DoctorCard({ doctor: d }: { doctor: DoctorSummary }) {
             <dt className="sr-only">Rating</dt>
             <Star aria-hidden weight="fill" className="text-warning size-4" />
             <dd>
-              <span className="text-ink font-semibold">{d.rating.toFixed(1)}</span> ({d.reviewCount}{" "}
-              reviews)
+              {d.reviewCount > 0 ? (
+                <>
+                  <span className="text-ink font-semibold">{d.rating.toFixed(1)}</span> (
+                  {d.reviewCount} {d.reviewCount === 1 ? "review" : "reviews"})
+                </>
+              ) : (
+                "New on ViniCure, no reviews yet"
+              )}
             </dd>
           </div>
           <div className="flex items-center gap-1.5">
@@ -62,7 +69,7 @@ export function DoctorCard({ doctor: d }: { doctor: DoctorSummary }) {
             )}
             <span>
               <span className="sr-only">Next available: </span>
-              {d.nextSlot}
+              {d.nextSlot ?? (d.availableToday ? "Has times today" : "See free times")}
             </span>
           </p>
         </div>

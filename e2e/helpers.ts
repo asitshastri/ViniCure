@@ -147,7 +147,9 @@ export async function cleanup() {
     [like],
   );
   await db().query(
-    "DELETE FROM patients WHERE account_user_id IN (SELECT id FROM users WHERE email LIKE $1 OR phone_number LIKE '+919%')",
+    // A profile with an appointment stays: the appointment history is append-only by design.
+    `DELETE FROM patients WHERE account_user_id IN (SELECT id FROM users WHERE email LIKE $1 OR phone_number LIKE '+919%')
+       AND id NOT IN (SELECT patient_id FROM appointments)`,
     [like],
   );
   await db().query("DELETE FROM users WHERE email LIKE $1", [like]);
@@ -188,4 +190,16 @@ export async function resetRateLimits(): Promise<void> {
   const keys = await redis.keys("vc:local:*");
   if (keys.length > 0) await redis.del(...keys);
   await redis.quit();
+}
+
+/** Signs a new patient in by phone code and returns the number. */
+export async function patientSignIn(page: Page) {
+  const phone = newPhone();
+  await page.goto("/login");
+  await page.getByLabel(/mobile number/i).fill(phone);
+  await page.getByRole("button", { name: /send/i }).click();
+  await expect(page.getByLabel("Digit 1 of 6")).toBeVisible();
+  await typeCode(page, await otpFor(phone));
+  await expect(page).toHaveURL(/\/patient\/dashboard/);
+  return phone;
 }

@@ -43,7 +43,7 @@ export function SlotStep({
   const [day, setDay] = useState(selected?.date ?? days[0]?.[0]);
   const times = days.find(([d]) => d === day)?.[1] ?? [];
 
-  const modes: Array<{
+  const allModes: Array<{
     id: ConsultMode;
     label: string;
     icon: typeof VideoCamera;
@@ -51,17 +51,19 @@ export function SlotStep({
     disabled?: string;
   }> = [
     { id: "video", label: "Video", icon: VideoCamera, fee: doctor.feePaise },
-    { id: "audio", label: "Audio", icon: PhoneCall, fee: doctor.audioFeePaise },
+    { id: "audio", label: "Audio", icon: PhoneCall, fee: doctor.audioFeePaise ?? 0 },
     {
       id: "followup",
       label: "Follow-up",
       icon: ArrowsClockwise,
-      fee: doctor.followUpFeePaise,
+      fee: doctor.followUpFeePaise ?? 0,
       disabled: followUpEligible
         ? undefined
         : "Available after a first consultation with this doctor",
     },
   ];
+  // Real doctors have no audio or follow-up price yet, so those choices are left out.
+  const modes = allModes.filter((m) => m.id === "video" || m.fee > 0);
 
   return (
     <div className="grid gap-8">

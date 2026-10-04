@@ -48,13 +48,14 @@ export type DoctorSummary = {
   qualifications: string;
   /** Medical council registration number. Shown wherever a doctor appears. */
   registrationNumber: string;
-  experienceYears: number;
+  /** Not collected yet for real doctors, so the screens leave it out when missing. */
+  experienceYears?: number;
   languages: string[];
   rating: number;
   reviewCount: number;
   feePaise: number;
-  /** Short label for the next free slot, in IST. */
-  nextSlot: string;
+  /** Short label for the next free slot, in IST. Missing when not worked out. */
+  nextSlot?: string;
   availableToday: boolean;
 };
 
@@ -76,12 +77,16 @@ export type DoctorReview = {
 };
 
 export type DoctorProfile = DoctorSummary & {
-  about: string;
+  /** Real doctors have no free-text biography yet. */
+  about?: string;
+  /** True when the profile comes from the database, not the sample data. */
+  real?: boolean;
   education: string[];
   treats: string[];
   council: string;
-  audioFeePaise: number;
-  followUpFeePaise: number;
+  /** Audio and follow-up pricing do not exist for real doctors yet; 0 or missing hides them. */
+  audioFeePaise?: number;
+  followUpFeePaise?: number;
   slots: DoctorSlot[];
   reviews: DoctorReview[];
 };

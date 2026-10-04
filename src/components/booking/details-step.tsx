@@ -20,7 +20,15 @@ type Props = {
   family: FamilyMember[];
   initial: { who: string; reason: string; consent: boolean };
   onBack: () => void;
-  onNext: (choice: PatientChoice, reason: string) => void;
+  onNext: (
+    choice: PatientChoice,
+    reason: string,
+    adult?: { name: string; relation: string },
+  ) => void;
+  /** Real bookings: only saved profiles can be chosen, and a child needs a named adult. */
+  real?: boolean;
+  busy?: boolean;
+  submitError?: string | undefined;
 };
 
 const QUICK_REASONS = [
@@ -31,12 +39,22 @@ const QUICK_REASONS = [
   "Second opinion",
 ];
 
-export function DetailsStep({ selfName, family, initial, onBack, onNext }: Props) {
+export function DetailsStep({
+  selfName,
+  family,
+  initial,
+  onBack,
+  onNext,
+  real = false,
+  busy = false,
+  submitError,
+}: Props) {
   const uid = useId();
   const [who, setWho] = useState(initial.who);
   const [person, setPerson] = useState({ name: "", age: "", relation: "" });
   const [reason, setReason] = useState(initial.reason);
   const [consent, setConsent] = useState(initial.consent);
+  const [adult, setAdult] = useState({ name: "", relation: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [attempt, setAttempt] = useState(0);
   const ids = {
@@ -45,7 +63,13 @@ export function DetailsStep({ selfName, family, initial, onBack, onNext }: Props
     relation: `${uid}-prel`,
     reason: `${uid}-reason`,
     consent: `${uid}-consent`,
+    adultName: `${uid}-adultname`,
+    adultRelation: `${uid}-adultrel`,
   };
+
+  const minor =
+    (who.startsWith("fm-") && (family.find((m) => m.id === who)?.age ?? 99) < 18) ||
+    (who === "other" && Number(person.age) > 0 && Number(person.age) < 18);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -61,18 +85,24 @@ export function DetailsStep({ selfName, family, initial, onBack, onNext }: Props
     }
     const d = bookingDetailsSchema.safeParse({ reason, consent });
     if (!d.success) Object.assign(found, fieldErrors(d.error));
+    if (real && minor) {
+      if (adult.name.trim().length < 2)
+        found.adultName = "Enter the name of the adult who will be with the child.";
+      if (adult.relation.trim().length < 2)
+        found.adultRelation = "Enter how they are related, for example Mother.";
+    }
     if (Object.keys(found).length) {
       setErrors(found);
       setAttempt((a) => a + 1);
       return;
     }
     setErrors({});
-    onNext(choice, reason.trim());
+    onNext(
+      choice,
+      reason.trim(),
+      real && minor ? { name: adult.name.trim(), relation: adult.relation.trim() } : undefined,
+    );
   }
-
-  const minor =
-    (who.startsWith("fm-") && (family.find((m) => m.id === who)?.age ?? 99) < 18) ||
-    (who === "other" && Number(person.age) > 0 && Number(person.age) < 18);
 
   return (
     <form noValidate onSubmit={submit} className="grid gap-8">
@@ -96,12 +126,23 @@ export function DetailsStep({ selfName, family, initial, onBack, onNext }: Props
             onChange={() => setWho(m.id)}
           />
         ))}
-        <Radio
-          name="who"
-          label="Someone else"
-          checked={who === "other"}
-          onChange={() => setWho("other")}
-        />
+        {real ? null : (
+          <Radio
+            name="who"
+            label="Someone else"
+            checked={who === "other"}
+            onChange={() => setWho("other")}
+          />
+        )}
+        {real ? (
+          <p className="text-ink-muted text-sm">
+            To book for someone else, add them first under{" "}
+            <Link href="/patient/profile" className="text-primary underline">
+              your profile and family
+            </Link>
+            .
+          </p>
+        ) : null}
       </fieldset>
 
       {who === "other" ? (
@@ -159,6 +200,45 @@ export function DetailsStep({ selfName, family, initial, onBack, onNext }: Props
         <p role="note" className="bg-info-soft text-info rounded-xl p-4 font-medium">
           For a child under 18, a parent or guardian must be with them during the call.
         </p>
+      ) : null}
+
+      {real && minor ? (
+        <div className="border-line grid gap-4 rounded-xl border p-4 sm:grid-cols-2">
+          <Field
+            inputId={ids.adultName}
+            label="Name of the adult with the child"
+            error={errors.adultName}
+            required
+          >
+            {({ describedBy, invalid }) => (
+              <Input
+                id={ids.adultName}
+                value={adult.name}
+                onChange={(e) => setAdult({ ...adult, name: e.target.value })}
+                autoComplete="off"
+                aria-describedby={describedBy}
+                aria-invalid={invalid || undefined}
+              />
+            )}
+          </Field>
+          <Field
+            inputId={ids.adultRelation}
+            label="Their relation to the child"
+            error={errors.adultRelation}
+            required
+          >
+            {({ describedBy, invalid }) => (
+              <Input
+                id={ids.adultRelation}
+                value={adult.relation}
+                onChange={(e) => setAdult({ ...adult, relation: e.target.value })}
+                autoComplete="off"
+                aria-describedby={describedBy}
+                aria-invalid={invalid || undefined}
+              />
+            )}
+          </Field>
+        </div>
       ) : null}
 
       <div className="grid gap-3">
@@ -219,13 +299,18 @@ export function DetailsStep({ selfName, family, initial, onBack, onNext }: Props
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <Button variant="secondary" size="lg" onClick={onBack}>
+        <Button variant="secondary" size="lg" onClick={onBack} disabled={busy}>
           Back
         </Button>
-        <Button type="submit" size="lg">
-          Review and pay
+        <Button type="submit" size="lg" loading={busy}>
+          {real ? "Hold this time and review" : "Review and pay"}
         </Button>
       </div>
+      {submitError ? (
+        <p role="alert" className="text-danger font-medium">
+          {submitError}
+        </p>
+      ) : null}
     </form>
   );
 }

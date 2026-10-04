@@ -3,7 +3,13 @@ import { MagnifyingGlass } from "@phosphor-icons/react/ssr";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/choice";
 import { Input, Select } from "@/components/ui/field";
-import { FEE_CAPS, DOCTOR_SORTS, SORT_LABELS, type DirectoryQuery } from "@/lib/schemas/doctors";
+import {
+  FEE_CAPS,
+  DOCTOR_SORTS,
+  SORT_LABELS,
+  type DirectoryQuery,
+  type DoctorSort,
+} from "@/lib/schemas/doctors";
 import type { Specialty } from "@/lib/types";
 import { FilterPanel } from "./filter-panel";
 
@@ -12,6 +18,8 @@ type Props = {
   specialties: Specialty[];
   languages: string[];
   activeCount: number;
+  /** The real directory searches by name and has fewer sort orders. */
+  real?: { sorts: readonly DoctorSort[]; labels: Record<DoctorSort, string> };
 };
 
 function Labeled({
@@ -34,7 +42,9 @@ function Labeled({
 }
 
 /** A plain GET form: the URL holds all the state and it works without JavaScript. */
-export function DirectoryFilters({ query, specialties, languages, activeCount }: Props) {
+export function DirectoryFilters({ query, specialties, languages, activeCount, real }: Props) {
+  const sorts = real?.sorts ?? DOCTOR_SORTS;
+  const labels = real?.labels ?? SORT_LABELS;
   return (
     <form
       action="/doctors"
@@ -43,7 +53,7 @@ export function DirectoryFilters({ query, specialties, languages, activeCount }:
       aria-label="Find doctors"
       className="grid gap-4"
     >
-      <Labeled id="f-q" label="Doctor or symptom">
+      <Labeled id="f-q" label={real ? "Doctor's name" : "Doctor or symptom"}>
         <Input
           id="f-q"
           name="q"
@@ -51,7 +61,7 @@ export function DirectoryFilters({ query, specialties, languages, activeCount }:
           defaultValue={query.q ?? ""}
           autoComplete="off"
           maxLength={80}
-          placeholder="Fever, skin rash, Dr. Rao"
+          placeholder={real ? "Dr. Rao" : "Fever, skin rash, Dr. Rao"}
           leading={<MagnifyingGlass className="size-5" />}
         />
       </Labeled>
@@ -93,9 +103,9 @@ export function DirectoryFilters({ query, specialties, languages, activeCount }:
           </Labeled>
           <Labeled id="f-sort" label="Sort by">
             <Select id="f-sort" name="sort" defaultValue={query.sort}>
-              {DOCTOR_SORTS.map((s) => (
+              {sorts.map((s) => (
                 <option key={s} value={s}>
-                  {SORT_LABELS[s]}
+                  {labels[s]}
                 </option>
               ))}
             </Select>

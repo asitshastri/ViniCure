@@ -3,7 +3,11 @@ import { notFound } from "next/navigation";
 import { BookingFlow } from "@/components/booking/booking-flow";
 import { Breadcrumbs } from "@/components/shell/breadcrumbs";
 import { getDoctor } from "@/lib/data/doctors";
+import { realDoctor, isRealDirectory } from "@/lib/data/directory-real";
+import { loadBookingProfiles } from "@/lib/data/booking-profiles";
 import { getSession } from "@/lib/data/session";
+import type { RealProfile } from "@/components/booking/booking-flow";
+import { requireRole } from "@/modules/identity/page-guard-next";
 
 export const metadata: Metadata = {
   title: "Book a consultation | ViniCure",
@@ -18,8 +22,18 @@ export default async function BookPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ slot?: string | string[]; type?: string | string[] }>;
 }) {
-  const doctor = getDoctor((await params).id);
+  const id = (await params).id;
+  const real = isRealDirectory();
+  const doctor = real ? await realDoctor(id) : getDoctor(id);
   if (!doctor) notFound();
+  // Real bookings need a signed-in patient (the server checks again on every request).
+  let profiles: RealProfile[] | undefined;
+  let accountName: string | null = null;
+  if (real) {
+    const who = await requireRole(["patient"]);
+    accountName = who.displayName;
+    profiles = await loadBookingProfiles();
+  }
   const sp = await searchParams;
   const rawSlot = sp.slot;
   // The follow-up price is offered only from a completed visit. The server checks this in P4.
@@ -27,7 +41,7 @@ export default async function BookPage({
   const slotParam = Array.isArray(rawSlot) ? rawSlot[0] : rawSlot;
   // Only a slot that belongs to this doctor is accepted from the URL.
   const initialSlotId = doctor.slots.some((s) => s.id === slotParam) ? slotParam : undefined;
-  const selfName = getSession("patient").user.name;
+  const selfName = accountName ?? getSession("patient").user.name;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
@@ -44,6 +58,7 @@ export default async function BookPage({
         initialSlotId={initialSlotId}
         selfName={selfName}
         followUp={followUp}
+        {...(profiles ? { real: { profiles } } : {})}
       />
     </div>
   );

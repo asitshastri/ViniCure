@@ -12,8 +12,8 @@ export const MODE_LABEL: Record<ConsultMode, string> = {
 };
 
 export function feeFor(doctor: DoctorProfile, mode: ConsultMode): number {
-  if (mode === "audio") return doctor.audioFeePaise;
-  if (mode === "followup") return doctor.followUpFeePaise;
+  if (mode === "audio") return doctor.audioFeePaise ?? 0;
+  if (mode === "followup") return doctor.followUpFeePaise ?? 0;
   return doctor.feePaise;
 }
 

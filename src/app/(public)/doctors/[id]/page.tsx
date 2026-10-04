@@ -7,9 +7,13 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { getDoctor, getDoctorIds } from "@/lib/data/doctors";
+import { realDoctor, isRealDirectory } from "@/lib/data/directory-real";
+
+// One doctor, from the database when it is configured and from the sample data otherwise.
+const load = (id: string) => (isRealDirectory() ? realDoctor(id) : Promise.resolve(getDoctor(id)));
 
 export function generateStaticParams() {
-  return getDoctorIds().map((id) => ({ id }));
+  return isRealDirectory() ? [] : getDoctorIds().map((id) => ({ id }));
 }
 
 export async function generateMetadata({
@@ -17,7 +21,7 @@ export async function generateMetadata({
 }: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
-  const doctor = getDoctor((await params).id);
+  const doctor = await load((await params).id);
   return {
     title: doctor
       ? `${doctor.name}, ${doctor.specialty} | ViniCure`
@@ -26,7 +30,7 @@ export async function generateMetadata({
 }
 
 export default async function DoctorProfilePage({ params }: { params: Promise<{ id: string }> }) {
-  const doctor = getDoctor((await params).id);
+  const doctor = await load((await params).id);
   if (!doctor) notFound();
 
   return (
@@ -54,15 +58,23 @@ export default async function DoctorProfilePage({ params }: { params: Promise<{ 
                   <dt className="sr-only">Rating</dt>
                   <Star aria-hidden weight="fill" className="text-warning size-5" />
                   <dd>
-                    <span className="text-ink font-semibold">{doctor.rating.toFixed(1)}</span> (
-                    {doctor.reviewCount} reviews)
+                    {doctor.reviewCount > 0 ? (
+                      <>
+                        <span className="text-ink font-semibold">{doctor.rating.toFixed(1)}</span> (
+                        {doctor.reviewCount} {doctor.reviewCount === 1 ? "review" : "reviews"})
+                      </>
+                    ) : (
+                      "New on ViniCure, no reviews yet"
+                    )}
                   </dd>
                 </div>
-                <div className="flex items-center gap-2">
-                  <dt className="sr-only">Experience</dt>
-                  <GraduationCap aria-hidden className="size-5" />
-                  <dd>{doctor.experienceYears} years of experience</dd>
-                </div>
+                {doctor.experienceYears !== undefined ? (
+                  <div className="flex items-center gap-2">
+                    <dt className="sr-only">Experience</dt>
+                    <GraduationCap aria-hidden className="size-5" />
+                    <dd>{doctor.experienceYears} years of experience</dd>
+                  </div>
+                ) : null}
                 <div className="flex items-center gap-2">
                   <dt className="sr-only">Languages</dt>
                   <Translate aria-hidden className="size-5" />
@@ -75,25 +87,39 @@ export default async function DoctorProfilePage({ params }: { params: Promise<{ 
             </div>
           </header>
 
-          <section aria-labelledby="about-heading">
-            <h2 id="about-heading" className="text-2xl font-semibold">
-              About
-            </h2>
-            <p className="text-ink-muted mt-3 max-w-prose text-lg">{doctor.about}</p>
-          </section>
+          {doctor.about ? (
+            <section aria-labelledby="about-heading">
+              <h2 id="about-heading" className="text-2xl font-semibold">
+                About
+              </h2>
+              <p className="text-ink-muted mt-3 max-w-prose text-lg">{doctor.about}</p>
+            </section>
+          ) : null}
 
           <section aria-labelledby="treats-heading">
-            <h2 id="treats-heading" className="text-2xl font-semibold">
-              Can help with
-            </h2>
-            <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-              {doctor.treats.map((t) => (
-                <li key={t} className="flex items-center gap-2">
-                  <CheckCircle aria-hidden weight="fill" className="text-success size-5 shrink-0" />
-                  {t}
-                </li>
-              ))}
-            </ul>
+            {doctor.treats.length ? (
+              <>
+                <h2 id="treats-heading" className="text-2xl font-semibold">
+                  Can help with
+                </h2>
+                <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {doctor.treats.map((t) => (
+                    <li key={t} className="flex items-center gap-2">
+                      <CheckCircle
+                        aria-hidden
+                        weight="fill"
+                        className="text-success size-5 shrink-0"
+                      />
+                      {t}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <h2 id="treats-heading" className="text-2xl font-semibold">
+                Before you book
+              </h2>
+            )}
             <p className="text-ink-muted mt-4 text-sm">
               Online consultations are not for emergencies. Call 112 or go to the nearest hospital.
             </p>
@@ -109,7 +135,7 @@ export default async function DoctorProfilePage({ params }: { params: Promise<{ 
               ))}
               <li>
                 Registered with the {doctor.council}, number {doctor.registrationNumber}. We checked
-                this before the profile went live (sample data for now).
+                this before the profile went live{doctor.real ? "." : " (sample data for now)."}
               </li>
             </ul>
           </section>
@@ -119,8 +145,12 @@ export default async function DoctorProfilePage({ params }: { params: Promise<{ 
               Patient reviews
             </h2>
             <p className="text-ink-muted mt-1 text-sm">
-              Sample reviews. Only patients who had a consultation can review.
+              {doctor.real ? "" : "Sample reviews. "}Only patients who had a consultation can
+              review.
             </p>
+            {doctor.reviews.length === 0 ? (
+              <p className="text-ink-muted mt-4">No reviews yet.</p>
+            ) : null}
             <ul className="divide-line border-line mt-4 divide-y border-y">
               {doctor.reviews.map((r) => (
                 <li key={r.id} className="py-4">

@@ -45,6 +45,7 @@ const schema = z.object({
   today: z.literal("1").optional().catch(undefined),
   sort: z.enum(DOCTOR_SORTS).catch("relevance"),
   page: z.coerce.number().int().min(1).max(100).catch(1),
+  cursor: text(300),
 });
 
 export type DirectoryQuery = {
@@ -55,6 +56,8 @@ export type DirectoryQuery = {
   today: boolean;
   sort: DoctorSort;
   page: number;
+  /** Page link from the real directory (it pages by cursor, not by number). */
+  cursor?: string;
 };
 
 type RawParams = Record<string, string | string[] | undefined>;
@@ -73,12 +76,14 @@ export function parseDirectoryQuery(raw: RawParams): DirectoryQuery {
     today: first("today"),
     sort: first("sort"),
     page: first("page"),
+    cursor: first("cursor"),
   });
   const out: DirectoryQuery = { today: parsed.today === "1", sort: parsed.sort, page: parsed.page };
   if (parsed.q) out.q = parsed.q;
   if (parsed.specialty) out.specialty = parsed.specialty;
   if (parsed.language) out.language = parsed.language;
   if (parsed.maxFee) out.maxFee = parsed.maxFee;
+  if (parsed.cursor) out.cursor = parsed.cursor;
   return out;
 }
 
@@ -87,7 +92,8 @@ export function directoryHref(
   query: DirectoryQuery,
   overrides: Partial<Record<keyof DirectoryQuery, unknown>> = {},
 ): string {
-  const merged = { ...query, ...overrides } as Record<string, unknown>;
+  // A page link belongs to one search, so changing anything starts from the first page.
+  const merged = { ...query, cursor: undefined, ...overrides } as Record<string, unknown>;
   const params = new URLSearchParams();
   for (const key of ["q", "specialty", "language", "maxFee"] as const) {
     const v = merged[key];
@@ -96,6 +102,14 @@ export function directoryHref(
   if (merged.today) params.set("today", "1");
   if (merged.sort && merged.sort !== "relevance") params.set("sort", String(merged.sort));
   if (typeof merged.page === "number" && merged.page > 1) params.set("page", String(merged.page));
+  if (typeof merged.cursor === "string" && merged.cursor) params.set("cursor", merged.cursor);
   const qs = params.toString();
   return qs ? `/doctors?${qs}` : "/doctors";
 }
+
+/** What the real directory can sort by, and what to call each. The sample data supports all of them. */
+export const REAL_SORTS: readonly DoctorSort[] = ["relevance", "fee_asc", "fee_desc"];
+export const REAL_SORT_LABELS: Record<DoctorSort, string> = {
+  ...SORT_LABELS,
+  relevance: "Name, A to Z",
+};

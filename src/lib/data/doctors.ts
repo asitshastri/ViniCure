@@ -66,7 +66,7 @@ export function searchDoctors(query: DirectoryQuery): DirectoryResult {
     soonest: (a, b) => first(a).localeCompare(first(b)),
     fee_asc: (a, b) => a.feePaise - b.feePaise,
     fee_desc: (a, b) => b.feePaise - a.feePaise,
-    experience: (a, b) => b.experienceYears - a.experienceYears,
+    experience: (a, b) => (b.experienceYears ?? 0) - (a.experienceYears ?? 0),
     rating: (a, b) => b.rating - a.rating || b.reviewCount - a.reviewCount,
   };
   list = [...list].sort(sorters[query.sort]);
