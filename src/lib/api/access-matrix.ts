@@ -157,6 +157,17 @@ export const ACCESS_MATRIX: Record<RouteKey, MatrixEntry> = {
     probeAllowed: false,
     why: "Public free slots of a listed doctor. Anyone not listed is 404. Cached for seconds only.",
   },
+  "POST /api/v1/appointments": {
+    auth: "session",
+    roles: ["patient"],
+    roleDenied: "not_found",
+    rateLimit: "write",
+    audited: true,
+    freshLogin: false,
+    fullSession: true,
+    probeAllowed: true,
+    why: "A patient holds a slot for a profile they own (404 for anyone else's). Idempotent; capped open holds.",
+  },
   "GET /api/v1/doctor/application": {
     auth: "staff",
     roles: ["doctor"],

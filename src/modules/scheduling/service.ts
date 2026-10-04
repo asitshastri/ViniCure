@@ -45,7 +45,10 @@ export class SlotService {
   }
 
   /** Free slots for a listed doctor between two India dates, inclusive. */
-  async list(doctorId: string, input: { from?: string; to?: string }): Promise<{ slots: Slot[] }> {
+  async list(
+    doctorId: string,
+    input: { from?: string; to?: string; fresh?: boolean },
+  ): Promise<{ slots: Slot[] }> {
     const now = this.now();
     const today = istDate(now);
     const from = input.from ?? today;
@@ -71,7 +74,7 @@ export class SlotService {
     const cache = this.deps.cache();
     const gen = (await cache.peekWindow(this.genKey(doctorId))).count;
     const key = cacheKey(this.deps.env, "slots", doctorId, String(gen), from, to);
-    const hit = await cache.get(key);
+    const hit = input.fresh ? null : await cache.get(key);
     if (hit) {
       try {
         return { slots: JSON.parse(hit) as Slot[] };
@@ -96,7 +99,9 @@ export class SlotService {
       minLeadMinutes: MIN_LEAD_MINUTES,
       maxHorizonDays: MAX_HORIZON_DAYS,
     });
-    await cache.set(key, JSON.stringify(slots), SLOT_CACHE_TTL_MS).catch(() => undefined);
+    if (!input.fresh) {
+      await cache.set(key, JSON.stringify(slots), SLOT_CACHE_TTL_MS).catch(() => undefined);
+    }
     return { slots };
   }
 }

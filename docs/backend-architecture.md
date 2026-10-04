@@ -297,7 +297,7 @@ Auth column: `public`, `session` (any signed-in user), `patient`, `doctor`, `sta
 | POST | `/api/v1/doctor/kyc/uploads` | doctor | Presign |
 | POST | `/api/v1/doctor/kyc/uploads/:id/complete` | doctor | Starts scan |
 | GET | `/api/v1/admin/doctors` | admin | Filter by status |
-| POST | `/api/v1/admin/doctors/:id/approve`, `/reject`, `/suspend` | admin | Audited |
+| POST | `/api/v1/admin/doctors/:id/decision` | admin | approve, reject, suspend or reinstate in one route (P4-02). Audited, fresh login |
 | GET | `/api/v1/admin/doctors/:id/kyc/:fileId` | admin | Short signed URL, logged |
 
 ### scheduling
