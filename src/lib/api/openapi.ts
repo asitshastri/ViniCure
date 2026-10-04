@@ -8,7 +8,7 @@ import { listRoutes, type RouteEntry } from "./registry";
 type Json = Record<string, unknown>;
 
 function schemaOf(schema: z.ZodType): Json {
-  const json = { ...(toJSONSchema(schema) as Json) };
+  const json = { ...(toJSONSchema(schema, { io: "input" }) as Json) };
   delete json.$schema;
   return json;
 }

@@ -11,6 +11,9 @@ import {
   type ApplicationBody,
   type ApplicationView,
   type DocumentView,
+  type PublicDoctorView,
+  type PublicDoctorsQuery,
+  type SpecialtyView,
 } from "./schemas";
 
 // Doctor application and KYC pipeline (P4-02). A doctor saves an application, uploads
@@ -133,6 +136,48 @@ export function decodeCursor(cursor: string): { createdAt: string; id: string } 
     throw bad();
   }
 }
+
+export function encodePublicCursor(sort: string, row: { sortKey: string; id: string }): string {
+  return Buffer.from(JSON.stringify({ s: sort, k: row.sortKey, i: row.id })).toString("base64url");
+}
+
+export function decodePublicCursor(cursor: string, sort: string): { key: string; id: string } {
+  const bad = () =>
+    errors.validation([{ path: "cursor", message: "This page link is not valid." }]);
+  try {
+    const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Record<
+      string,
+      unknown
+    >;
+    // A cursor belongs to one sort order; reusing it with another would skip or repeat people.
+    if (
+      parsed.s !== sort ||
+      typeof parsed.k !== "string" ||
+      parsed.k.length > 200 ||
+      typeof parsed.i !== "string" ||
+      !/^[0-9a-f-]{36}$/.test(parsed.i) ||
+      (sort !== "name" && !/^\d{1,9}$/.test(parsed.k))
+    ) {
+      throw bad();
+    }
+    return { key: parsed.k, id: parsed.i };
+  } catch {
+    throw bad();
+  }
+}
+
+/** Copies the allow-listed fields only, so the page-cursor key never reaches a visitor. */
+const toPublicView = (row: PublicDoctorView): PublicDoctorView => ({
+  id: row.id,
+  displayName: row.displayName,
+  registrationNo: row.registrationNo,
+  registrationCouncil: row.registrationCouncil,
+  qualifications: row.qualifications,
+  languages: row.languages,
+  specialty: row.specialty,
+  consultationFeePaise: row.consultationFeePaise,
+  availableToday: row.availableToday,
+});
 
 type Deps = {
   repo: DirectoryRepo;
@@ -374,6 +419,37 @@ export class DirectoryService {
       fileName: doc.docType,
     });
     return { url: link.url, expiresAt: link.expiresAt.toISOString() };
+  }
+
+  // ---- public directory (P4-03): no sign-in, only listed doctors ----
+
+  specialties(): Promise<SpecialtyView[]> {
+    return this.repo.listSpecialties();
+  }
+
+  async searchDoctors(
+    query: PublicDoctorsQuery,
+  ): Promise<{ items: PublicDoctorView[]; nextCursor: string | null }> {
+    const { cursor, limit, sort, ...filters } = query;
+    const rows = await this.repo.searchPublic({
+      ...filters,
+      sort,
+      ...(cursor ? { after: decodePublicCursor(cursor, sort) } : {}),
+      limit: limit + 1,
+    });
+    const page = rows.slice(0, limit);
+    const last = page[page.length - 1];
+    return {
+      items: page.map(toPublicView),
+      nextCursor: rows.length > limit && last ? encodePublicCursor(sort, last) : null,
+    };
+  }
+
+  /** A doctor who is not listed is a 404, whatever the reason (pending, rejected, suspended). */
+  async publicProfile(id: string): Promise<PublicDoctorView> {
+    const row = await this.repo.findPublic(id);
+    if (!row) throw errors.notFound();
+    return toPublicView(row);
   }
 
   // ---- worker ----

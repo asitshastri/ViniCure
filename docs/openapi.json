@@ -105,8 +105,7 @@
                   },
                   "required": [
                     "status"
-                  ],
-                  "additionalProperties": false
+                  ]
                 }
               }
             }
@@ -179,8 +178,7 @@
                   "required": [
                     "status",
                     "checks"
-                  ],
-                  "additionalProperties": false
+                  ]
                 }
               }
             }
@@ -261,7 +259,7 @@
           {
             "name": "limit",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "default": 20,
               "type": "integer",
@@ -1439,6 +1437,294 @@
             "sessionCookie": []
           }
         ]
+      }
+    },
+    "/api/v1/doctors": {
+      "get": {
+        "summary": "Search listed doctors by name, specialty, language, fee and availability today",
+        "tags": [
+          "directory"
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 60
+            }
+          },
+          {
+            "name": "specialtyId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32767
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 30
+            }
+          },
+          {
+            "name": "feeMin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 500000
+            }
+          },
+          {
+            "name": "feeMax",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 500000
+            }
+          },
+          {
+            "name": "availableToday",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": "name",
+              "type": "string",
+              "enum": [
+                "name",
+                "fee_asc",
+                "fee_desc"
+              ]
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "public_read",
+        "x-auth": "public",
+        "x-roles": [],
+        "x-audited": false,
+        "x-fresh-login": false,
+        "x-full-session": false
+      }
+    },
+    "/api/v1/doctors/{id}": {
+      "get": {
+        "summary": "Read one listed doctor's public profile",
+        "tags": [
+          "directory"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "public_read",
+        "x-auth": "public",
+        "x-roles": [],
+        "x-audited": false,
+        "x-fresh-login": false,
+        "x-full-session": false
+      }
+    },
+    "/api/v1/doctors/{id}/slots": {
+      "get": {
+        "summary": "List the free slots of a listed doctor",
+        "tags": [
+          "scheduling"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "public_read",
+        "x-auth": "public",
+        "x-roles": [],
+        "x-audited": false,
+        "x-fresh-login": false,
+        "x-full-session": false
       }
     },
     "/api/v1/invitations/{token}/accept": {
@@ -2808,7 +3094,7 @@
           {
             "name": "scope",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "default": "all",
               "type": "string",
@@ -3004,6 +3290,46 @@
             "sessionCookie": []
           }
         ]
+      }
+    },
+    "/api/v1/specialties": {
+      "get": {
+        "summary": "List specialties with the number of listed doctors",
+        "tags": [
+          "directory"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Something went wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit-tier": "public_read",
+        "x-auth": "public",
+        "x-roles": [],
+        "x-audited": false,
+        "x-fresh-login": false,
+        "x-full-session": false
       }
     }
   },

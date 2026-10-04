@@ -1,5 +1,12 @@
 import type { Queryable } from "../../lib/db/queryable";
-import { MAX_KYC_DOCUMENTS, MAX_PER_DOC_TYPE, type ApplicationBody } from "./schemas";
+import {
+  MAX_KYC_DOCUMENTS,
+  MAX_PER_DOC_TYPE,
+  type ApplicationBody,
+  type PublicDoctorView,
+  type PublicSort,
+  type SpecialtyView,
+} from "./schemas";
 
 // Doctor application and KYC queries. Only this file talks to the database for them.
 
@@ -84,6 +91,87 @@ function toDocument(row: Record<string, unknown>): DocumentRow {
     storageKey: String(row.storage_key),
     mimeType: String(row.mime_type),
     sizeBytes: Number(row.size_bytes),
+  };
+}
+
+export type PublicDoctorRow = PublicDoctorView & { sortKey: string };
+
+// Working hours are stored as India wall-clock times, weekday 0 = Sunday (the same numbering as
+// Postgres `dow`). "Today" and "now" below are India time.
+const IST_NOW = "(now() AT TIME ZONE 'Asia/Kolkata')";
+const AVAILABLE_TODAY_SQL =
+  "(EXISTS (SELECT 1 FROM doctor_availability_rules r WHERE r.doctor_id = d.id" +
+  " AND r.weekday = extract(dow FROM " +
+  IST_NOW +
+  ")::int" +
+  " AND r.valid_from <= " +
+  IST_NOW +
+  "::date" +
+  " AND (r.valid_to IS NULL OR r.valid_to >= " +
+  IST_NOW +
+  "::date)" +
+  " AND r.end_time > " +
+  IST_NOW +
+  "::time)" +
+  " AND NOT EXISTS (SELECT 1 FROM doctor_time_off t WHERE t.doctor_id = d.id" +
+  " AND t.start_at <= date_trunc('day', " +
+  IST_NOW +
+  ") AT TIME ZONE 'Asia/Kolkata'" +
+  " AND t.end_at >= (date_trunc('day', " +
+  IST_NOW +
+  ") + interval '1 day') AT TIME ZONE 'Asia/Kolkata'))";
+
+const PUBLIC_COLUMNS =
+  "d.id, d.display_name, d.registration_no, d.registration_council, d.qualifications, d.languages," +
+  " d.consultation_fee_paise, sp.id AS specialty_id, sp.name AS specialty_name," +
+  " " +
+  AVAILABLE_TODAY_SQL +
+  " AS available_today";
+
+const PUBLIC_FROM =
+  " FROM doctors d LEFT JOIN doctor_specialties ds ON ds.doctor_id = d.id AND ds.is_primary" +
+  " LEFT JOIN specialties sp ON sp.id = ds.specialty_id";
+
+/** Only listed doctors: approved and active. The database also forbids active without approved. */
+const LISTED = "d.status = 'active' AND d.kyc_status = 'approved'";
+
+/** The sort orders, as fixed text. A visitor picks a key; nothing they send reaches the SQL. */
+const SORTS: Record<PublicSort, { key: string; type: string; order: string; after: string }> = {
+  name: {
+    key: "lower(d.display_name)",
+    type: "text",
+    order: "lower(d.display_name), d.id",
+    after: ">",
+  },
+  fee_asc: {
+    key: "d.consultation_fee_paise",
+    type: "integer",
+    order: "d.consultation_fee_paise, d.id",
+    after: ">",
+  },
+  fee_desc: {
+    key: "d.consultation_fee_paise",
+    type: "integer",
+    order: "d.consultation_fee_paise DESC, d.id DESC",
+    after: "<",
+  },
+};
+
+function toPublic(row: Record<string, unknown>): PublicDoctorRow {
+  return {
+    id: String(row.id),
+    displayName: String(row.display_name),
+    registrationNo: String(row.registration_no),
+    registrationCouncil: String(row.registration_council),
+    qualifications: String(row.qualifications),
+    languages: (row.languages as string[] | null) ?? [],
+    specialty:
+      row.specialty_id === null || row.specialty_id === undefined
+        ? null
+        : { id: Number(row.specialty_id), name: String(row.specialty_name) },
+    consultationFeePaise: Number(row.consultation_fee_paise),
+    availableToday: row.available_today === true,
+    sortKey: String(row.sort_key ?? ""),
   };
 }
 
@@ -345,5 +433,92 @@ export class DirectoryRepo {
       params,
     );
     return rows.map(toDoctor);
+  }
+
+  // ---- public directory (P4-03) ----
+
+  async listSpecialties(): Promise<SpecialtyView[]> {
+    const { rows } = await this.db.query(
+      "SELECT s.id, s.name, count(d.id)::int AS doctor_count FROM specialties s" +
+        " LEFT JOIN doctor_specialties ds ON ds.specialty_id = s.id AND ds.is_primary" +
+        " LEFT JOIN doctors d ON d.id = ds.doctor_id AND " +
+        LISTED +
+        " GROUP BY s.id, s.name ORDER BY s.name",
+    );
+    return rows.map((r) => ({
+      id: Number(r.id),
+      name: String(r.name),
+      doctorCount: Number(r.doctor_count),
+    }));
+  }
+
+  async findPublic(id: string): Promise<PublicDoctorRow | null> {
+    const { rows } = await this.db.query(
+      "SELECT " + PUBLIC_COLUMNS + PUBLIC_FROM + " WHERE d.id = $1 AND " + LISTED,
+      [id],
+    );
+    return rows[0] ? toPublic(rows[0]) : null;
+  }
+
+  /** One page of listed doctors. Every filter is a bound value; the sort comes from SORTS. */
+  async searchPublic(input: {
+    q?: string;
+    specialtyId?: number;
+    language?: string;
+    feeMin?: number;
+    feeMax?: number;
+    availableToday?: boolean;
+    sort: PublicSort;
+    after?: { key: string; id: string };
+    limit: number;
+  }): Promise<PublicDoctorRow[]> {
+    const sort = SORTS[input.sort];
+    const where: string[] = [LISTED];
+    const params: unknown[] = [];
+    const bind = (value: unknown): string => {
+      params.push(value);
+      return "$" + String(params.length);
+    };
+    // Not LIKE: the text is compared as a plain substring, so % and _ mean nothing.
+    if (input.q) where.push("strpos(lower(d.display_name), lower(" + bind(input.q) + ")) > 0");
+    if (input.specialtyId !== undefined) where.push("sp.id = " + bind(input.specialtyId));
+    if (input.language) where.push("d.languages @> ARRAY[" + bind(input.language) + "]::text[]");
+    if (input.feeMin !== undefined) where.push("d.consultation_fee_paise >= " + bind(input.feeMin));
+    if (input.feeMax !== undefined) where.push("d.consultation_fee_paise <= " + bind(input.feeMax));
+    if (input.availableToday) where.push(AVAILABLE_TODAY_SQL);
+    if (input.after) {
+      const k = bind(input.after.key);
+      const i = bind(input.after.id);
+      where.push(
+        "(" +
+          sort.key +
+          ", d.id) " +
+          sort.after +
+          " (" +
+          k +
+          "::" +
+          sort.type +
+          ", " +
+          i +
+          "::uuid)",
+      );
+    }
+    const limit = bind(input.limit);
+    const { rows } = await this.db.query(
+      "SELECT " +
+        PUBLIC_COLUMNS +
+        ", (" +
+        sort.key +
+        ")::text AS sort_key" +
+        PUBLIC_FROM +
+        " WHERE " +
+        where.join(" AND ") +
+        " ORDER BY " +
+        sort.order +
+        " LIMIT " +
+        limit,
+      params,
+    );
+    return rows.map(toPublic);
   }
 }

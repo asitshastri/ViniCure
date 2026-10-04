@@ -20,3 +20,8 @@ export function getDirectory(): DirectoryService {
   });
   return holder.service;
 }
+
+/** Replaces the service (tests). Pass undefined to reset. */
+export function setDirectoryForTest(service: DirectoryService | undefined): void {
+  holder.service = service;
+}

@@ -4,6 +4,7 @@ import { FakeFileScanner } from "../../lib/adapters/fakes";
 import { uuidv7 } from "../../lib/ids";
 import { StorageService, type ObjectStore } from "../../lib/storage/storage";
 import { DirectoryRepo } from "./repo";
+import { publicDoctorsQuery } from "./schemas";
 import { DirectoryService } from "./service";
 
 // The application and KYC pipeline as the real `app` role on real Postgres (grants, the
@@ -154,5 +155,31 @@ describe.skipIf(!url)("directory on real Postgres as the app role", () => {
       service.decide(admin, saved.id, { decision: "reject", note: "second" }),
     ]);
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+  });
+
+  it("the public search runs with every filter and sort, and pages by cursor", async () => {
+    for (const sort of ["name", "fee_asc", "fee_desc"]) {
+      const first = await service.searchDoctors(
+        publicDoctorsQuery.parse({
+          sort,
+          limit: "1",
+          q: "doc",
+          specialtyId: "31001",
+          language: "english",
+          feeMin: "0",
+          feeMax: "500000",
+          availableToday: "false",
+        }),
+      );
+      expect(first.items.length).toBeLessThanOrEqual(1);
+      if (first.nextCursor) {
+        const next = await service.searchDoctors(
+          publicDoctorsQuery.parse({ sort, limit: "1", cursor: first.nextCursor }),
+        );
+        expect(next.items[0]?.id).not.toBe(first.items[0]?.id);
+      }
+    }
+    await service.searchDoctors(publicDoctorsQuery.parse({ availableToday: "true" }));
+    await service.specialties();
   });
 });

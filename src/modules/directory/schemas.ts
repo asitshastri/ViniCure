@@ -28,6 +28,10 @@ const text = (min: number, max: number) =>
     .max(max)
     .refine((v) => !CONTROL.test(v), "Remove special characters.");
 
+/** One spelling per language ("hindi", "HINDI" and "Hindi" are the same), so filters match. */
+export const normaliseLanguage = (value: string): string =>
+  value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+
 export const applicationBody = z
   .object({
     displayName: text(2, 100).regex(
@@ -40,7 +44,11 @@ export const applicationBody = z
     ),
     registrationCouncil: text(2, 120),
     qualifications: text(2, 300),
-    languages: z.array(text(2, 30)).min(1).max(12),
+    languages: z
+      .array(text(2, 30))
+      .min(1)
+      .max(12)
+      .transform((list) => [...new Set(list.map(normaliseLanguage))]),
     specialtyId: z.number().int().min(1).max(32767),
     consultationFeePaise: z.number().int().min(FEE_MIN_PAISE).max(FEE_MAX_PAISE),
   })
@@ -124,3 +132,46 @@ export type ApplicationView = {
   documents: DocumentView[];
   createdAt: string;
 };
+
+// ---- public directory (P4-03) ----
+
+/** Sort orders a visitor may ask for. Anything else is refused, never put into SQL. */
+export const PUBLIC_SORTS = ["name", "fee_asc", "fee_desc"] as const;
+export type PublicSort = (typeof PUBLIC_SORTS)[number];
+
+const flag = z.enum(["true", "false"]).transform((v) => v === "true");
+
+export const publicDoctorsQuery = z
+  .object({
+    q: text(2, 60).optional(),
+    specialtyId: z.coerce.number().int().min(1).max(32767).optional(),
+    language: text(2, 30).transform(normaliseLanguage).optional(),
+    feeMin: z.coerce.number().int().min(0).max(FEE_MAX_PAISE).optional(),
+    feeMax: z.coerce.number().int().min(0).max(FEE_MAX_PAISE).optional(),
+    availableToday: flag.optional(),
+    sort: z.enum(PUBLIC_SORTS).default("name"),
+    cursor: z.string().min(1).max(300).optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+  })
+  .strict()
+  .refine((v) => v.feeMin === undefined || v.feeMax === undefined || v.feeMin <= v.feeMax, {
+    message: "The lowest fee is above the highest.",
+    path: ["feeMin"],
+  });
+export type PublicDoctorsQuery = z.infer<typeof publicDoctorsQuery>;
+
+/** What a visitor sees. An allow-list: no contact details, no account, no review notes. */
+export type PublicDoctorView = {
+  id: string;
+  displayName: string;
+  registrationNo: string;
+  registrationCouncil: string;
+  qualifications: string;
+  languages: string[];
+  specialty: { id: number; name: string } | null;
+  consultationFeePaise: number;
+  /** Has working hours left today (India time) and is not on leave for the whole day. */
+  availableToday: boolean;
+};
+
+export type SpecialtyView = { id: number; name: string; doctorCount: number };
