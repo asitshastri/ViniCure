@@ -53,7 +53,7 @@
     "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "4.3.3",
-    "@types/node": "24.19.1",
+    "@types/node": "26.6.4",
     "@types/nodemailer": "8.0.2",
     "@types/pdfkit": "0.17.6",
     "@types/pg": "8.23.1",
