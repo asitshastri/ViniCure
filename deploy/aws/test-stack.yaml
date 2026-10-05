@@ -1,0 +1,443 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  ViniCure test deployment in Mumbai (ap-south-1): one small server running the whole site, an
+  encryption key (KMS), private encrypted S3 buckets, daily disk snapshots, a firewall that opens
+  only web ports, a budget alert, and settings in Parameter Store. See
+  docs/runbooks/aws-test-deployment.md. Nothing here is public except ports 80 and 443.
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t3.medium
+    AllowedValues: [t3.small, t3.medium, t3.large]
+    Description: >-
+      t3.medium (4 GB) runs everything including the virus scanner. t3.small (2 GB) is too small for
+      ClamAV unless the scanner is left out.
+  DiskGiB:
+    Type: Number
+    Default: 40
+    MinValue: 30
+    MaxValue: 200
+    Description: Size of the encrypted disk that holds the database, in GiB.
+  BudgetEmail:
+    Type: String
+    AllowedPattern: "[^@\\s]+@[^@\\s]+\\.[^@\\s]+"
+    Description: Where the budget alert is sent.
+  MonthlyBudgetUsd:
+    Type: Number
+    Default: 30
+    MinValue: 5
+    Description: Alert at 80 percent of this much spending in a month.
+  GitHubRepo:
+    Type: String
+    Default: asitshastri/ViniCure
+    Description: The repository to deploy, as owner/name.
+  WebAllowedCidr:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: Who may reach the website (ports 80 and 443). Narrow it to your own address to keep the test site private.
+
+Resources:
+  # ---------------------------------------------------------------------------------------------
+  # Encryption key. The application's data keys are wrapped by it (src/lib/crypto/kms.ts); the key
+  # itself never leaves KMS. Rotated every year by AWS.
+  DataKey:
+    Type: AWS::KMS::Key
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: ViniCure test - wraps the application's data keys
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AccountAdministration
+            Effect: Allow
+            Principal: { AWS: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:root" }
+            Action: "kms:*"
+            Resource: "*"
+  DataKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/vinicure-test
+      TargetKeyId: !Ref DataKey
+
+  # ---------------------------------------------------------------------------------------------
+  # Buckets: private, encrypted, versioned, TLS only. Names carry the account id so they are unique.
+  FilesBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub "vinicure-test-files-${AWS::AccountId}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls: { Rules: [{ ObjectOwnership: BucketOwnerEnforced }] }
+      VersioningConfiguration: { Status: Enabled }
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-versions
+            Status: Enabled
+            NoncurrentVersionExpiration: { NoncurrentDays: 90 }
+          - Id: abort-unfinished-uploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload: { DaysAfterInitiation: 2 }
+  ExportsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub "vinicure-test-exports-${AWS::AccountId}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls: { Rules: [{ ObjectOwnership: BucketOwnerEnforced }] }
+      LifecycleConfiguration:
+        Rules:
+          # Exports are short-lived downloads.
+          - Id: expire-exports
+            Status: Enabled
+            ExpirationInDays: 14
+  RecordingsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub "vinicure-test-recordings-${AWS::AccountId}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls: { Rules: [{ ObjectOwnership: BucketOwnerEnforced }] }
+  BackupBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub "vinicure-test-backups-${AWS::AccountId}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls: { Rules: [{ ObjectOwnership: BucketOwnerEnforced }] }
+      VersioningConfiguration: { Status: Enabled }
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-backups
+            Status: Enabled
+            ExpirationInDays: 35
+            NoncurrentVersionExpiration: { NoncurrentDays: 7 }
+
+  # Every bucket refuses plain HTTP.
+  FilesBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FilesBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: TlsOnly
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource: [!GetAtt FilesBucket.Arn, !Sub "${FilesBucket.Arn}/*"]
+            Condition: { Bool: { "aws:SecureTransport": "false" } }
+  ExportsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ExportsBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: TlsOnly
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource: [!GetAtt ExportsBucket.Arn, !Sub "${ExportsBucket.Arn}/*"]
+            Condition: { Bool: { "aws:SecureTransport": "false" } }
+  RecordingsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref RecordingsBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: TlsOnly
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource: [!GetAtt RecordingsBucket.Arn, !Sub "${RecordingsBucket.Arn}/*"]
+            Condition: { Bool: { "aws:SecureTransport": "false" } }
+  BackupBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BackupBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: TlsOnly
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource: [!GetAtt BackupBucket.Arn, !Sub "${BackupBucket.Arn}/*"]
+            Condition: { Bool: { "aws:SecureTransport": "false" } }
+
+  # ---------------------------------------------------------------------------------------------
+  # What the server may do. No static keys anywhere: the server's role is the only credential.
+  ServerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: "sts:AssumeRole"
+      # Session Manager: a shell without opening any inbound port (no SSH).
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
+      Policies:
+        - PolicyName: vinicure-test-server
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: UnwrapDataKeys
+                Effect: Allow
+                Action: ["kms:Decrypt", "kms:GenerateDataKeyWithoutPlaintext"]
+                Resource: !GetAtt DataKey.Arn
+              - Sid: FilesAndRecordings
+                Effect: Allow
+                Action:
+                  ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:AbortMultipartUpload"]
+                Resource:
+                  - !Sub "${FilesBucket.Arn}/*"
+                  - !Sub "${ExportsBucket.Arn}/*"
+                  - !Sub "${RecordingsBucket.Arn}/*"
+              - Sid: ListBuckets
+                Effect: Allow
+                Action: ["s3:ListBucket", "s3:GetBucketLocation"]
+                Resource:
+                  [!GetAtt FilesBucket.Arn, !GetAtt ExportsBucket.Arn, !GetAtt RecordingsBucket.Arn]
+              - Sid: Backups
+                Effect: Allow
+                Action: ["s3:PutObject", "s3:GetObject", "s3:ListBucket"]
+                Resource: [!GetAtt BackupBucket.Arn, !Sub "${BackupBucket.Arn}/*"]
+              - Sid: Settings
+                Effect: Allow
+                Action:
+                  [
+                    "ssm:GetParameter",
+                    "ssm:GetParameters",
+                    "ssm:GetParametersByPath",
+                    "ssm:PutParameter",
+                  ]
+                Resource: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/vinicure/test*"
+  ServerProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref ServerRole]
+
+  # ---------------------------------------------------------------------------------------------
+  # Firewall: web ports only, and nothing for SSH (use Session Manager).
+  ServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ViniCure test server - web only
+      SecurityGroupIngress:
+        - {
+            IpProtocol: tcp,
+            FromPort: 80,
+            ToPort: 80,
+            CidrIp: !Ref WebAllowedCidr,
+            Description: web,
+          }
+        - {
+            IpProtocol: tcp,
+            FromPort: 443,
+            ToPort: 443,
+            CidrIp: !Ref WebAllowedCidr,
+            Description: web over HTTPS,
+          }
+
+  # ---------------------------------------------------------------------------------------------
+  # The server. Ubuntu 24.04. The first start installs Docker and the tools; the site itself is
+  # deployed afterwards by deploy/scripts/deploy.sh (see the runbook).
+  Server:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: "{{resolve:ssm:/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id}}"
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref ServerProfile
+      SecurityGroupIds: [!Ref ServerSecurityGroup]
+      # IMDSv2 only; hop limit 2 lets the containers use the server's role (a test-only compromise,
+      # see the runbook: the launch setup gives each service its own role).
+      MetadataOptions:
+        HttpTokens: required
+        HttpPutResponseHopLimit: 2
+        HttpEndpoint: enabled
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: !Ref DiskGiB
+            VolumeType: gp3
+            Encrypted: true
+            DeleteOnTermination: false
+      Tags:
+        - { Key: Name, Value: vinicure-test }
+        - { Key: Backup, Value: vinicure-test }
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          # First start only: tools and folders. No secrets here.
+          set -euxo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y ca-certificates curl gnupg git jq unzip unattended-upgrades cron
+          # Docker from Docker's own repository.
+          install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+          chmod a+r /etc/apt/keyrings/docker.asc
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" > /etc/apt/sources.list.d/docker.list
+          apt-get update
+          apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+          systemctl enable --now docker
+          # AWS command line (used by the deploy and backup scripts, with the server's role).
+          curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscli.zip
+          unzip -q /tmp/awscli.zip -d /tmp && /tmp/aws/install && rm -rf /tmp/aws /tmp/awscli.zip
+          # A little swap: the image build for the website needs more memory than a small server has.
+          if [ ! -f /swapfile ]; then fallocate -l 3G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab; fi
+          mkdir -p /opt/vinicure/data/postgres
+          chmod 700 /opt/vinicure
+          # The first-time download of the code. The GitHub token is read from Parameter Store, used
+          # for this one command, and never written to disk.
+          cat > /opt/vinicure/clone.sh <<'CLONE'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          REGION="$(curl -fsS -H "X-aws-ec2-metadata-token: $(curl -fsS -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')" http://169.254.169.254/latest/meta-data/placement/region)"
+          export AWS_DEFAULT_REGION="$REGION"
+          REPO="$(aws ssm get-parameter --name /vinicure/test/GITHUB_REPO --query Parameter.Value --output text)"
+          TOKEN="$(aws ssm get-parameter --name /vinicure/test/GITHUB_TOKEN --with-decryption --query Parameter.Value --output text)"
+          AUTH="$(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)"
+          [ -d /opt/vinicure/app/.git ] && { echo "the code is already there"; exit 0; }
+          git -c "http.extraHeader=Authorization: Basic $AUTH" clone "https://github.com/$REPO.git" /opt/vinicure/app
+          echo "cloned. Next: sudo bash /opt/vinicure/app/deploy/scripts/deploy.sh"
+          CLONE
+          chmod 700 /opt/vinicure/clone.sh
+          touch /opt/vinicure/.bootstrap-done
+
+  ServerAddress:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref Server
+
+  # Daily snapshots of the server's disk, kept 7 days (the database lives on it).
+  SnapshotRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: dlm.amazonaws.com }
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole"
+  SnapshotPolicy:
+    Type: AWS::DLM::LifecyclePolicy
+    Properties:
+      Description: ViniCure test - daily disk snapshots
+      State: ENABLED
+      ExecutionRoleArn: !GetAtt SnapshotRole.Arn
+      PolicyDetails:
+        ResourceTypes: [INSTANCE]
+        TargetTags: [{ Key: Backup, Value: vinicure-test }]
+        Schedules:
+          - Name: daily
+            CreateRule: { Interval: 24, IntervalUnit: HOURS, Times: ["20:30"] }
+            RetainRule: { Count: 7 }
+            CopyTags: true
+
+  # ---------------------------------------------------------------------------------------------
+  # Settings the server reads (the rest are added by hand, see the runbook). Names are the
+  # environment variable names. Secrets are added as SecureString by hand, never in this file.
+  SettingKmsKey:
+    Type: AWS::SSM::Parameter
+    Properties: { Name: /vinicure/test/KMS_KEY_ID, Type: String, Value: alias/vinicure-test }
+  SettingRegion:
+    Type: AWS::SSM::Parameter
+    Properties: { Name: /vinicure/test/S3_REGION, Type: String, Value: !Ref "AWS::Region" }
+  SettingFilesBucket:
+    Type: AWS::SSM::Parameter
+    Properties: { Name: /vinicure/test/S3_BUCKET_FILES, Type: String, Value: !Ref FilesBucket }
+  SettingExportsBucket:
+    Type: AWS::SSM::Parameter
+    Properties: { Name: /vinicure/test/S3_BUCKET_EXPORTS, Type: String, Value: !Ref ExportsBucket }
+  SettingRecordingsBucket:
+    Type: AWS::SSM::Parameter
+    Properties:
+      { Name: /vinicure/test/S3_BUCKET_RECORDINGS, Type: String, Value: !Ref RecordingsBucket }
+  SettingBackupBucket:
+    Type: AWS::SSM::Parameter
+    Properties: { Name: /vinicure/test/BACKUP_BUCKET, Type: String, Value: !Ref BackupBucket }
+  SettingRepo:
+    Type: AWS::SSM::Parameter
+    Properties: { Name: /vinicure/test/GITHUB_REPO, Type: String, Value: !Ref GitHubRepo }
+
+  # ---------------------------------------------------------------------------------------------
+  Budget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: vinicure-test-monthly
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit: { Amount: !Ref MonthlyBudgetUsd, Unit: USD }
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref BudgetEmail }]
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref BudgetEmail }]
+
+Outputs:
+  InstanceId:
+    Value: !Ref Server
+    Description: Open a shell with Session Manager (the AWS console, EC2, Connect, Session Manager).
+  PublicIp:
+    Value: !Ref ServerAddress
+    Description: The server's fixed address.
+  KmsKeyAlias:
+    Value: alias/vinicure-test
+  FilesBucketName:
+    Value: !Ref FilesBucket
+  BackupBucketName:
+    Value: !Ref BackupBucket
+  StartShell:
+    Value: !Sub "aws ssm start-session --target ${Server} --region ${AWS::Region}"

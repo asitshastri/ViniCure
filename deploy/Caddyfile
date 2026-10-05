@@ -1,0 +1,30 @@
+# The front door of the test server. SITE_ADDRESS is ":80" (plain HTTP, for use behind a CDN that
+# gives HTTPS) or a domain name such as "vinicure.com" (Caddy then gets and renews its own HTTPS
+# certificate). The app sets its own security headers (CSP and more); Caddy only adds the
+# transport ones and hides what it is.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+	}
+
+	# Large uploads go straight to S3 with a signed link, so the app never needs a big body.
+	request_body {
+		max_size 2MB
+	}
+
+	reverse_proxy web:3000 {
+		# The app counts proxy hops to find the real client address (TRUSTED_PROXY_HOPS).
+		header_up X-Forwarded-For {remote_host}
+		health_uri /api/health
+		health_interval 15s
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

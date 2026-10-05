@@ -55,9 +55,10 @@ export class LocalKeyProvider implements KeyProvider {
   }
 }
 
-/** The part of the AWS KMS client the provider needs. The real client is wired in P3. */
+/** The part of the AWS KMS client the provider needs (the real one is in kms.ts). */
 export interface KmsClient {
-  decrypt(wrapped: Buffer): Promise<Buffer>;
+  /** Unwraps a data key. The key id is part of what KMS checks, so a key cannot be used under another id. */
+  decrypt(wrapped: Buffer, keyId: string): Promise<Buffer>;
 }
 
 /**
@@ -84,7 +85,7 @@ export class KmsKeyProvider implements KeyProvider {
     if (cached) return cached;
     const wrapped = this.wrappedKeys.get(keyId);
     if (!wrapped) throw new Error("unknown key id");
-    const key = await this.client.decrypt(wrapped);
+    const key = await this.client.decrypt(wrapped, keyId);
     if (key.length !== 32) throw new Error("data key must be 32 bytes");
     this.cache.set(keyId, key);
     return key;

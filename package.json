@@ -16,15 +16,18 @@
     "e2e": "playwright test",
     "db:seed": "esbuild db/seed.mts --bundle --platform=node --format=esm --packages=external --outfile=dist/seed.mjs && node --env-file-if-exists=.env.local dist/seed.mjs",
     "dev:code": "esbuild scripts/dev-code.mts --bundle --platform=node --format=esm --packages=external --outfile=dist/dev-code.mjs && node --env-file-if-exists=.env.local dist/dev-code.mjs",
+    "kms:new-key": "esbuild scripts/kms-new-key.mts --bundle --platform=node --format=esm --packages=external --outfile=dist/kms-new-key.mjs && node --env-file-if-exists=.env.local dist/kms-new-key.mjs",
     "db:migrate": "pnpm build:migrate && node --env-file-if-exists=.env.local dist/migrate.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "build:worker": "esbuild worker/main.mts --bundle --platform=node --format=esm --packages=external --outfile=dist/worker.mjs",
     "worker": "pnpm build:worker && node --env-file-if-exists=.env.local dist/worker.mjs",
+    "build:first-admin": "esbuild scripts/first-admin.mts --bundle --platform=node --format=esm --packages=external --outfile=dist/first-admin.mjs",
     "build:migrate": "esbuild db/migrate.mts --bundle --platform=node --format=esm --packages=external --outfile=dist/migrate.mjs",
     "prepare": "husky || true"
   },
   "dependencies": {
+    "@aws-sdk/client-kms": "3.1144.0",
     "@aws-sdk/client-s3": "3.1144.0",
     "@aws-sdk/s3-request-presigner": "3.1144.0",
     "@phosphor-icons/react": "2.1.10",

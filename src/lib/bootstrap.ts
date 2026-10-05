@@ -3,7 +3,8 @@ import { AuditService, MemoryAuditStore } from "./audit/audit";
 import { PgAuditStore } from "./audit/repo";
 import { configureCache, createCache } from "./cache";
 import { getConfig } from "./config/config";
-import { Crypto, LocalKeyProvider, configureCrypto } from "./crypto/crypto";
+import { configureCrypto } from "./crypto/crypto";
+import { cryptoFromConfig } from "./crypto/from-config";
 import { configureDatabase, queryable } from "./db/pool";
 import { MemoryDurableStore, createIdempotency } from "./idempotency/idempotency";
 import { PgDurableStore } from "./idempotency/repo";
@@ -38,12 +39,11 @@ export function bootstrap(): void {
     trustedOrigins: [new URL(config.APP_URL).origin, ...config.AUTH_TRUSTED_ORIGINS],
   });
 
-  let crypto: Crypto | undefined;
-  if (config.CRYPTO_PROVIDER === "local" && config.LOCAL_DEV_KEY) {
-    crypto = new Crypto(new LocalKeyProvider(config.LOCAL_DEV_KEY));
+  const crypto = cryptoFromConfig(config);
+  if (crypto) {
     configureCrypto(crypto);
   } else if (config.CRYPTO_PROVIDER === "kms") {
-    // The KMS client and wrapped keys arrive with the AWS setup (P3-06).
+    // Production configuration refuses this, so it is reached only in development.
     logger.warn({ event: "crypto_not_configured", provider: "kms" });
   }
 

@@ -1,4 +1,6 @@
 import { loadConfig } from "../src/lib/config/config";
+import { configureCrypto } from "../src/lib/crypto/crypto";
+import { cryptoFromConfig } from "../src/lib/crypto/from-config";
 import { configureDatabase } from "../src/lib/db/pool";
 import { logger } from "../src/lib/logging/logger";
 import { createBoss } from "../src/lib/queue/queue";
@@ -13,6 +15,10 @@ if (!config.DATABASE_URL) {
   logger.error({ event: "worker_config", problem: "DATABASE_URL is required" });
   process.exit(1);
 }
+
+// The same encryption as the web server, for jobs that read or write encrypted fields.
+const crypto = cryptoFromConfig(config);
+if (crypto) configureCrypto(crypto);
 
 // One process-wide pool: the health check, the job handlers and shutdown all use it.
 const database = configureDatabase(config, "vinicure-worker");

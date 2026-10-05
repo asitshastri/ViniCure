@@ -11,6 +11,8 @@ const prodEnv = {
   AUTH_SECRET: "x".repeat(40),
   CRYPTO_PROVIDER: "kms",
   KMS_KEY_ID: "alias/vinicure",
+  KMS_WRAPPED_KEYS: `k1=${"A".repeat(80)}`,
+  KMS_CURRENT_KEY_ID: "k1",
   S3_BUCKET_FILES: "files",
   S3_BUCKET_EXPORTS: "exports",
   S3_REGION: "ap-south-1",
@@ -37,6 +39,8 @@ describe("loadConfig", () => {
     "S3_BUCKET_EXPORTS",
     "S3_REGION",
     "KMS_KEY_ID",
+    "KMS_WRAPPED_KEYS",
+    "KMS_CURRENT_KEY_ID",
   ])("production refuses to boot without %s", (name) => {
     const env: Record<string, string | undefined> = { ...prodEnv };
     delete env[name];

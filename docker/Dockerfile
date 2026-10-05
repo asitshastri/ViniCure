@@ -18,7 +18,7 @@ RUN pnpm install --frozen-lockfile
 
 FROM deps AS build
 COPY . .
-RUN pnpm build && pnpm build:worker && pnpm build:migrate
+RUN pnpm build && pnpm build:worker && pnpm build:migrate && pnpm build:first-admin
 
 # Production dependencies only, for the worker.
 FROM base AS prod-deps
@@ -42,6 +42,8 @@ ENV NODE_ENV=production WORKER_HEALTH_PORT=3001
 WORKDIR /app
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist/worker.mjs ./worker.mjs
+# One-time tool for a new site: node first-admin.mjs you@example.com (see docs/runbooks/aws-test-deployment.md)
+COPY --from=build --chown=node:node /app/dist/first-admin.mjs ./first-admin.mjs
 COPY --chown=node:node package.json ./
 USER node
 EXPOSE 3001

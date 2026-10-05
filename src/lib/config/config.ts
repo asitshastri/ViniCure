@@ -54,6 +54,12 @@ const schema = z.object({
   // Crypto
   CRYPTO_PROVIDER: z.enum(["local", "kms"]).default("local"),
   KMS_KEY_ID: optionalString,
+  /** The data keys, wrapped by KMS: "k1=BASE64,k2=BASE64". Made by `pnpm kms:new-key`. Useless without KMS access. */
+  KMS_WRAPPED_KEYS: optionalString,
+  /** Which of the wrapped keys encrypts new values. Older ids keep decrypting. */
+  KMS_CURRENT_KEY_ID: optionalString,
+  /** Defaults to S3_REGION. */
+  KMS_REGION: optionalString,
   LOCAL_DEV_KEY: optionalString,
 
   // Storage
@@ -162,8 +168,10 @@ function productionProblems(config: z.output<typeof schema>): string[] {
     problems.push("APP_ENV must be staging or production in production");
   if (!config.APP_URL.startsWith("https://")) problems.push("APP_URL must use https in production");
   if (config.CRYPTO_PROVIDER !== "kms") problems.push("CRYPTO_PROVIDER must be kms in production");
-  if (config.CRYPTO_PROVIDER === "kms" && !config.KMS_KEY_ID) {
-    problems.push("KMS_KEY_ID is required when CRYPTO_PROVIDER is kms");
+  if (config.CRYPTO_PROVIDER === "kms") {
+    for (const name of ["KMS_KEY_ID", "KMS_WRAPPED_KEYS", "KMS_CURRENT_KEY_ID"] as const) {
+      if (!config[name]) problems.push(`${name} is required when CRYPTO_PROVIDER is kms`);
+    }
   }
   if (config.UI_MOCK_SESSION) problems.push("UI_MOCK_SESSION must not be set in production");
   if (config.LOCAL_DEV_KEY) problems.push("LOCAL_DEV_KEY must not be set in production");

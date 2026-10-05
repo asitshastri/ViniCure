@@ -1,0 +1,146 @@
+# The whole site on ONE server (the test deployment, see docs/runbooks/aws-test-deployment.md).
+# It is the production build of the app with the real settings: nothing here is a fake.
+#
+#   cd /opt/vinicure/app && sudo ./deploy/scripts/deploy.sh      (builds, migrates, starts)
+#
+# Only Caddy is reachable from outside (ports 80 and 443). The database, cache and virus scanner
+# publish no ports. Settings come from two files that deploy.sh builds from AWS Parameter Store,
+# both readable by root only:
+#   /opt/vinicure/app.env      what the website and worker read (the app's database password, never
+#                              the migrator's or the database administrator's)
+#   /opt/vinicure/compose.env  passwords used only to start the containers (--env-file)
+name: vinicure
+
+x-app: &app
+  env_file: /opt/vinicure/app.env
+  restart: unless-stopped
+  # A container that crashes in a loop must not fill the disk with logs.
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
+  networks: [internal]
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      # ":80" until a domain exists (a CDN in front gives HTTPS), or "vinicure.com" for automatic HTTPS.
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [web]
+    networks: [internal, public]
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+  web:
+    <<: *app
+    build: { context: .., dockerfile: docker/Dockerfile, target: web }
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      valkey: { condition: service_healthy }
+
+  worker:
+    <<: *app
+    build: { context: .., dockerfile: docker/Dockerfile, target: worker }
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      valkey: { condition: service_healthy }
+
+  # One-off: applies migrations as the migrator role and creates the job queues, then exits. It gets
+  # only the migrator login, and the website never does.
+  migrate:
+    restart: "no"
+    build: { context: .., dockerfile: docker/Dockerfile, target: migrate }
+    environment:
+      DATABASE_MIGRATION_URL: postgres://migrator:${MIGRATOR_DB_PASSWORD:?set in compose.env}@postgres:5432/vinicure
+    networks: [internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: vinicure
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in /opt/vinicure/compose.env}
+      # Read by deploy/postgres-init/01-roles.sh, once, when the data folder is first made.
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?set in /opt/vinicure/compose.env}
+      MIGRATOR_DB_PASSWORD: ${MIGRATOR_DB_PASSWORD:?set in /opt/vinicure/compose.env}
+    volumes:
+      # On the server's encrypted disk (EBS), not in a Docker-managed volume, so a snapshot of the
+      # disk is a backup of the database.
+      - /opt/vinicure/data/postgres:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    # Reachable only from the other containers: no published ports.
+    expose: ["5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d vinicure"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    # Small server: keep memory modest and log slow queries (over half a second).
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - max_connections=60
+      - -c
+      - log_min_duration_statement=500
+      - -c
+      - password_encryption=scram-sha-256
+    networks: [internal]
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    # Rate limits and short-lived state only: never patient data. Password required.
+    command:
+      [
+        "sh",
+        "-c",
+        'exec valkey-server --requirepass "$$VALKEY_PASSWORD" --save '''' --appendonly no',
+      ]
+    environment:
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD:?set in /opt/vinicure/compose.env}
+    expose: ["6379"]
+    healthcheck:
+      test: ["CMD-SHELL", 'valkey-cli -a "$$VALKEY_PASSWORD" --no-auth-warning ping | grep PONG']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [internal]
+
+  clamav:
+    image: clamav/clamav:stable
+    restart: unless-stopped
+    expose: ["3310"]
+    volumes: [clamav_db:/var/lib/clamav]
+    # The first start downloads virus signatures and takes a few minutes.
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      start_period: 180s
+    networks: [internal]
+
+networks:
+  internal:
+    internal: false # the containers still need to reach AWS (KMS, S3), SMS and email providers
+  public: {}
+
+volumes:
+  caddy_data:
+  caddy_config:
+  clamav_db:
