@@ -227,6 +227,16 @@ Decided by the human on 2026-10-05 (D-022): build a fast, production-grade site 
 | Final logo file | Needs you | Temporary derived logo |
 | Licence for the repository | Questions, P0-01 | README says not chosen |
 
+**Real SMS before you have a business entity (human decision 2026-10-05: do it later)**
+
+| Option | Cost | Notes (vendor claims, not verified by me) |
+|---|---|---|
+| Test-numbers mode: a short list of your own and testers' numbers get a fixed code on the test site | Free | To build. Switched off in production. Nothing is sent. |
+| Google sign-in for patients | Free | Already built (P2-17). Works on any site with the Google keys. |
+| A shared-route OTP provider (Fast2SMS gives ₹50 of free credit; Message Central VerifyNow and others advertise "no DLT needed") | Small cost per SMS after the free credit | They send under their own registered sender and templates, so you need no entity of your own. The message carries their wording or sender, delivery can be uneven, and patients' numbers pass through a reseller. For testing only. Pick one, read its API, then build the adapter. Never use a route that skips DLT outright: that is blocked or illegal. |
+| Firebase phone sign-in | About $0.07 (₹6) per SMS in India, Blaze plan required | Rejected: too costly and a new login system. |
+| MSG91 with your own DLT registration (entity ID, sender name, OTP template) | Low per-SMS cost | The launch choice. Needs a registered business with PAN and GSTIN or similar. Ask MSG91 support what they accept for a business that is not registered yet. |
+
 **Accounts and services (when you are ready to go live)**
 
 | What | Needed for |
