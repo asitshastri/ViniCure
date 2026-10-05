@@ -241,6 +241,7 @@ Decided by the human on 2026-10-05 (D-022): build a fast, production-grade site 
 
 | What | Needed for |
 |---|---|
+| A domain name (Hostinger or similar; buy the domain alone, no hosting or email add-ons, check the 3-year total and renewal price) and an AWS account with a budget alert | The online test site and launch on AWS Mumbai (D-023) |
 | Razorpay test keys, then live approval | P5-02 live sandbox runs, real payments |
 | SMS provider and DLT registration; Meta business verification and WhatsApp | P8: real OTP and reminders (locally the code is read from the database) |
 | AWS account and domain; Sentry | P3 cloud staging, P1-18 error tracking |
@@ -548,6 +549,8 @@ Things Claude Code cannot do for you. Fill the owner and date.
 | 2026-10-04 | D-021 | Sessions are never renewed: patients stay signed in 14 days from sign-in, staff 8 hours from sign-in | Better Auth renews every session by one global lifetime, which would stretch a staff session to 14 days (found by a failing test). Fixed lifetimes are simpler and safer. Extra idle risk is handled by the phone recycling step-up (D-019). |
 
 | 2026-10-05 | D-022 | **Priorities set by the human.** (1) Video media encryption is not needed for the first release; calls keep the provider's default protection (TLS in transit, nothing stored). The strong protection goes to patient **records**: prescriptions, medical history, vitals and conditions, uploaded scans, X-rays, MRIs and reports. (2) The Agora free tier is used; the human adds the keys. (3) Legal text, policy answers, Q&A content and similar are added later and tracked in "Later" below. (4) The aim is a fast, production-grade Indian telemedicine site, tested with an admin, demo doctors and demo patients. More video security can be added later as the product grows | Human decision. Keeps the work on what protects patients most and on a site that works end to end. The P6-12 encryption task and the video items move to "Later". |
+
+| 2026-10-05 | D-023 | **Testing stays on the human's own computer for now** (a private Docker server: the databases, cache, file storage and virus scanner in Docker, the site and worker beside them; `start-local.cmd`, `stop-local.cmd`, `codes.cmd`). No domain, hosting or AWS account is bought yet. A dummy-data "staging" mode for the production build was tried and dropped at the human's request. | Domain and hosting cost money before the product is ready. The move to AWS Mumbai (KMS keys, real SMS and email, SES, captcha, payment keys, a domain) stays a required launch task, listed in "Later". |
 
 ## Progress log
 
