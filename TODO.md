@@ -239,6 +239,17 @@ Decided by the human on 2026-10-05 (D-022): build a fast, production-grade site 
 | Firebase phone sign-in | About $0.07 (₹6) per SMS in India, Blaze plan required | Rejected: too costly and a new login system. |
 | MSG91 with your own DLT registration (entity ID, sender name, OTP template) | Low per-SMS cost | The launch choice. Needs a registered business with PAN and GSTIN or similar. Ask MSG91 support what they accept for a business that is not registered yet. |
 
+**SMS provider prices (supplied by the human 2026-10-05, not verified by me)**
+
+| Provider | Entry price per SMS | Lowest price at scale | Model |
+|---|---|---|---|
+| Fast2SMS | ₹0.25 | ₹0.11 | Small wallet top-ups |
+| 2Factor | ₹0.165 | ₹0.165 | Pay per delivered SMS only |
+| SMSGatewayHub | ₹0.245 | ₹0.10 | 10,000 starter pack |
+| MSG91 | ₹0.25 | ₹0.18 | 5,000 minimum tier |
+
+Every one of them still needs a DLT-registered sender and template (the pasted note was cut off at the TRAI rule). The difference between providers is a few paise, so MSG91 stays first because the adapter is built and ViniCare already had it set up. Another provider is a new adapter (a day's work) if volume ever makes the price matter. At 5,000 OTPs a month the cost is about ₹825 to ₹1,250.
+
 **Accounts and services (when you are ready to go live)**
 
 | What | Needed for |
