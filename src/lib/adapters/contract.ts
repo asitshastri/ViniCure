@@ -267,8 +267,8 @@ export function emailContract(make: () => EmailProvider) {
     it("sends a template and returns a provider id", async () => {
       const { providerId } = await make().send({
         to: "doc@example.com",
-        templateKey: "invite",
-        variables: {},
+        templateKey: "staff_invitation",
+        variables: { link: "https://vinicure.example/invite/abc", role: "doctor", hours: "72" },
       });
       expect(providerId).toBeTruthy();
     });

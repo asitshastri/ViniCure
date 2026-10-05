@@ -68,3 +68,51 @@ describe("getVideoProvider", () => {
     expect(getVideoProvider().constructor.name).toBe("AgoraProvider");
   });
 });
+
+describe("getSmsProvider and getEmailProvider", () => {
+  it("use MSG91 and SMTP when they are configured, in development and in production", async () => {
+    for (const NODE_ENV of ["development", "production"]) {
+      const real = await registryWith({
+        NODE_ENV,
+        MSG91_AUTH_KEY: "key",
+        MSG91_TEMPLATE_OTP: "tpl",
+        SMTP_HOST: "smtp.test",
+        SMTP_PORT: 465,
+        SMTP_SECURE: true,
+        SMTP_USER: "u",
+        SMTP_PASSWORD: "p",
+        EMAIL_FROM: "ViniCure <no-reply@vinicure.example>",
+      });
+      expect(real.getSmsProvider().constructor.name, NODE_ENV).toBe("Msg91SmsProvider");
+      expect(real.getEmailProvider().constructor.name, NODE_ENV).toBe("SmtpEmailProvider");
+    }
+  });
+
+  it("need the OTP template as well as the key, and the from address as well as the host; production refuses the fakes", async () => {
+    const half = await registryWith({
+      NODE_ENV: "production",
+      MSG91_AUTH_KEY: "key",
+      SMTP_HOST: "smtp.test",
+    });
+    expect(() => half.getSmsProvider()).toThrow(/No real SMS/);
+    expect(() => half.getEmailProvider()).toThrow(/No real email/);
+    const dev = await registryWith({
+      NODE_ENV: "development",
+      APP_ENV: "staging",
+      MSG91_AUTH_KEY: "key",
+    });
+    expect(dev.getSmsProvider().constructor.name).toBe("FakeSmsProvider");
+  });
+
+  it("show the code in the terminal only on a local computer without MSG91", async () => {
+    const local = await registryWith({ NODE_ENV: "development", APP_ENV: "local" });
+    expect(local.getSmsProvider().constructor.name).toBe("DevConsoleSms");
+    const real = await registryWith({
+      NODE_ENV: "development",
+      APP_ENV: "local",
+      MSG91_AUTH_KEY: "key",
+      MSG91_TEMPLATE_OTP: "tpl",
+    });
+    expect(real.getSmsProvider().constructor.name).toBe("Msg91SmsProvider");
+  });
+});

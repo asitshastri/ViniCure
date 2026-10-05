@@ -128,3 +128,17 @@ describe("feature flags", () => {
     expect(isEnabled("recording", loadConfig({ S3_BUCKET_RECORDINGS: "recordings" }))).toBe(false);
   });
 });
+
+describe("email and SMS settings", () => {
+  it("SMTP needs a from address, and a user and password go together", () => {
+    expect(() => loadConfig({ SMTP_HOST: "smtp.test" })).toThrow(/EMAIL_FROM/);
+    expect(
+      loadConfig({ SMTP_HOST: "localhost", SMTP_PORT: "1025", EMAIL_FROM: "a@b.cd" }).SMTP_PORT,
+    ).toBe(1025);
+    expect(() => loadConfig({ SMTP_USER: "u" })).toThrow(/together/);
+    expect(() => loadConfig({ SMTP_PASSWORD: "p" })).toThrow(/together/);
+    expect(() => loadConfig({ SMTP_PORT: "70000" })).toThrow(/SMTP_PORT/);
+    expect(loadConfig({ SMTP_SECURE: "true" }).SMTP_SECURE).toBe(true);
+    expect(loadConfig({}).SMTP_SECURE).toBeUndefined();
+  });
+});

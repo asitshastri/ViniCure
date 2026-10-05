@@ -3,6 +3,8 @@ import { globalSingleton } from "../singleton";
 import { getStorage } from "../storage";
 import { ClamAvScanner } from "./clamav";
 import { DevConsoleSms } from "./dev-sms";
+import { Msg91SmsProvider } from "./msg91";
+import { SmtpEmailProvider } from "./smtp-email";
 import { AgoraProvider } from "./agora";
 import {
   FakeEmailProvider,
@@ -38,8 +40,26 @@ function refuseFakeInProduction(what: string): void {
   }
 }
 
+/**
+ * MSG91 when its key and the OTP template id are set (a real SMS goes out, to real numbers); a fake
+ * otherwise, outside production only. A send is never repeated by the wrapper: a repeat is a
+ * second SMS to the patient.
+ */
 export function getSmsProvider(): SmsProvider {
   if (holder.sms) return holder.sms;
+  const config = getConfig();
+  if (config.MSG91_AUTH_KEY && config.MSG91_TEMPLATE_OTP) {
+    holder.sms = protect(
+      new Msg91SmsProvider({
+        authKey: config.MSG91_AUTH_KEY,
+        templates: { otp: config.MSG91_TEMPLATE_OTP },
+        ...(config.MSG91_SENDER_ID ? { senderId: config.MSG91_SENDER_ID } : {}),
+      }),
+      { provider: "msg91" },
+      { sendTemplate: { timeoutMs: 10_000 } },
+    );
+    return holder.sms;
+  }
   refuseFakeInProduction("SMS");
   holder.sms = new FakeSmsProvider();
   // On a developer machine only, show the message in the server terminal so a person can sign in
@@ -50,8 +70,24 @@ export function getSmsProvider(): SmsProvider {
   return holder.sms;
 }
 
+/** SMTP when SMTP_HOST and EMAIL_FROM are set (Mailpit, Gmail, SES...); a fake otherwise, outside production only. */
 export function getEmailProvider(): EmailProvider {
   if (holder.email) return holder.email;
+  const config = getConfig();
+  if (config.SMTP_HOST && config.EMAIL_FROM) {
+    holder.email = protect(
+      new SmtpEmailProvider({
+        host: config.SMTP_HOST,
+        port: config.SMTP_PORT ?? 587,
+        ...(config.SMTP_SECURE !== undefined ? { secure: config.SMTP_SECURE } : {}),
+        ...(config.SMTP_USER ? { user: config.SMTP_USER, password: config.SMTP_PASSWORD } : {}),
+        from: config.EMAIL_FROM,
+      }),
+      { provider: "smtp" },
+      { send: { timeoutMs: 20_000 } },
+    );
+    return holder.email;
+  }
   refuseFakeInProduction("email");
   holder.email = new FakeEmailProvider();
   return holder.email;

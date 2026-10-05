@@ -88,10 +88,19 @@ const schema = z.object({
   PLATFORM_FEE_BPS: z.coerce.number().int().min(0).max(10_000).default(0),
   MSG91_AUTH_KEY: optionalString,
   MSG91_SENDER_ID: optionalString,
+  /** The template id of the OTP message, made in the MSG91 dashboard (registered on DLT). */
+  MSG91_TEMPLATE_OTP: optionalString,
   WHATSAPP_TOKEN: optionalString,
   WHATSAPP_PHONE_NUMBER_ID: optionalString,
   SES_REGION: optionalString,
   EMAIL_FROM: optionalString,
+  // Email over SMTP: Mailpit on this computer (localhost, 1025), Gmail (smtp.gmail.com, 465, an app
+  // password), or the SES SMTP endpoint later. EMAIL_FROM is then needed too.
+  SMTP_HOST: optionalString,
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+  SMTP_SECURE: strictBool.optional(),
+  SMTP_USER: optionalString,
+  SMTP_PASSWORD: optionalString,
   CLAMAV_HOST: optionalString,
   CLAMAV_PORT: z.coerce.number().int().min(1).max(65535).optional(),
   HCAPTCHA_SITE_KEY: optionalString,
@@ -181,6 +190,12 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
   const config = parsed.data;
   if (Boolean(config.GOOGLE_CLIENT_ID) !== Boolean(config.GOOGLE_CLIENT_SECRET)) {
     throw new ConfigError(["GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set together"]);
+  }
+  if (config.SMTP_HOST && !config.EMAIL_FROM) {
+    throw new ConfigError(["EMAIL_FROM is required when SMTP_HOST is set"]);
+  }
+  if (Boolean(config.SMTP_USER) !== Boolean(config.SMTP_PASSWORD)) {
+    throw new ConfigError(["SMTP_USER and SMTP_PASSWORD must be set together"]);
   }
   if (config.FEATURE_RECORDING) {
     const problems: string[] = [];
